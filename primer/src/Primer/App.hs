@@ -5,6 +5,7 @@
 -- This module defines the high level application functions.
 
 module Primer.App (
+  focusNodeImports, focusNode, focusNodeDefs, -- these three for temporary testing
   Log (..),
   defaultLog,
   App,
@@ -91,7 +92,7 @@ import Optics (
   _Right,
  )
 import Primer.Action (
-  Action,
+  Action (..),
   ActionError (..),
   ProgAction (..),
   applyActionsToBody,
@@ -477,10 +478,10 @@ focusNode :: MonadError ProgError m => Prog -> GVarName -> ID -> m (Either (Eith
 focusNode prog = focusNodeDefs $ foldMap moduleDefsQualified $ progModules prog
 
 -- This looks in the editable modules and also in any imports
-focusNodeImports :: MonadError ProgError m => Prog -> GVarName -> ID -> m (Either (Either ExprZ TypeZ) TypeZip)
+focusNodeImports :: (HasCallStack, MonadError ProgError m) => Prog -> GVarName -> ID -> m (Either (Either ExprZ TypeZ) TypeZip)
 focusNodeImports prog = focusNodeDefs $ allDefs prog
 
-focusNodeDefs :: MonadError ProgError m => DefMap -> GVarName -> ID -> m (Either (Either ExprZ TypeZ) TypeZip)
+focusNodeDefs :: (HasCallStack, MonadError ProgError m) => DefMap -> GVarName -> ID -> m (Either (Either ExprZ TypeZ) TypeZip)
 focusNodeDefs defs defname nodeid =
   case lookupASTDef defname defs of
     Nothing -> throwError $ DefNotFound defname
@@ -488,7 +489,8 @@ focusNodeDefs defs defname nodeid =
       let mzE = locToEither <$> focusOn nodeid (astDefExpr def)
           mzT = focusOnTy nodeid $ astDefType def
        in case fmap Left mzE <|> fmap Right mzT of
-            Nothing -> throwError $ ActionError (IDNotFound nodeid)
+--            Nothing -> throwError $ ActionError (IDNotFound nodeid)
+            Nothing -> throwError $ ActionError $ CustomFailure NoOp $ toS $ prettyCallStack callStack
             Just x -> pure x
 
 -- | Handle a request to retrieve the current program
@@ -502,7 +504,7 @@ handleMutationRequest = \case
   Undo -> handleUndoRequest
 
 -- | Handle an edit request
-handleEditRequest :: forall m. MonadEditApp m => [ProgAction] -> m Prog
+handleEditRequest :: forall m. (HasCallStack, MonadEditApp m) => [ProgAction] -> m Prog
 handleEditRequest actions = do
   (prog, _) <- gets appProg >>= \p -> foldM go (p, Nothing) actions
   let Log l = progLog prog
@@ -510,7 +512,7 @@ handleEditRequest actions = do
   modify (\s -> s & #currentState % #prog .~ prog')
   pure prog'
   where
-    go :: (Prog, Maybe GVarName) -> ProgAction -> m (Prog, Maybe GVarName)
+    go :: HasCallStack => (Prog, Maybe GVarName) -> ProgAction -> m (Prog, Maybe GVarName)
     go (prog, mdef) a =
       applyProgAction prog mdef a <&> \prog' ->
         (prog', selectedDef <$> progSelection prog')
@@ -542,7 +544,7 @@ handleEvalFullRequest (EvalFullReq{evalFullReqExpr, evalFullCxtDir, evalFullMaxS
 -- | Handle a 'ProgAction'
 -- The 'GVarName' argument is the currently-selected definition, which is
 -- provided for convenience: it is the same as the one in the progSelection.
-applyProgAction :: MonadEdit m => Prog -> Maybe GVarName -> ProgAction -> m Prog
+applyProgAction :: (HasCallStack, MonadEdit m) => Prog -> Maybe GVarName -> ProgAction -> m Prog
 applyProgAction prog mdefName = \case
   MoveToDef d -> do
     m <- lookupEditableModule (qualifiedModule d) prog
@@ -1361,7 +1363,7 @@ tcWholeProg p =
         pure $ p'{progSelection = newSel}
    in liftError ActionError $ runReaderT tc $ progCxt p
 
-copyPasteBody :: MonadEdit m => Prog -> (GVarName, ID) -> GVarName -> [Action] -> m Prog
+copyPasteBody :: (HasCallStack, MonadEdit m) => Prog -> (GVarName, ID) -> GVarName -> [Action] -> m Prog
 copyPasteBody p (fromDefName, fromId) toDefName setup = do
   src' <- focusNodeImports p fromDefName fromId
   -- reassociate so get Expr+(Type+Type), rather than (Expr+Type)+Type

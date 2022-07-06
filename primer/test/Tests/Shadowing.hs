@@ -115,6 +115,35 @@ checkShadowing t = if fst $ foldTree f t
 -- - actionsForDefBody,
 -- - actionsForDefSig,
 
+unit_shadow_action_a_weirdness :: Assertion
+unit_shadow_action_a_weirdness =
+  let (e,t) = create' $ (,) <$> hole emptyHole <*> tEmptyHole
+      mn = ModuleName ["M", "0"]
+      m = Module mn mempty $
+            Map.singleton "a" $ DefAST $ ASTDef e t
+      p = App.Prog   { progImports = []
+                     , progModules = [m]
+                     , progSelection = Nothing
+                     , progSmartHoles = SmartHoles
+                     , progLog = App.Log []
+                     }
+      a' = App.mkAppSafe (toEnum 0) p
+  in do
+    assertBool "huh" $ isRight $ App.focusNodeImports p (qualifyDefName m "a") (getID e)
+    a <- case a' of
+      Left _ -> assertFailure "bad app"
+      Right a'' -> pure a''
+    case runEditAppM (handleEditRequest
+                      [CreateDef mn $ Just "aCopy"
+                      ,CopyPasteSig (qualifyDefName m "a",getID t) []
+--                      ,CopyPasteBody (qualifyDefName m "a",getID e) []
+                      ])
+         a of
+      (Left err, _ ) -> assertFailure $ show err
+      (Right p, _) -> assertFailure $ show $ progModules p --pure ()
+-- OH, I SEE what the weird issue was: genApp generates a non-smartholes-normal app, so
+-- the node of id 0 gets removed after running the first action, so we cannot find it when
+-- wanting to copy the body!
 unit_shadow_action_a :: Assertion
 unit_shadow_action_a =
   let (e,t) = create' $ (,) <$> hole emptyHole <*> tEmptyHole
