@@ -561,7 +561,7 @@ genPrimCon = catMaybes <$> sequence [genChar, genInt]
 genProg :: GenT WT Prog
 genProg = do
   imports <- telescope (Range.linear 0 2) (local . extendCxtByModule) (genModule "I")
-  home <- local (extendCxtByModules imports) $ telescope (Range.linear 0 2) (local . extendCxtByModule) (genModule "M")
+  home <- local (extendCxtByModules imports) $ telescope (Range.linear 1 2) (local . extendCxtByModule) (genModule "M")
   pure $ Prog { progImports = imports
               , progModules = home
               , progSelection = Nothing

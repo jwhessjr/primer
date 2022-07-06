@@ -181,13 +181,6 @@ tasty_genChk = withTests 1000 $
       t' <- checkTest ty =<< generateIDs t
       t === forgetIDs t' -- check no smart holes stuff happened
 
-tasty_genApp_nontrivial :: Property
-tasty_genApp_nontrivial =  propertyWT [] $ do
-  a1 <- forAllT genApp
-  a2 <- forAllT genApp
-  a1 /== a2
-
-
 tasty_genApp_well_formed :: Property
 tasty_genApp_well_formed = propertyWT [] $ do
   a <- forAllT genApp
