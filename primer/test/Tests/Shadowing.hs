@@ -33,7 +33,7 @@ import Data.List.Extra (enumerate)
 import Hedgehog.Internal.Property (forAllWithT)
 import Primer.Action
 import qualified Data.Text as T
-import Primer.App (appProg, Prog (progModules), handleEditRequest, runEditAppM, EditAppM)
+import Primer.App (appProg, Prog (..), handleEditRequest, runEditAppM, EditAppM)
 import qualified Primer.App as App
 
 
@@ -115,6 +115,31 @@ checkShadowing t = if fst $ foldTree f t
 -- - actionsForDefBody,
 -- - actionsForDefSig,
 
+unit_shadow_action_a :: Assertion
+unit_shadow_action_a =
+  let (e,t) = create' $ (,) <$> hole emptyHole <*> tEmptyHole
+      mn = ModuleName ["M", "0"]
+      m = Module mn mempty $
+            Map.singleton "a" $ DefAST $ ASTDef e t
+      p = App.Prog   { progImports = []
+                     , progModules = [m]
+                     , progSelection = Nothing
+                     , progSmartHoles = SmartHoles
+                     , progLog = App.Log []
+                     }
+      a' = App.mkAppSafe (toEnum 0) p
+  in do
+    a <- case a' of
+      Left _ -> assertFailure "bad app"
+      Right a'' -> pure a''
+    case runEditAppM (handleEditRequest
+                      [CreateDef mn $ Just "aCopy"
+                      ,CopyPasteSig (qualifyDefName m "a",getID t) []
+                      ,CopyPasteBody (qualifyDefName m "a",getID e) []])
+         a of
+      (Left err, _ ) -> assertFailure $ show err
+      (Right _, _) -> pure ()
+
 -- TODO: this actually just tests actions work -- should be moved!
 tasty_shadow_action :: Property
 tasty_shadow_action = withTests 500 $
@@ -133,7 +158,7 @@ tasty_shadow_action = withTests 500 $
       act <- forAllWithT name' $ Gen.element $ actionsForDef l (moduleDefsQualified m) (defName, def)
       case input act of
 --        InputRequired a' -> _
-        NoInputRequired a' -> actionSucceeds (handleEditRequest a') a
+        NoInputRequired act' -> annotateShow act' >> actionSucceeds (handleEditRequest act') a
 --        AskQuestion q a' -> _
         _ -> discard
       {-
