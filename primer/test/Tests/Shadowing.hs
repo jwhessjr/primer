@@ -27,12 +27,14 @@ import Primer.Core.DSL
 import Test.Tasty.HUnit hiding ((@?=))
 import qualified Data.Map as Map
 import Gen.Core.Raw (genName, genModuleName)
-import Primer.Action.Available (actionsForDefBody)
+import Primer.Action.Available (actionsForDefBody, actionsForDef)
 import qualified Hedgehog.Gen as Gen
 import Data.List.Extra (enumerate)
 import Hedgehog.Internal.Property (forAllWithT)
 import Primer.Action
 import qualified Data.Text as T
+import Primer.App (appProg, Prog (progModules), handleEditRequest, runEditAppM, EditAppM)
+import qualified Primer.App as App
 
 
 -- The 'a' parameter (node labels) are only needed for implementation of 'binderTree'
@@ -113,10 +115,28 @@ checkShadowing t = if fst $ foldTree f t
 -- - actionsForDefBody,
 -- - actionsForDefSig,
 
+-- TODO: this actually just tests actions work -- should be moved!
 tasty_shadow_action :: Property
 tasty_shadow_action = withTests 500 $
   withDiscards 2000 $
-    propertyWTInExtendedGlobalCxt [builtinModule, primitiveModule] $ do
+    propertyWT [] $ do
+      l <- forAllT $ Gen.element enumerate
+      a <- forAllT $ genApp [builtinModule, primitiveModule]
+      (m,(defName, def')) <- forAllT $ Gen.justT $ do
+        m' <- Gen.element $ progModules $ appProg a
+        let ds = Map.toList $ moduleDefsQualified m'
+        traverse (fmap (m',) . element) $ nonEmpty ds
+      def <- case def' of
+        DefAST d -> pure d
+        _ -> discard
+      -- TODO: other sorts of action...
+      act <- forAllWithT name' $ Gen.element $ actionsForDef l (moduleDefsQualified m) (defName, def)
+      case input act of
+--        InputRequired a' -> _
+        NoInputRequired a' -> actionSucceeds (handleEditRequest a') a
+--        AskQuestion q a' -> _
+        _ -> discard
+      {-
       let globs = foldMap moduleDefsQualified testModules
       tds <- asks typeDefs
       (dir, t, ty) <- genDirTm
@@ -135,11 +155,16 @@ tasty_shadow_action = withTests 500 $
           [] -> footnote "actionsForDefBody always returns a MoveToDef as first action, and rest of actions are wrapped in BodyAction" >> failure
 --        AskQuestion q a' -> _
         _ -> discard
+-}
   where
     name' a = toS $ case name a of
       Code t -> t
       Prose t -> t
-
+    actionSucceeds :: HasCallStack => EditAppM a -> App.App -> PropertyT WT ()
+    actionSucceeds m a = case runEditAppM m a of
+      (Left err, _) -> annotateShow err >> failure
+      (Right _, _) -> pure ()
+    element = Gen.element . toList
       
 -- Check evaluation does not introduce shadowing, except in some known cases
 tasty_eval_shadow :: Property

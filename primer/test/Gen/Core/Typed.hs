@@ -558,11 +558,11 @@ genPrimCon = catMaybes <$> sequence [genChar, genInt]
 
 
 -- | Generate a whole 'Prog', with empty log, and smartholes turned on
-genProg :: GenT WT Prog
-genProg = do
+genProg :: [Module] -> GenT WT Prog
+genProg initialImports = local (extendCxtByModules initialImports) $ do
   imports <- telescope (Range.linear 0 2) (local . extendCxtByModule) (genModule "I")
   home <- local (extendCxtByModules imports) $ telescope (Range.linear 1 2) (local . extendCxtByModule) (genModule "M")
-  pure $ Prog { progImports = imports
+  pure $ Prog { progImports = initialImports <> imports
               , progModules = home
               , progSelection = Nothing
               , progSmartHoles = SmartHoles
@@ -593,9 +593,9 @@ genProg = do
                     , moduleDefs = defs
                     }
 
-genApp :: GenT WT App
-genApp = do
-  p <- genProg
+genApp :: [Module] -> GenT WT App
+genApp initialImports = do
+  p <- genProg initialImports
   i <- lift $ isolateWT fresh
   nc <- lift $ isolateWT fresh
   pure $ mkApp i nc p

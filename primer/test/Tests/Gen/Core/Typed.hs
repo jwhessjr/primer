@@ -184,7 +184,7 @@ tasty_genChk = withTests 1000 $
 tasty_genApp_well_formed :: Property
 tasty_genApp_well_formed = withTests 1000 $
   withDiscards 2000 $ propertyWT [] $ do
-  a <- forAllT genApp
+  a <- forAllT $ genApp [builtinModule, primitiveModule]
   case checkAppWellFormed a of
     Left err -> annotateShow err >> failure
     Right _ -> pure ()
