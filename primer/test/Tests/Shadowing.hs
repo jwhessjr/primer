@@ -23,6 +23,9 @@ import Primer.Typecheck
 import Primer.Module
 import Tests.Gen.Core.Typed (propertyWTInExtendedGlobalCxt)
 import Primer.Core.Transform (unfoldApp, unfoldAPP)
+import Primer.Core.DSL 
+import Test.Tasty.HUnit hiding ((@?=))
+import qualified Data.Map as Map
 
 
 -- The 'a' parameter (node labels) are only needed for implementation of 'binderTree'
@@ -146,6 +149,44 @@ tasty_eval_shadow = withTests 500 $
     isKnownCase = \case
       Case _ e _ | (h,_) <- unfoldApp e, (Con{},_) <- unfoldAPP h -> True
       _ -> False
+
+unit_known_case_shadow :: Assertion
+unit_known_case_shadow =
+  let ((expr, expected), maxID) = create $ do
+        e <- lam "x" $ case_ ((con' ["M"] "C" `app` emptyHole) `ann` tcon' ["M"] "D")
+                             [branch' (["M"],"C") [("t",Nothing)] emptyHole]
+        expect <- lam "x" $ let_ "t" (emptyHole `ann` tforall "x" KType (tvar "x")) emptyHole
+        pure (e, expect)
+      td = TypeDefAST $ ASTTypeDef {
+              astTypeDefParameters = mempty
+              , astTypeDefConstructors = [ValCon (vcn ["M"] "C") [TForall () "x" KType $ TVar () "x"]]
+              , astTypeDefNameHints = mempty}
+      s = evalFullTest maxID (Map.singleton (tcn ["M"] "D") td) mempty 1 Chk expr
+   in do
+        distinctIDs s
+        s <~==> Left (TimedOut expected)
+        noShadowing expected @?= ShadowingNotExists
+
+unit_known_case_shadow_substTy :: Assertion
+unit_known_case_shadow_substTy =
+  let ((expr, expected), maxID) = create $ do
+        let v :: LocalName k
+            v = "a25"
+        e <- lAM "x" $ case_ ((con' ["M"] "C" `app` emptyHole `app` emptyHole) `ann` (tcon' ["M"] "D" `tapp` tvar "x"))
+                             [branch' (["M"],"C") [(v,Nothing),("t",Nothing)] emptyHole]
+        expect <- lAM "x" $ let_ v (emptyHole `ann` tcon tBool) $
+           let_ "t" (emptyHole `ann` tforall v KType (tvar "x")) emptyHole
+        pure (e, expect)
+      td = TypeDefAST $ ASTTypeDef {
+              astTypeDefParameters = [("p", KType)]
+              , astTypeDefConstructors = [ValCon (vcn ["M"] "C") [TCon () tBool,
+                                                                  TForall () "x" KType $ TVar () "p"]]
+              , astTypeDefNameHints = mempty}
+      s = evalFullTest maxID (Map.singleton (tcn ["M"] "D") td) mempty 1 Chk expr
+   in do
+        distinctIDs s
+        s <~==> Left (TimedOut expected)
+        noShadowing expected @?= ShadowingNotExists
 
 getEvalResultExpr :: Either EvalFullError Expr -> Expr
 getEvalResultExpr = \case
