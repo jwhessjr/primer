@@ -19,6 +19,7 @@ module Gen.Core.Typed (
   genCxtExtendingGlobal,
   genCxtExtendingLocal,
   genPrimCon,
+  genApp,
   forAllT,
   propertyWT,
   freshNameForCxt,
@@ -26,7 +27,7 @@ module Gen.Core.Typed (
   freshTyVarNameForCxt,
 ) where
 
-import Foreword
+import Foreword hiding (mod)
 
 import Control.Monad.Fresh (MonadFresh, fresh)
 import Control.Monad.Morph (hoist)
@@ -47,8 +48,8 @@ import Primer.Core (
   CaseBranch' (CaseBranch),
   Expr' (..),
   GVarName,
-  GlobalName (qualifiedModule),
-  ID,
+  GlobalName (qualifiedModule, baseName),
+  ID (ID),
   Kind (..),
   LVarName,
   LocalName (LocalName, unLocalName),
@@ -64,9 +65,9 @@ import Primer.Core (
   typeDefKind,
   typeDefParameters,
   valConName,
-  valConType, defType, ModuleName (ModuleName)
+  valConType, defType, ModuleName (ModuleName), Def (DefAST), ASTDef (ASTDef), DefMap
  )
-import Primer.Core.Utils (freeVarsTy, forgetTypeIDs)
+import Primer.Core.Utils (freeVarsTy, forgetTypeIDs, generateIDs, generateTypeIDs)
 import Primer.Module (Module (..), moduleTypesQualified, moduleDefsQualified)
 import Primer.Name (Name, NameCounter, freshName, unName, unsafeMkName)
 import Primer.Refine (Inst (InstAPP, InstApp, InstUnconstrainedAPP), refine)
@@ -92,11 +93,11 @@ import Primer.Typecheck (
   matchForallType,
   mkTAppCon,
   primConInScope,
-  typeDefs, extendGlobalCxt
+  typeDefs, extendGlobalCxt, exprTtoExpr
  )
 import TestM (TestM, evalTestM, isolateTestM)
 import TestUtils (Property, property)
-import Primer.App (Prog (..), defaultLog)
+import Primer.App (Prog (..), defaultLog, App, mkApp)
 
 {-
 Generate well scoped and typed expressions.
@@ -444,10 +445,15 @@ forgetLocals :: Cxt -> Cxt
 forgetLocals cxt = cxt{localCxt = mempty}
 
 -- Generates a group of potentially-mutually-recursive typedefs
-genTypeDefGroup :: GenT WT [(TyConName, TypeDef)]
-genTypeDefGroup = local forgetLocals $ do
+-- If given a module name, they will all live in that module,
+-- otherwise they may live in disparate modules
+genTypeDefGroup :: Maybe ModuleName -> GenT WT [(TyConName, TypeDef)]
+genTypeDefGroup mod = local forgetLocals $ do
   let genParams = Gen.list (Range.linear 0 5) $ (,) <$> freshTyVarNameForCxt <*> genWTKind
-  nps <- Gen.list (Range.linear 1 5) $ (,) <$> freshTyConNameForCxt <*> genParams
+  let tyconName = case mod of
+        Nothing -> freshTyConNameForCxt
+        Just m -> qualifyName m <$> freshNameForCxt
+  nps <- Gen.list (Range.linear 1 5) $ (,) <$> tyconName <*> genParams
   -- create empty typedefs to temporarilly extend the context, so can do recursive types
   let types =
         map
@@ -479,6 +485,16 @@ genTypeDefGroup = local forgetLocals $ do
           <$> genCons n ps
   mapM genTD nps
 
+-- Generate a mutually-recursive group of term definitions
+genASTDefGroup :: ModuleName -> GenT WT (Map Name Def)
+genASTDefGroup mod = do
+  nts <- Gen.list (Range.linear 0 5) $ (\n t -> (qualifyName mod n, t)) <$> freshNameForCxt <*> genWTType KType
+  nTyTms <- local (extendGlobalCxt nts) $ for nts $ \(n,ty) -> (n,ty,) <$> genChk ty
+  fmap M.fromList . for nTyTms $ \(n,ty,tm) -> do
+    tm' <- generateIDs tm
+    ty' <- generateTypeIDs ty
+    pure (baseName n,DefAST $ ASTDef tm' ty')
+
 addTypeDefs :: [(TyConName, TypeDef)] -> Cxt -> Cxt
 addTypeDefs = extendTypeDefCxt . M.fromList
 
@@ -491,7 +507,7 @@ extendGlobals nts cxt = cxt{globalCxt = globalCxt cxt <> M.fromList nts}
 -- coverage)
 genCxtExtendingGlobal :: GenT WT Cxt
 genCxtExtendingGlobal = do
-  tds <- genTypeDefGroup
+  tds <- genTypeDefGroup Nothing
   globals <- local (addTypeDefs tds) genGlobalCxtExtension
   asks $ extendGlobals globals . addTypeDefs tds
 
@@ -570,12 +586,19 @@ genProg = do
     genModule :: Name -> Int -> GenT WT Module
     genModule prefix index = do
       let mn = ModuleName [prefix, unsafeMkName $ show index]
-      tds <- genTypeDefGroup mn
+      tds <- genTypeDefGroup $ Just mn
       defs <- local (addTypeDefs tds) (genASTDefGroup mn)
       pure $ Module { moduleName = mn
-                    , moduleTypes = _ tds
-                    , moduleDefs = _ defs
+                    , moduleTypes = M.fromList $ first baseName <$> tds
+                    , moduleDefs = defs
                     }
+
+genApp :: GenT WT App
+genApp = do
+  p <- genProg
+  i <- lift $ isolateWT fresh
+  nc <- lift $ isolateWT fresh
+  pure $ mkApp i nc p
 
 hoist' :: Applicative f => Cxt -> WT a -> f a
 hoist' cxt = pure . evalTestM 0 . flip runReaderT cxt . unWT

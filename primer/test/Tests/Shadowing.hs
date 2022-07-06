@@ -130,8 +130,8 @@ tasty_shadow_action = withTests 500 $
       case input a of
 --        InputRequired a' -> _
         NoInputRequired a' -> case a' of
-          [MoveToDef m , BodyAction as'] | n == m -> do
-             _
+--          [MoveToDef m , BodyAction as'] | n == m -> do
+--             _
           [] -> footnote "actionsForDefBody always returns a MoveToDef as first action, and rest of actions are wrapped in BodyAction" >> failure
 --        AskQuestion q a' -> _
         _ -> discard
