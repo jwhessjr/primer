@@ -182,7 +182,8 @@ tasty_genChk = withTests 1000 $
       t === forgetIDs t' -- check no smart holes stuff happened
 
 tasty_genApp_well_formed :: Property
-tasty_genApp_well_formed = propertyWT [] $ do
+tasty_genApp_well_formed = withTests 1000 $
+  withDiscards 2000 $ propertyWT [] $ do
   a <- forAllT genApp
   case checkAppWellFormed a of
     Left err -> annotateShow err >> failure
