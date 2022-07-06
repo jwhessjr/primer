@@ -26,6 +26,13 @@ import Primer.Core.Transform (unfoldApp, unfoldAPP)
 import Primer.Core.DSL 
 import Test.Tasty.HUnit hiding ((@?=))
 import qualified Data.Map as Map
+import Gen.Core.Raw (genName, genModuleName)
+import Primer.Action.Available (actionsForDefBody)
+import qualified Hedgehog.Gen as Gen
+import Data.List.Extra (enumerate)
+import Hedgehog.Internal.Property (forAllWithT)
+import Primer.Action
+import qualified Data.Text as T
 
 
 -- The 'a' parameter (node labels) are only needed for implementation of 'binderTree'
@@ -102,7 +109,38 @@ checkShadowing t = if fst $ foldTree f t
 
 
 -- TODO: We check that all advertised API calls never introduce shadowing
+-- - actionsForDef,
+-- - actionsForDefBody,
+-- - actionsForDefSig,
 
+tasty_shadow_action :: Property
+tasty_shadow_action = withTests 500 $
+  withDiscards 2000 $
+    propertyWTInExtendedGlobalCxt [builtinModule, primitiveModule] $ do
+      let globs = foldMap moduleDefsQualified testModules
+      tds <- asks typeDefs
+      (dir, t, ty) <- genDirTm
+      unless (noShadowing t == ShadowingNotExists) discard
+      unless (noShadowingTy ty == ShadowingNotExists) discard
+      annotateShow t
+      n <- forAllT (qualifyName <$> genModuleName <*> genName)
+      l <- forAllT $ Gen.element enumerate
+      i <- forAllT $ Gen.element $ t ^.. exprIDs
+      a <- forAllWithT name' $ Gen.element $ actionsForDefBody l n i t
+      case input a of
+--        InputRequired a' -> _
+        NoInputRequired a' -> case a' of
+          [MoveToDef m , BodyAction as'] | n == m -> do
+             _
+          [] -> footnote "actionsForDefBody always returns a MoveToDef as first action, and rest of actions are wrapped in BodyAction" >> failure
+--        AskQuestion q a' -> _
+        _ -> discard
+  where
+    name' a = toS $ case name a of
+      Code t -> t
+      Prose t -> t
+
+      
 -- Check evaluation does not introduce shadowing, except in some known cases
 tasty_eval_shadow :: Property
 tasty_eval_shadow = withTests 500 $

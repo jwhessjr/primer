@@ -64,16 +64,16 @@ import Primer.Core (
   typeDefKind,
   typeDefParameters,
   valConName,
-  valConType,
+  valConType, defType, ModuleName (ModuleName)
  )
-import Primer.Core.Utils (freeVarsTy)
-import Primer.Module (Module)
+import Primer.Core.Utils (freeVarsTy, forgetTypeIDs)
+import Primer.Module (Module (..), moduleTypesQualified, moduleDefsQualified)
 import Primer.Name (Name, NameCounter, freshName, unName, unsafeMkName)
 import Primer.Refine (Inst (InstAPP, InstApp, InstUnconstrainedAPP), refine)
 import Primer.Subst (substTy, substTys)
 import Primer.Typecheck (
   Cxt (),
-  SmartHoles (NoSmartHoles),
+  SmartHoles (NoSmartHoles, SmartHoles),
   TypeDefError (TDIHoleType),
   buildTypingContextFromModules,
   consistentKinds,
@@ -92,10 +92,11 @@ import Primer.Typecheck (
   matchForallType,
   mkTAppCon,
   primConInScope,
-  typeDefs,
+  typeDefs, extendGlobalCxt
  )
 import TestM (TestM, evalTestM, isolateTestM)
 import TestUtils (Property, property)
+import Primer.App (Prog (..), defaultLog)
 
 {-
 Generate well scoped and typed expressions.
@@ -538,6 +539,43 @@ genPrimCon = catMaybes <$> sequence [genChar, genInt]
     _ = \case
       PrimChar _ -> ()
       PrimInt _ -> ()
+
+
+-- | Generate a whole 'Prog', with empty log, and smartholes turned on
+genProg :: GenT WT Prog
+genProg = do
+  imports <- telescope (Range.linear 0 2) (local . extendCxtByModule) (genModule "I")
+  home <- local (extendCxtByModules imports) $ telescope (Range.linear 0 2) (local . extendCxtByModule) (genModule "M")
+  pure $ Prog { progImports = imports
+              , progModules = home
+              , progSelection = Nothing
+              , progSmartHoles = SmartHoles
+              , progLog = defaultLog
+              }
+  where
+    telescope :: MonadGen m => Range.Range Int -> (a -> m [a] -> m [a]) -> (Int -> m a) -> m [a]
+    telescope n f m = Gen.int n >>= \n' -> telescope' n' 0 f m
+    telescope' :: MonadGen m => Int -> Int -> (a -> m [a] -> m [a]) -> (Int -> m a) -> m [a]
+    telescope' nMax n k m
+      | n >= nMax = pure []
+      | otherwise = do
+          x <- m n
+          rest <- k x $ telescope' nMax (n+1) k m
+          pure $ x : rest
+    extendCxtByModule :: Module -> Cxt -> Cxt
+    extendCxtByModule = extendCxtByModules . pure
+    extendCxtByModules :: [Module] -> Cxt -> Cxt
+    extendCxtByModules ms = extendTypeDefCxt (foldMap moduleTypesQualified ms)
+      . extendGlobalCxt (M.toList . fmap (forgetTypeIDs . defType) $ foldMap moduleDefsQualified ms)
+    genModule :: Name -> Int -> GenT WT Module
+    genModule prefix index = do
+      let mn = ModuleName [prefix, unsafeMkName $ show index]
+      tds <- genTypeDefGroup mn
+      defs <- local (addTypeDefs tds) (genASTDefGroup mn)
+      pure $ Module { moduleName = mn
+                    , moduleTypes = _ tds
+                    , moduleDefs = _ defs
+                    }
 
 hoist' :: Applicative f => Cxt -> WT a -> f a
 hoist' cxt = pure . evalTestM 0 . flip runReaderT cxt . unWT
