@@ -601,8 +601,8 @@ check t = \case
           SmartHoles -> do
             -- 'synth' will take care of adding an annotation - no need to do it
             -- explicitly here
-            (_, lam') <- synth lam
-            Hole <$> meta' (TCSynthed (TEmptyHole ())) <*> pure lam'
+            lam' <- check (TEmptyHole ()) lam
+            Hole <$> meta' (TCEmb TCBoth{tcChkedAt = t, tcSynthed = TEmptyHole ()}) <*> pure lam' -- TODO: I should probably do this for LAM and maybe other stuff; I should also check that this is "correct" -- is check now idempotent? (Was it previously?)
   lAM@(LAM i n e) -> do
     matchForallType t >>= \case
       Just (m, k, b) -> do
