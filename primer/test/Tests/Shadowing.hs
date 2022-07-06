@@ -1,0 +1,153 @@
+module Tests.Shadowing where
+
+import Foreword
+
+import Hedgehog hiding (Property, check, property, withDiscards, withTests)
+import Data.Data (Data)
+import Primer.Core
+import Primer.Name
+import qualified Data.Tree as T
+import qualified Data.Set as Set
+import qualified Data.Generics.Uniplate.Data as U
+import Primer.Zipper
+import Optics
+import Data.Tree.Optics (root)
+import TestUtils
+import Primer.Builtins
+import Primer.Primitives
+import Gen.Core.Typed
+import Primer.Core.Utils
+import Tests.EvalFull
+import Primer.EvalFull
+import Primer.Typecheck
+import Primer.Module
+import Tests.Gen.Core.Typed (propertyWTInExtendedGlobalCxt)
+import Primer.Core.Transform (unfoldApp, unfoldAPP)
+
+
+-- The 'a' parameter (node labels) are only needed for implementation of 'binderTree'
+data Tree a b = Node a [(b,Tree a b)]
+  deriving Show
+
+instance Bifunctor Tree where
+  bimap f g (Node a xs) = Node (f a) $ map (bimap g (bimap f g)) xs
+
+--drawTree :: Tree String String -> String
+drawTree = T.drawTree . f
+  where
+    f (Node a xs) = T.Node a $ map (\(b,t) -> f t & root %~ (("[" <> b <> "]--") <>)) xs
+
+
+foldTree :: (a -> [(b,c)] -> c) -> Tree a b -> c
+foldTree f (Node a xs) = f a $ map (second $ foldTree f) xs
+
+-- NB: there are no children in kinds, so we need not look in the metadata
+-- NB: any binder in types (∀ only) scopes over all type children
+binderTreeTy :: Data b => Type' b -> Tree () (Set Name)
+binderTreeTy = U.para $ \ty children ->
+  Node () $ map (Set.map unLocalName $ getBoundHereTy ty,) children
+
+-- Note this DOES NOT check if anything in the metadata's TypeCache is
+-- shadowed (or is shadowing) Currently it happens that we can ascribe
+-- a type of '∀a. _' to a subterm that happens to be under an 'a'
+-- binder. See https://github.com/hackworthltd/primer/issues/556
+noShadowing :: (Data a, Data b, Eq a, Eq b) => Expr' a b -> Shadowing
+noShadowing = checkShadowing . binderTree
+
+noShadowingTy :: Data b => Type' b -> Shadowing
+noShadowingTy = checkShadowing . binderTreeTy
+
+binderTree :: forall a b. (Data a, Data b, Eq a, Eq b) => Expr' a b -> Tree () (Set Name)
+binderTree = noNodeLabels' . go
+  where
+    noNodeLabels :: Tree () b' -> Tree (Maybe a') b'
+    noNodeLabels = bimap (const Nothing) identity
+    noNodeLabels' :: Tree a' b' -> Tree () b'
+    noNodeLabels' = bimap (const ()) identity
+    go :: Expr' a b -> Tree (Maybe (Expr' a b)) (Set Name)
+    go = U.para $ \e exprChildren' ->
+      let exprChildren = map (\c@(Node c' _) ->  (case c' of
+                                                    Nothing -> mempty -- no term binders scope over metadata or type children
+                                                    Just c'' -> getBoundHereUp $ FA {prior = c'', current = e},c))
+                         exprChildren'
+          typeChildren = case target . focusOnlyType <$> focusType (focus e) of
+            Just ty -> [binderTreeTy ty]
+            Nothing -> mempty
+            {-
+          metaChildren = case e ^. _exprMetaLens % _type of
+            Nothing -> mempty
+            Just (TCChkedAt ty) -> [binderTreeTy ty]
+            Just (TCSynthed ty) -> [binderTreeTy ty]
+            Just (TCEmb (TCBoth ty1 ty2)) -> [binderTreeTy ty1, binderTreeTy ty2]
+-} -- don't include metadata. see #556
+      in Node (Just e) $ exprChildren <> map ((mempty,). noNodeLabels) (typeChildren {- <> metaChildren-})
+
+data Shadowing = ShadowingExists | ShadowingNotExists
+  deriving (Eq, Show)
+
+checkShadowing :: Tree () (Set Name) -> Shadowing
+checkShadowing t = if fst $ foldTree f t
+  then ShadowingExists
+  else ShadowingNotExists
+  where
+    f :: () -> [(Set Name,(Bool,Set Name))] -> (Bool,Set Name)
+    f () xs = let allSubtreeBinds = Set.unions $ map (snd.snd) xs
+                  bindsHere = Set.unions $ map fst xs
+                  allBinds = bindsHere <> allSubtreeBinds
+                  shadowing = any (\(bs, (s, bs')) -> s || not (Set.disjoint bs bs')) xs
+              in (shadowing, allBinds)
+
+
+-- TODO: We check that all advertised API calls never introduce shadowing
+
+-- Check evaluation does not introduce shadowing, except in some known cases
+tasty_eval_shadow :: Property
+tasty_eval_shadow = withTests 500 $
+  withDiscards 2000 $
+    propertyWTInExtendedGlobalCxt [builtinModule, primitiveModule] $ do
+      let globs = foldMap moduleDefsQualified testModules
+      tds <- asks typeDefs
+      (dir, t, ty) <- genDirTm
+      unless (noShadowing t == ShadowingNotExists) discard
+      unless (noShadowingTy ty == ShadowingNotExists) discard
+      when (any isKnownShadow $ U.universe t) discard
+      (_steps, s) <- evalFullStepCount tds globs 1 dir t
+      annotateShow s
+      noShadowing (getEvalResultExpr s) === ShadowingNotExists
+  where
+    -- There are a few cases where evaluation may cause shadowing
+    -- currently
+    isKnownShadow e = isLet e || isHetroAPP e || isKnownCase e
+    -- Since we inline let bindings underneath the let (without
+    -- simultaneously removing the let binding), this can easily
+    -- cause shadowing. If we implement a "push down let bindings"
+    -- explicit-substitution style rule, then this check can be
+    -- removed. See https://github.com/hackworthltd/primer/issues/44
+    isLet = \case
+      Let{} -> True
+      Letrec{} -> True
+      LetType{} -> True
+      _ -> False
+    -- Since the rule here is (because we do not have the ability
+    -- to put a `lettype` inside a type)
+    -- (Λa.e : ∀b.T) S ~> lettype b=S in (lettype a = S in e) : T
+    -- it could happen that the `lettype b` may shadow something in `e`
+    isHetroAPP = \case
+      APP _ (Ann _ (LAM _ x _) (TForall _ y _ _)) _ -> x /= y
+      _ -> False
+    -- Since we introduce a let bindings per argument, and annotate
+    -- these with the type from the type declaration, we could
+    -- introduce a shadowed binder. For instance, if we have
+    --   λx. case (C a : D) of C t -> t
+    -- it will evaluate to
+    --   λx. let t = a : A in t
+    -- where 'A' is read from the declaration of 'D', and thus may
+    -- contain a ∀ x. ...
+    isKnownCase = \case
+      Case _ e _ | (h,_) <- unfoldApp e, (Con{},_) <- unfoldAPP h -> True
+      _ -> False
+
+getEvalResultExpr :: Either EvalFullError Expr -> Expr
+getEvalResultExpr = \case
+  Left (TimedOut e) -> e
+  Right e -> e
