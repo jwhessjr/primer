@@ -20,7 +20,7 @@ module Gen.Core.Typed (
   genCxtExtendingLocal,
   genPrimCon,
   genApp,
-  genAppSH,
+  genAppSH, normaliseApp,
   forAllT,
   propertyWT,
   freshNameForCxt,
@@ -606,20 +606,23 @@ genApp sh initialImports = do
 -- smartholes machinery will not make any changes to it. The returned
 -- 'App' will have smartholes enabled.
 genAppSH :: [Module] -> GenT WT App
-genAppSH m = do
-  a <- genApp SmartHoles m
+genAppSH m = normaliseApp <$> genApp SmartHoles m
+
+normaliseApp :: App -> App
+normaliseApp a =
   let p = appProg a
-  let pNormalised = evalTestM 0 . runExceptT @TypeError $ do
-        imp' <- checkEverything SmartHoles CheckEverything{trusted = [], toCheck = progImports p}
-        mod' <- checkEverything SmartHoles CheckEverything{trusted = imp', toCheck = progModules p}
-        pure p{progImports=imp', progModules=mod'}
+  in
   -- genApp always generates a well-typed App (see tasty_genApp_well_formed)
   -- so we will just crash if something has gone wrong.
   -- We know that smartholes will only remove nodes, never inserting them, so we
   -- do not need to track id counters etc
-  case pNormalised of
+  case evalTestM 0 . runExceptT @TypeError $ do
+        imp' <- checkEverything SmartHoles CheckEverything{trusted = [], toCheck = progImports p}
+        mod' <- checkEverything SmartHoles CheckEverything{trusted = imp', toCheck = progModules p}
+        pure p{progImports=imp', progModules=mod'}
+        of
     Left err -> error $ show err
-    Right p' -> pure $ mkApp (appIdCounter a) (appNameCounter a) p'
+    Right p' -> mkApp (appIdCounter a) (appNameCounter a) p'
 
 hoist' :: Applicative f => Cxt -> WT a -> f a
 hoist' cxt = pure . evalTestM 0 . flip runReaderT cxt . unWT

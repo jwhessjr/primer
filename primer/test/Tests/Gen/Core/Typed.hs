@@ -14,7 +14,7 @@ import Gen.Core.Typed (
   genSyns,
   genWTKind,
   genWTType,
-  propertyWT, genApp, genAppSH
+  propertyWT, genApp, genAppSH, normaliseApp
  )
 import Hedgehog (
   PropertyT,
@@ -24,13 +24,13 @@ import Hedgehog (
   (===), (/==)
  )
 import Hedgehog.Internal.Property (forAllT)
-import Primer.Builtins (builtinModule)
+import Primer.Builtins (builtinModule, tBool)
 import Primer.Core (
   Expr,
   Kind (KType),
   Meta,
   Type,
-  Type',
+  Type', Def (DefAST), ASTDef (ASTDef, astDefExpr), ModuleName (ModuleName), defType, defAST
  )
 import Primer.Core.Utils (
   forgetIDs,
@@ -38,7 +38,7 @@ import Primer.Core.Utils (
   generateIDs,
   generateTypeIDs,
  )
-import Primer.Module (Module)
+import Primer.Module (Module (Module), moduleDefs)
 import Primer.Primitives (primitiveModule)
 import Primer.Typecheck (
   Cxt (..),
@@ -54,11 +54,14 @@ import Primer.Typecheck (
   synthKind, CheckEverythingRequest (..), checkEverything
  )
 import TestUtils (Property, withDiscards, withTests)
-import Primer.App (checkAppWellFormed, Prog (progModules), appProg)
+import Primer.App (checkAppWellFormed, Prog (progModules, progImports, Prog), appProg, mkApp, mkAppSafe, defaultLog)
 import qualified Hedgehog.Gen as Gen
 import Data.List.Extra (enumerate)
 import Primer.Action (Level)
 import TestM (evalTestM)
+import Primer.Core.DSL
+import Test.Tasty.HUnit
+import qualified Data.Map as Map
 
 inExtendedGlobalCxt :: PropertyT WT a -> PropertyT WT a
 inExtendedGlobalCxt p = do
@@ -193,14 +196,50 @@ tasty_genApp_well_formed = withTests 1000 $
     Left err -> annotateShow err >> failure
     Right _ -> pure ()
 
+tasty_normaliseApp_idempotent :: Property
+tasty_normaliseApp_idempotent = withTests 1000 $
+  withDiscards 2000 $ propertyWT [] $ do
+  base <- forAllT $ Gen.element [[],[builtinModule],[builtinModule, primitiveModule]]
+  a <- forAllT $ genApp SmartHoles base
+  let a' = normaliseApp a
+  let a'' = normaliseApp a'
+  on (===) (progImports.appProg) a' a''
+  on (===) (progModules.appProg) a' a''
+
+-- REVIEW TODO this was for debugging / understanding what is going on
+-- It seems that if we define
+--   foo :: {? ∀a.a ?} ; foo = λx.?
+-- then normalising it is not idempotent
+-- we get
+--   foo :: ∀a.a ; foo = {? λx.? : ? ?}
+-- and then
+--   foo :: ∀a.a ; foo = λx.? : ?
+unit_normaliseApp_idempotent_weirdness_TMP :: Assertion
+unit_normaliseApp_idempotent_weirdness_TMP =
+  let fooBool e' t' = (\e t -> DefAST $ ASTDef e t) <$> e' <*> t'
+      d0 = create' $ fooBool (lam "x" emptyHole) (thole $ tforall "a" KType $ tvar "a")
+      d1 = create' $ fooBool (hole $ lam "x" emptyHole `ann` tEmptyHole) (tforall "a" KType $ tvar "a")
+      d2 = create' $ fooBool (lam "x" emptyHole `ann` tEmptyHole) (tforall "a" KType $ tvar "a")
+      mkApp' d = case mkAppSafe (toEnum 0) $ Prog [] [Module (ModuleName ["M"]) mempty $ Map.singleton "foo" d] Nothing NoSmartHoles defaultLog of
+        Left err -> assertFailure $ show err
+        Right a -> pure a
+      getFoo a = foldMap (fmap (\d -> (forgetTypeIDs $ defType d, forgetIDs . astDefExpr <$> defAST d)) . Map.elems . moduleDefs) $ progModules $ appProg a
+  in do
+    a0 <- mkApp' d0
+    a1 <- mkApp' d1
+    a2 <- mkApp' d2
+    getFoo a1 @?= getFoo (normaliseApp a0)
+    getFoo a2 @?= getFoo (normaliseApp a1)
+
+
 tasty_genAppSH_normalised :: Property
 tasty_genAppSH_normalised = withTests 1000 $
   withDiscards 2000 $ propertyWT [] $ do
-  a <- forAllT $ genAppSH [builtinModule, primitiveModule]
-  let ms = progModules $ appProg a
-  case evalTestM 0 . runExceptT @TypeError $ checkEverything SmartHoles CheckEverything{trusted = [], toCheck=ms} of
-      Left err -> annotateShow err >> failure
-      Right ms' ->  ms === ms'
+  base <- forAllT $ Gen.element [[],[builtinModule],[builtinModule, primitiveModule]]
+  a <- forAllT $ genAppSH base
+  let a' = normaliseApp a
+  on (===) (progImports.appProg) a a' 
+  on (===) (progModules.appProg) a a' 
 
 -- Lift 'synth' into a property
 synthTest :: HasCallStack => Expr -> PropertyT WT (Type' (), ExprT)
