@@ -20,6 +20,7 @@ module Gen.Core.Typed (
   genCxtExtendingLocal,
   genPrimCon,
   genApp,
+  genAppSH,
   forAllT,
   propertyWT,
   freshNameForCxt,
@@ -93,11 +94,12 @@ import Primer.Typecheck (
   matchForallType,
   mkTAppCon,
   primConInScope,
-  typeDefs, extendGlobalCxt, exprTtoExpr
+  typeDefs, extendGlobalCxt, exprTtoExpr, checkEverything, CheckEverythingRequest (..), TypeError
  )
 import TestM (TestM, evalTestM, isolateTestM)
 import TestUtils (Property, property)
-import Primer.App (Prog (..), defaultLog, App, mkApp)
+import Primer.App (Prog (..), defaultLog, App, mkApp, appProg, runEditAppM, appIdCounter, appNameCounter)
+import Prelude (error)
 
 {-
 Generate well scoped and typed expressions.
@@ -557,15 +559,15 @@ genPrimCon = catMaybes <$> sequence [genChar, genInt]
       PrimInt _ -> ()
 
 
--- | Generate a whole 'Prog', with empty log, and smartholes turned on
-genProg :: [Module] -> GenT WT Prog
-genProg initialImports = local (extendCxtByModules initialImports) $ do
+-- | Generate a whole 'Prog', with empty log
+genProg :: SmartHoles -> [Module] -> GenT WT Prog
+genProg sh initialImports = local (extendCxtByModules initialImports) $ do
   imports <- telescope (Range.linear 0 2) (local . extendCxtByModule) (genModule "I")
   home <- local (extendCxtByModules imports) $ telescope (Range.linear 1 2) (local . extendCxtByModule) (genModule "M")
   pure $ Prog { progImports = initialImports <> imports
               , progModules = home
               , progSelection = Nothing
-              , progSmartHoles = SmartHoles
+              , progSmartHoles = sh
               , progLog = defaultLog
               }
   where
@@ -593,12 +595,31 @@ genProg initialImports = local (extendCxtByModules initialImports) $ do
                     , moduleDefs = defs
                     }
 
-genApp :: [Module] -> GenT WT App
-genApp initialImports = do
-  p <- genProg initialImports
+genApp :: SmartHoles -> [Module] -> GenT WT App
+genApp sh initialImports = do
+  p <- genProg sh initialImports
   i <- lift $ isolateWT fresh
   nc <- lift $ isolateWT fresh
   pure $ mkApp i nc p
+
+-- | Generate an 'App' which is "smartholes-normal", i.e. that the
+-- smartholes machinery will not make any changes to it. The returned
+-- 'App' will have smartholes enabled.
+genAppSH :: [Module] -> GenT WT App
+genAppSH m = do
+  a <- genApp SmartHoles m
+  let p = appProg a
+  let pNormalised = evalTestM 0 . runExceptT @TypeError $ do
+        imp' <- checkEverything SmartHoles CheckEverything{trusted = [], toCheck = progImports p}
+        mod' <- checkEverything SmartHoles CheckEverything{trusted = imp', toCheck = progModules p}
+        pure p{progImports=imp', progModules=mod'}
+  -- genApp always generates a well-typed App (see tasty_genApp_well_formed)
+  -- so we will just crash if something has gone wrong.
+  -- We know that smartholes will only remove nodes, never inserting them, so we
+  -- do not need to track id counters etc
+  case pNormalised of
+    Left err -> error $ show err
+    Right p' -> pure $ mkApp (appIdCounter a) (appNameCounter a) p'
 
 hoist' :: Applicative f => Cxt -> WT a -> f a
 hoist' cxt = pure . evalTestM 0 . flip runReaderT cxt . unWT

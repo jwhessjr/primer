@@ -35,6 +35,7 @@ import Primer.Action
 import qualified Data.Text as T
 import Primer.App (appProg, Prog (..), handleEditRequest, runEditAppM, EditAppM)
 import qualified Primer.App as App
+import TestM (evalTestM)
 
 
 -- The 'a' parameter (node labels) are only needed for implementation of 'binderTree'
@@ -124,7 +125,7 @@ unit_shadow_action_a_weirdness =
       p = App.Prog   { progImports = []
                      , progModules = [m]
                      , progSelection = Nothing
-                     , progSmartHoles = SmartHoles
+                     , progSmartHoles = NoSmartHoles
                      , progLog = App.Log []
                      }
       a' = App.mkAppSafe (toEnum 0) p
@@ -136,11 +137,12 @@ unit_shadow_action_a_weirdness =
     case runEditAppM (handleEditRequest
                       [CreateDef mn $ Just "aCopy"
                       ,CopyPasteSig (qualifyDefName m "a",getID t) []
---                      ,CopyPasteBody (qualifyDefName m "a",getID e) []
+                      ,CopyPasteBody (qualifyDefName m "a",getID e) []
                       ])
          a of
       (Left err, _ ) -> assertFailure $ show err
-      (Right p, _) -> assertFailure $ show $ progModules p --pure ()
+--      (Right p, _) -> assertFailure $ show $ progModules p --pure ()
+      (Right p, _) -> pure ()
 -- OH, I SEE what the weird issue was: genApp generates a non-smartholes-normal app, so
 -- the node of id 0 gets removed after running the first action, so we cannot find it when
 -- wanting to copy the body!
@@ -153,7 +155,7 @@ unit_shadow_action_a =
       p = App.Prog   { progImports = []
                      , progModules = [m]
                      , progSelection = Nothing
-                     , progSmartHoles = SmartHoles
+                     , progSmartHoles = NoSmartHoles
                      , progLog = App.Log []
                      }
       a' = App.mkAppSafe (toEnum 0) p
@@ -169,13 +171,30 @@ unit_shadow_action_a =
       (Left err, _ ) -> assertFailure $ show err
       (Right _, _) -> pure ()
 
+unit_shadow_action_b :: Assertion
+unit_shadow_action_b = 
+  let (e,t) = create' $ (,) <$> hole (emptyHole `ann` tEmptyHole) <*> tEmptyHole `tapp` tEmptyHole
+      mn = ModuleName ["M", "0"]
+      m = Module mn mempty $
+            Map.singleton "a" $ DefAST $ ASTDef e t
+      p = App.Prog   { progImports = []
+                     , progModules = [m]
+                     , progSelection = Nothing
+                     , progSmartHoles = SmartHoles
+                     , progLog = App.Log []
+                     }
+  in do
+    case evalTestM 0 . runExceptT @TypeError $ checkEverything SmartHoles CheckEverything{trusted = [], toCheck=[m]} of
+      Left err -> assertFailure $ show err
+      Right p' ->  p' @?= [m]
+
 -- TODO: this actually just tests actions work -- should be moved!
 tasty_shadow_action :: Property
 tasty_shadow_action = withTests 500 $
   withDiscards 2000 $
     propertyWT [] $ do
       l <- forAllT $ Gen.element enumerate
-      a <- forAllT $ genApp [builtinModule, primitiveModule]
+      a <- forAllT $ genAppSH [] -- [builtinModule, primitiveModule]
       (m,(defName, def')) <- forAllT $ Gen.justT $ do
         m' <- Gen.element $ progModules $ appProg a
         let ds = Map.toList $ moduleDefsQualified m'

@@ -14,7 +14,7 @@ import Gen.Core.Typed (
   genSyns,
   genWTKind,
   genWTType,
-  propertyWT, genApp
+  propertyWT, genApp, genAppSH
  )
 import Hedgehog (
   PropertyT,
@@ -43,7 +43,7 @@ import Primer.Primitives (primitiveModule)
 import Primer.Typecheck (
   Cxt (..),
   ExprT,
-  SmartHoles (NoSmartHoles),
+  SmartHoles (NoSmartHoles, SmartHoles),
   TypeError,
   check,
   checkKind,
@@ -51,10 +51,14 @@ import Primer.Typecheck (
   consistentTypes,
   initialCxt,
   synth,
-  synthKind
+  synthKind, CheckEverythingRequest (..), checkEverything
  )
 import TestUtils (Property, withDiscards, withTests)
-import Primer.App (checkAppWellFormed)
+import Primer.App (checkAppWellFormed, Prog (progModules), appProg)
+import qualified Hedgehog.Gen as Gen
+import Data.List.Extra (enumerate)
+import Primer.Action (Level)
+import TestM (evalTestM)
 
 inExtendedGlobalCxt :: PropertyT WT a -> PropertyT WT a
 inExtendedGlobalCxt p = do
@@ -184,10 +188,19 @@ tasty_genChk = withTests 1000 $
 tasty_genApp_well_formed :: Property
 tasty_genApp_well_formed = withTests 1000 $
   withDiscards 2000 $ propertyWT [] $ do
-  a <- forAllT $ genApp [builtinModule, primitiveModule]
+  a <- forAllT $ genApp NoSmartHoles [builtinModule, primitiveModule]
   case checkAppWellFormed a of
     Left err -> annotateShow err >> failure
     Right _ -> pure ()
+
+tasty_genAppSH_normalised :: Property
+tasty_genAppSH_normalised = withTests 1000 $
+  withDiscards 2000 $ propertyWT [] $ do
+  a <- forAllT $ genAppSH [builtinModule, primitiveModule]
+  let ms = progModules $ appProg a
+  case evalTestM 0 . runExceptT @TypeError $ checkEverything SmartHoles CheckEverything{trusted = [], toCheck=ms} of
+      Left err -> annotateShow err >> failure
+      Right ms' ->  ms === ms'
 
 -- Lift 'synth' into a property
 synthTest :: HasCallStack => Expr -> PropertyT WT (Type' (), ExprT)

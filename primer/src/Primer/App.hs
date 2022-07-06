@@ -490,7 +490,7 @@ focusNodeDefs defs defname nodeid =
           mzT = focusOnTy nodeid $ astDefType def
        in case fmap Left mzE <|> fmap Right mzT of
 --            Nothing -> throwError $ ActionError (IDNotFound nodeid)
-            Nothing -> throwError $ ActionError $ CustomFailure NoOp $ toS $ prettyCallStack callStack
+            Nothing -> throwError $ ActionError $ CustomFailure NoOp $ "focusNodeDefs: not found: id " <> show nodeid <> " in def " <> show defname <> " in defs " <> show defs <> toS (prettyCallStack callStack)
             Just x -> pure x
 
 -- | Handle a request to retrieve the current program
