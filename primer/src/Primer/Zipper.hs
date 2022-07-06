@@ -239,7 +239,7 @@ unfocusType :: TypeZ' a b -> ExprZ' a b
 unfocusType (TypeZ zt f) = f (fromZipper zt)
 
 -- | Forget the surrounding expression context
-focusOnlyType :: TypeZ -> TypeZip
+focusOnlyType :: TypeZ' a b -> TypeZip' b
 focusOnlyType (TypeZ zt _) = zt
 
 -- | We want to use up, down, left, right, etc. on 'ExprZ' and 'TypeZ',
