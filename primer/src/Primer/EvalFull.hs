@@ -1,5 +1,6 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE ImpredicativeTypes #-}
+{-# LANGUAGE OverloadedLabels #-}
 
 module Primer.EvalFull (
   Dir (..),
@@ -18,18 +19,41 @@ module Primer.EvalFull (
 -- (Perhaps we should just run a TC pass after each step?)
 -- See https://github.com/hackworthltd/primer/issues/6
 
-import Foreword
+import Foreword hiding (hoistAccum)
+import Foreword qualified
 
 import Control.Monad.Extra (untilJustM)
 import Control.Monad.Fresh (MonadFresh)
 import Control.Monad.Log (MonadLog, WithSeverity)
+import Control.Monad.Morph (generalize)
+import Control.Monad.Trans.Accum (Accum, AccumT, add, evalAccumT, look, readerToAccumT)
 import Data.Map qualified as M
 import Data.Set qualified as S
 import Data.Set.Optics (setOf)
-import Data.Tuple.Extra (thd3)
+import Data.Tuple.Extra (snd3, thd3)
 import GHC.Err (error)
 import Numeric.Natural (Natural)
-import Optics (AffineFold, Fold, afolding, elemOf, getting, summing, to, (%), _2, _3)
+import Optics (
+  AffineFold,
+  Fold,
+  afolding,
+  allOf,
+  elemOf,
+  foldVL,
+  folded,
+  getting,
+  ifiltered,
+  isnd,
+  notElemOf,
+  summing,
+  to,
+  traverseOf_,
+  (%),
+  (<%),
+  _1,
+  _2,
+  _Just,
+ )
 import Primer.Core (
   Bind' (Bind),
   CaseBranch,
@@ -51,6 +75,7 @@ import Primer.Core (
   ),
   ExprMeta,
   GVarName,
+  HasID,
   ID,
   Kind,
   LVarName,
@@ -68,6 +93,7 @@ import Primer.Core (
   TypeMeta,
   ValConName,
   bindName,
+  getID,
  )
 import Primer.Core.DSL (ann, letType, let_, letrec, lvar, tlet, tvar)
 import Primer.Core.Transform (renameTyVar, unfoldAPP, unfoldApp)
@@ -101,12 +127,15 @@ import Primer.TypeDef (
 import Primer.Typecheck.Utils (instantiateValCons', lookupConstructor, mkTAppCon)
 import Primer.Zipper (
   ExprZ,
+  IsZipper,
   TypeZ,
   bindersBelowTy,
   down,
   focus,
   focusType,
   getBoundHere,
+  getBoundHereDn,
+  getBoundHereTy,
   replace,
   right,
   target,
@@ -260,9 +289,21 @@ _freeVarsTy' = getting _freeVarsTy % _2 % to unLocalName
 
 _freeVarsLocal :: Fold (Local k) Name
 _freeVarsLocal =
-  _LLet % _2 % _freeVars'
-    `summing` _LLetrec % (_2 % _freeVars' `summing` _3 % _freeVarsTy')
-    `summing` _LLetType % _2 % _freeVarsTy'
+  (_LLet % _2 % _freeVars')
+    -- Since letrec bound variables expand with a local letrec,
+    -- we don't consider the recursively-bound variable free
+    -- (since it will not be in the inlining)
+    `summing` ( _LLetrec
+                  <% ( to (\(a, b, c) -> (a, (b, c)))
+                        % isnd
+                        % (_1 % _freeVars' `summing` _2 % _freeVarsTy')
+                        & ifiltered ((/=) . unLocalName)
+                     )
+              )
+    `summing` (_LLetType % _2 % _freeVarsTy')
+
+_freeVarsSomeLocal :: Fold SomeLocal Name
+_freeVarsSomeLocal = foldVL $ \f (LSome l) -> traverseOf_ _freeVarsLocal f l
 
 data Dir = Syn | Chk
   deriving (Eq, Show, Generic)
@@ -280,12 +321,11 @@ focusDir dirIfTop ez = case up ez of
     Hole _ _ -> Syn
     _ -> Chk
 
-viewLet :: ExprZ -> Maybe (SomeLocal, ExprZ)
-viewLet ez = case target ez of
-  -- the movements return Maybe but will obviously not fail in this scenario
-  Let _ x e _t -> (LSome $ LLet x e,) <$> (right =<< down ez)
-  Letrec _ x e ty _t -> (LSome $ LLetrec x e ty,) <$> (right =<< down ez)
-  LetType _ a ty _t -> (LSome $ LLetType a ty,) <$> down ez
+viewLet :: ExprZ -> Maybe (SomeLocal, Accum Cxt ExprZ)
+viewLet ez = case (target ez, exprChildren ez) of
+  (Let _ x e _b, [_, bz]) -> Just (LSome $ LLet x e, bz)
+  (Letrec _ x e ty _b, [_, bz]) -> Just (LSome $ LLetrec x e ty, bz)
+  (LetType _ a ty _b, [bz]) -> bz `seq` Just (LSome $ LLetType a ty, bz)
   _ -> Nothing
 
 viewCaseRedex :: TypeDefMap -> Expr -> Maybe Redex
@@ -371,17 +411,134 @@ viewCaseRedex tydefs = \case
       Just $
         CaseRedex c (zip args argTys) ty (map bindName patterns) br
 
--- This spots all redexs other than InlineLet
-viewRedex :: TypeDefMap -> DefMap -> Dir -> Expr -> Maybe Redex
-viewRedex tydefs globals dir = \case
-  Var _ (GlobalVarRef x) | Just (DefAST y) <- x `M.lookup` globals -> pure $ InlineGlobal x y
-  App _ (Ann _ (Lam _ x t) (TFun _ src tgt)) s -> pure $ Beta x t src tgt s
-  e@App{} -> ApplyPrimFun . thd3 <$> tryPrimFun (M.mapMaybe defPrim globals) e
-  -- (Λa.t : ∀b.T) S  ~> (letType a = S in t) : (letType b = S in T)
-  APP _ (Ann _ (LAM _ a t) (TForall _ b _ ty1)) ty2 -> pure $ BETA a t b ty1 ty2
-  e | Just r <- viewCaseRedex tydefs e -> Just r
-  Ann _ t ty | Chk <- dir, concreteTy ty -> pure $ Upsilon t ty
+-- We record each binder, along with its let-bound RHS (if any)
+-- and its original binding location and  context (to be able to detect capture)
+-- Invariant: lookup x c == Just (Just l,_,_) ==> localName l == x
+newtype Cxt = Cxt (M.Map Name (Maybe SomeLocal, ID, Cxt))
+  -- We want right-biased mappend, as we will use this with 'Accum'
+  -- and want later 'add's to overwrite earlier (more-global) context entries
+  deriving (Semigroup, Monoid) via Dual (M.Map Name (Maybe SomeLocal, ID, Cxt))
+
+-- TODO/REVIEW: is it worth trying to use a dependent map here?
+
+lookup :: Name -> Cxt -> Maybe (Maybe SomeLocal, ID, Cxt)
+lookup n (Cxt cxt) = M.lookup n cxt
+
+-- We only care about LLetType if we are looking up tyvars,
+-- as we assume that the input is well-typed, and the only things
+-- that tyvars can refer to are lettype, or foralls
+lookupTy :: TyVarName -> Cxt -> Maybe (Maybe (Local 'ATyVar), ID, Cxt)
+lookupTy n c = case lookup (unLocalName n) c of
+  Just (Just (LSome l@LLetType{}), i, c') -> Just (Just l, i, c')
   _ -> Nothing
+
+-- This notices all redexes
+-- Note that if a term is not a redex, but stuck on some sub-term,
+-- then it is either
+-- - a let (of some flavor)
+-- - stuck on its left-most child
+-- - stuck on the type annotation on its left-most child
+-- - stuck on expression under the type annotation in its left-most child
+viewRedex ::
+  TypeDefMap ->
+  DefMap ->
+  Dir ->
+  Expr ->
+  Reader Cxt (Maybe Redex)
+viewRedex tydefs globals dir = \case
+  Var _ (GlobalVarRef x) | Just (DefAST y) <- x `M.lookup` globals -> purer $ InlineGlobal x y
+  Var _ (LocalVarRef v) -> do
+    getNonCapturedLocal v <&> \x -> do
+      case x of
+        Just (LSome (LLet _ e)) -> pure $ InlineLet v e
+        Just (LSome (LLetrec _ e t)) -> pure $ InlineLetrec v e t
+        _ -> Nothing
+  Let _ v e1 e2
+    -- TODO: we will recompute the freeVars set a lot (especially when doing EvalFull iterations)
+    | unLocalName v `S.notMember` freeVars e2 -> purer $ ElideLet (LSome $ LLet v e1) e2
+    | unLocalName v `S.member` freeVars e1 -> purer $ RenameSelfLet v e1 e2
+    | otherwise -> pure Nothing
+  LetType _ v t e
+    | unLocalName v `S.notMember` freeVars e -> purer $ ElideLet (LSome $ LLetType v t) e
+    | v `S.member` freeVarsTy t -> purer $ RenameSelfLetType v t e
+    | otherwise -> pure Nothing
+  Letrec _ v e1 t e2
+    | unLocalName v `S.notMember` freeVars e2 -> purer $ ElideLet (LSome $ LLetrec v e1 t) e2
+    | otherwise -> pure Nothing
+  l@(Lam m v e) -> do
+    fvcxt <- fvCxt $ freeVars l
+    pure $
+      if unLocalName v `S.member` fvcxt
+        then pure $ RenameBindingsLam m v e fvcxt
+        else Nothing
+  l@(LAM m v e) -> do
+    fvcxt <- fvCxt $ freeVars l
+    pure $
+      if unLocalName v `S.member` fvcxt
+        then pure $ RenameBindingsLAM m v e fvcxt
+        else Nothing
+  App _ (Ann _ (Lam _ x t) (TFun _ src tgt)) s -> purer $ Beta x t src tgt s
+  e@App{} -> pure $ ApplyPrimFun . thd3 <$> tryPrimFun (M.mapMaybe defPrim globals) e
+  -- (Λa.t : ∀b.T) S  ~> (letType a = S in t) : (letType b = S in T)
+  APP _ (Ann _ (LAM _ a t) (TForall _ b _ ty1)) ty2 -> purer $ BETA a t b ty1 ty2
+  APP{} -> pure Nothing
+  e@(Case m s brs) -> do
+    fvcxt <- fvCxt $ freeVars e
+    -- TODO: we arbitrarily decide that renaming takes priority over reducing the case
+    -- This is good for evalfull, but bad for interactive
+    -- maybe we want to offer both, or maybe it will evaporate when do push-down-let
+    if getBoundHereDn e `S.disjoint` fvcxt
+      then case viewCaseRedex tydefs e of
+        Nothing -> pure Nothing
+        Just r -> purer r
+      else pure $ pure $ RenameBindingsCase m s brs fvcxt
+  Ann _ t ty | Chk <- dir, concreteTy ty -> purer $ Upsilon t ty
+  _ -> pure Nothing
+
+viewRedexType :: Type -> Reader Cxt (Maybe RedexType)
+viewRedexType = \case
+  TVar _ v ->
+    getNonCapturedLocal v <&> \case
+      Just (LSome (LLetType _ t)) -> pure $ InlineLetInType v t
+      _ -> Nothing
+  -- TODO: We may be able to do better if we grab the free vars out of the "catamorphism"
+  TLet _ v s t
+    | notElemOf (getting _freeVarsTy % _2) v t -> purer $ ElideLetInType (LLetType v s) t
+    | elemOf (getting _freeVarsTy % _2) v s -> purer $ RenameSelfLetInType v s t
+    | otherwise -> pure Nothing
+  fa@(TForall m v s t) -> do
+    fvcxt <- fvCxtTy $ freeVarsTy fa
+    pure $
+      if v `S.member` fvcxt
+        then -- If anything we may substitute would cause capture, we should rename this binder
+          pure $ RenameForall m v s t fvcxt
+        else Nothing
+  _ -> pure Nothing
+
+-- Get the let-bound definition of this variable, if some such exists
+-- and is substitutible in the current context
+getNonCapturedLocal :: LocalName k -> Reader Cxt (Maybe SomeLocal)
+getNonCapturedLocal v = do
+  def <- asks (lookup $ unLocalName v)
+  curCxt <- ask
+  pure $ do
+    (def', _, origCxt) <- def
+    def'' <- def'
+    let uncaptured x = ((==) `on` fmap snd3 . lookup x) origCxt curCxt
+    if allOf _freeVarsSomeLocal uncaptured def''
+      then Just def''
+      else Nothing
+
+-- What are the FVs of the RHS of these bindings?
+fvCxt :: S.Set Name -> Reader Cxt (S.Set Name)
+fvCxt vs = do
+  cxt <- ask
+  pure $ foldMap (setOf (_Just % _1 % _Just % _freeVarsSomeLocal) . flip lookup cxt) vs
+
+fvCxtTy :: S.Set TyVarName -> Reader Cxt (S.Set TyVarName)
+fvCxtTy vs = do
+  cxt <- ask
+  pure $ foldMap (setOf (_Just % _1 % _Just % _LLetType % _2 % getting _freeVarsTy % _2) . flip lookupTy cxt) vs
 
 -- We find the normal-order redex.
 -- Annoyingly this is not quite leftmost-outermost wrt our Expr type, as we
@@ -397,126 +554,144 @@ viewRedex tydefs globals dir = \case
 --   (λx.not x : Bool -> Bool) True
 -- This can be seen as "leftmost-outermost" if you consider the location of the
 -- "expand a" redex to be the 'lettype' rather than the variable occurrance.
---
--- This is unfortunately annoying to implement, because our Zipper doesn't mesh
--- well here (movements are Maybe, I know what should happen, but cannot
--- express the moves nicely...)
 findRedex ::
   TypeDefMap ->
   DefMap ->
   Dir ->
   Expr ->
   Maybe RedexWithContext
-findRedex tydefs globals dir = go . focus
+findRedex tydefs globals dir = flip evalAccumT mempty . go . focus
   where
-    eachChild z f = case down z of
-      Nothing -> Nothing
-      Just z' ->
-        let children = z' : unfoldr (fmap (\x -> (x, x)) . right) z'
-         in foldr ((<|>) . f) Nothing children
-    eachChildWithBinding z f = case down z of
-      Nothing -> Nothing
-      Just z' ->
-        let children = z' : unfoldr (fmap (\x -> (x, x)) . right) z'
-         in foldr (\c acc -> f (getBoundHere (target z) (Just $ target c)) c <|> acc) Nothing children
-    go ez
-      | Just (LSome l, bz) <- viewLet ez = goLet l ez bz
-      | Just mr <- viewRedex tydefs globals (focusDir dir ez) (target ez) = Just $ RExpr ez mr
-      | otherwise =
-          -- We reduce any types first, as computation in types is simple (just inlining)
-          (focusType ez >>= goType) <|> eachChild ez go
-    goType tz
-      | TLet _ a t _body <- target tz = down tz >>= right >>= goTLet (LLetType a t) tz
-      | otherwise = eachChild tz goType
-    -- This should always return Just
-    -- It finds either this let is redundant, or somewhere to substitute it
-    -- or something inside that we need to rename to unblock substitution
-    goLet :: Local k -> ExprZ -> ExprZ -> Maybe RedexWithContext
-    goLet l letz bodyz =
-      case (l, elemOf _freeVarsLocal (localName l) l) of
-        -- We have something like λx.let x = f x in g x (NB: non-recursive let)
-        -- We cannot substitute this let as we would get λx. let x = f x in g (f x)
-        -- where a variable has been captured
-        (LLet x e, True) -> pure $ RExpr letz $ RenameSelfLet x e (target bodyz)
-        (LLetType a ty, True) -> pure $ RExpr letz $ RenameSelfLetType a ty (target bodyz)
+    focusType' :: ExprZ -> AccumT Cxt Maybe TypeZ
+    -- Note that nothing in Expr binds a variable which scopes over a type child
+    -- so we don't need to 'add' anything
+    focusType' = lift . focusType
+    hoistAccum :: Accum Cxt a -> AccumT Cxt Maybe a
+    hoistAccum = Foreword.hoistAccum generalize
+    go :: ExprZ -> AccumT Cxt Maybe RedexWithContext
+    go ez = do
+      hoistAccum (readerToAccumT $ viewRedex tydefs globals (focusDir dir ez) (target ez)) >>= \case
+        Just r -> pure $ RExpr ez r
+        Nothing
+          | Just (LSome l, bz) <- viewLet ez -> goSubst l =<< hoistAccum bz
+          -- Since stuck things other than lets are stuck on the first child or
+          -- its type annotation, we can handle them all uniformly
+          | otherwise ->
+              msum $
+                (goType =<< focusType' ez)
+                  : map (go <=< hoistAccum) (exprChildren ez)
+    goType :: TypeZ -> AccumT Cxt Maybe RedexWithContext
+    goType tz = do
+      hoistAccum (readerToAccumT $ viewRedexType $ target tz) >>= \case
+        Just r -> pure $ RType tz r
+        Nothing
+          | TLet _ a t _body <- target tz
+          , [_, bz] <- typeChildren tz ->
+              goSubstTy a t =<< hoistAccum bz
+          | otherwise -> msum $ map (goType <=< hoistAccum) $ typeChildren tz
+    goSubst :: Local k -> ExprZ -> AccumT Cxt Maybe RedexWithContext
+    goSubst l ez = do
+      hoistAccum (readerToAccumT $ viewRedex tydefs globals (focusDir dir ez) $ target ez) >>= \case
+        -- We should inline such 'v' (note that we will not go under any 'v' binders)
+        Just r@(InlineLet w _) | localName l == unLocalName w -> pure $ RExpr ez r
+        Just r@(InlineLetrec w _ _) | localName l == unLocalName w -> pure $ RExpr ez r
+        -- Elide a let only if it blocks the reduction
+        Just r@(ElideLet (LSome w) _) | elemOf _freeVarsLocal (localName w) l -> pure $ RExpr ez r
+        -- Rename a binder only if it blocks the reduction
+        Just r@(RenameBindingsLam _ w _ _) | elemOf _freeVarsLocal (unLocalName w) l -> pure $ RExpr ez r
+        Just r@(RenameBindingsLAM _ w _ _) | elemOf _freeVarsLocal (unLocalName w) l -> pure $ RExpr ez r
+        Just r@(RenameBindingsCase _ _ brs _)
+          | not $ S.disjoint (setOf _freeVarsLocal l) (setOf (folded % #_CaseBranch % _2 % folded % to bindName % to unLocalName) brs) ->
+              pure $ RExpr ez r
+        Just r@(RenameSelfLet w _ _) | elemOf _freeVarsLocal (unLocalName w) l -> pure $ RExpr ez r
+        Just r@(RenameSelfLetType w _ _) | elemOf _freeVarsLocal (unLocalName w) l -> pure $ RExpr ez r
+        -- Switch to an inner let if substituting under it would cause capture
+        Nothing
+          | Just (LSome l', bz) <- viewLet ez
+          , localName l' /= localName l
+          , elemOf _freeVarsLocal (localName l') l ->
+              goSubst l' =<< hoistAccum bz
+        -- We should not go under 'v' binders, but otherwise substitute in each child
         _ ->
-          goSubst l bodyz
-            <|> Just (RExpr letz $ ElideLet (LSome l) (target bodyz))
-    -- As goLet, but for TLet
-    goTLet :: Local 'ATyVar -> TypeZ -> TypeZ -> Maybe RedexWithContext
-    goTLet l@(LLetType a s) tletz bodyz =
-      if elemOf (getting _freeVarsTy % _2) a s
-        then -- We have something like Λa. _ : tlet a = s a in t a
-        -- We cannot substitute this let as we would get Λa. _ : tlet a = s a in t (s a)
-        -- where a variable has been captured
-          pure $ RType tletz $ RenameSelfLetInType a s (target bodyz)
-        else
-          goSubstTy a s bodyz
-            <|> Just (RType tletz $ ElideLetInType l (target bodyz))
-    goSubst :: Local k -> ExprZ -> Maybe RedexWithContext
-    goSubst l ez = case target ez of
-      -- We've found one
-      Var _ (LocalVarRef x) | unLocalName x == localName l -> case l of
-        LLet n le -> pure $ RExpr ez $ InlineLet n le
-        LLetrec n le lt -> pure $ RExpr ez $ InlineLetrec n le lt
-        -- This case should have caught by the TC: a term var is bound by a lettype
-        LLetType _ _ -> Nothing
-      -- We have found something like
-      --   let x=y in let y=z in t
-      -- to substitute the 'x' inside 't' we would need to rename the 'let y'
-      -- binding, but that is implemented in terms of let:
-      --   let x=y in let w=z in let y=w in t
-      -- and this doesn't make progress for let! (c.f. if the 'y' was bound by a
-      -- lambda). Instead, we swap to reducing the let y. Similarly for lettype.
-      -- LetRec can make progress, but we treat it the same as let, for
-      -- consistency. We are careful to not start substituting the inner let in
-      --   letrec x = x:T in let x=True in x
-      -- as we prefer to elide the outer. This is important to avoid an growing
-      -- expansion when evaluating letrec x = x:T in x.
-      _
-        | Just (LSome l', bz') <- viewLet ez
-        , localName l' /= localName l
-        , elemOf _freeVarsLocal (localName l') l ->
-            goLet l' ez bz'
-        -- Otherwise recurse into subexpressions (including let bindings) and types (if appropriate)
-        | LLetType n t <- l -> eachChildWithBinding ez rec <|> (focusType ez >>= goSubstTy n t)
-        | otherwise -> eachChildWithBinding ez rec
-      where
-        rec bs z
-          -- Don't go under binding of 'n': those won't be the 'n's we are looking for
-          | localName l `S.member` bs = Nothing
-          -- If we are substituting x->y in e.g. λy.x, we rename the y to avoid capture
-          -- This may recompute the FV set of l quite a lot. We could be more efficient here!
-          | fvs <- setOf _freeVarsLocal l
-          , not $ S.null $ fvs `S.intersection` bs =
-              up z <&> \z' -> case target z' of
-                Lam m x e -> RExpr z' $ RenameBindingsLam m x e fvs
-                LAM m x e -> RExpr z' $ RenameBindingsLAM m x e fvs
-                Case m s brs -> RExpr z' $ RenameBindingsCase m s brs fvs
-                -- We should replace this with a proper exception. See:
-                -- https://github.com/hackworthltd/primer/issues/148
-                e -> error $ "Internal Error: something other than Lam/LAM/Case was a binding: " ++ show e
-          | otherwise = goSubst l z
-    goSubstTy :: TyVarName -> Type -> TypeZ -> Maybe RedexWithContext
-    goSubstTy n t tz = case target tz of
-      -- found one
-      TVar _ x | x == n -> pure $ RType tz $ InlineLetInType n t
-      -- Swap to an inner let, as long as it would make progress,
-      -- but prefer eliding an outer binder if possible
-      TLet _ m s _body
-        | m /= n
-        , elemOf (getting _freeVarsTy % _2) m t ->
-            down tz >>= right >>= goTLet (LLetType m s) tz
-      -- The only other binding form is a forall
-      -- Don't go under bindings of 'n'
-      (TForall i m k s)
-        | n == m -> Nothing
-        -- If we are substituting x->y in forall y.s, we rename the y to avoid capture
-        -- As we don't have 'let's in types, this is a big step
-        | fvs <- freeVarsTy t
-        , m `S.member` fvs ->
-            pure $ RType tz $ RenameForall i m k s fvs
-      _ -> eachChild tz (goSubstTy n t)
+          let substChild c = do
+                guard $ S.notMember (localName l) $ getBoundHere (target ez) (Just $ target c)
+                goSubst l c
+              substTyChild c = case l of
+                LLetType v t -> goSubstTy v t c
+                _ -> mzero
+           in msum @[] $ (substTyChild =<< focusType' ez) : map (substChild <=< hoistAccum) (exprChildren ez)
+    goSubstTy :: TyVarName -> Type -> TypeZ -> AccumT Cxt Maybe RedexWithContext
+    goSubstTy v t tz =
+      let isFreeIn = elemOf (getting _freeVarsTy % _2)
+       in do
+            hoistAccum (readerToAccumT $ viewRedexType $ target tz) >>= \case
+              -- We should inline such 'v' (note that we will not go under any 'v' binders)
+              Just r@(InlineLetInType w _) | w == v -> pure $ RType tz r
+              -- Elide a let only if it blocks the reduction
+              Just r@(ElideLetInType (LLetType w _) _) | w `isFreeIn` t -> pure $ RType tz r
+              -- Rename a binder only if it blocks the reduction
+              Just r@(RenameSelfLetInType w _ _) | w `isFreeIn` t -> pure $ RType tz r
+              Just r@(RenameForall _ w _ _ _) | w `isFreeIn` t -> pure $ RType tz r
+              -- We switch to an inner let if substituting under it would cause capture
+              Nothing
+                | TLet _ w s _ <- target tz
+                , [_, bz] <- typeChildren tz
+                , v /= w
+                , w `isFreeIn` t ->
+                    goSubstTy w s =<< hoistAccum bz
+              -- We should not go under 'v' binders, but otherwise substitute in each child
+              _ ->
+                let substChild c = do
+                      guard $
+                        S.notMember (unLocalName v) $
+                          S.map unLocalName $
+                            getBoundHereTy (target tz) (Just $ target c)
+                      goSubstTy v t c
+                 in msum $ map (substChild <=< hoistAccum) (typeChildren tz)
+
+children' :: IsZipper za a => za -> [za]
+children' z = case down z of
+  Nothing -> mempty
+  Just z' -> z' : unfoldr (fmap (\x -> (x, x)) . right) z'
+
+exprChildren :: ExprZ -> [Accum Cxt ExprZ]
+exprChildren ez =
+  children' ez <&> \c -> do
+    let bs = getBoundHere' (target ez) (Just $ target c)
+    addBinds ez bs
+    pure c
+
+typeChildren :: TypeZ -> [Accum Cxt TypeZ]
+typeChildren tz =
+  children' tz <&> \c -> do
+    let bs = getBoundHereTy' (target tz) (Just $ target c)
+    addBinds tz bs
+    pure c
+
+-- TODO: Yuck, is there another way?
+getBoundHere' :: Expr -> Maybe Expr -> [Either Name SomeLocal]
+getBoundHere' (Let _ x e1 e2) boundIn | boundIn == Just e2 = [Right $ LSome $ LLet x e1]
+getBoundHere' (LetType _ a t _) _ = [Right $ LSome $ LLetType a t]
+getBoundHere' (Letrec _ x e1 t _) _ = [Right $ LSome $ LLetrec x e1 t]
+getBoundHere' boundAt boundIn = map Left $ S.toList $ getBoundHere boundAt boundIn
+
+getBoundHereTy' :: Type -> Maybe Type -> [Either Name SomeLocal]
+getBoundHereTy' = fmap (bimap unLocalName LSome) <<$>> getBoundHereTy''
+  where
+    getBoundHereTy'' :: Type -> Maybe Type -> [Either TyVarName (Local 'ATyVar)]
+    getBoundHereTy'' (TLet _ x t1 t2) boundIn | boundIn == Just t2 = [Right $ LLetType x t1]
+    getBoundHereTy'' boundAt boundIn = map Left $ S.toList $ getBoundHereTy boundAt boundIn
+
+addBinds :: HasID i => i -> [Either Name SomeLocal] -> Accum Cxt ()
+addBinds i' bs = do
+  let i = getID i'
+  cxt <- look
+  add $
+    Cxt $
+      M.fromList $
+        bs <&> \case
+          Left n -> (n, (Nothing, i, cxt))
+          Right ls@(LSome l) -> (localName l, (Just ls, i, cxt))
 
 -- TODO: deal with metadata. https://github.com/hackworthltd/primer/issues/6
 runRedex :: MonadEvalFull l m => Redex -> m Expr
