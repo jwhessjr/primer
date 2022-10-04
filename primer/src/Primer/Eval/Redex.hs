@@ -17,6 +17,8 @@ module Primer.Eval.Redex (
   _freeVarsLocal,
   EvalFullLog (..),
   MonadEvalFull,
+  -- Exported for testing
+  getNonCapturedLocal
 ) where
 
 -- TODO: share code with Primer.Eval
@@ -225,6 +227,7 @@ data Local k where
   LLet :: LVarName -> Expr -> Local 'ATmVar
   LLetrec :: LVarName -> Expr -> Type -> Local 'ATmVar
   LLetType :: TyVarName -> Type -> Local 'ATyVar
+deriving instance Show (Local k)
 
 localName :: Local k -> Name
 localName = \case
@@ -243,6 +246,7 @@ _LLetType = afolding $ \case LLetType n t -> pure (n, t); _ -> Nothing
 
 data SomeLocal where
   LSome :: Local k -> SomeLocal
+deriving instance Show SomeLocal
 
 _freeVars' :: Fold (Expr' a b) Name
 _freeVars' = _freeVars % to (either (unLocalName . snd) (unLocalName . snd))
@@ -362,6 +366,10 @@ newtype Cxt = Cxt (M.Map Name (Maybe SomeLocal, ID, Cxt))
   -- We want right-biased mappend, as we will use this with 'Accum'
   -- and want later 'add's to overwrite earlier (more-global) context entries
   deriving (Semigroup, Monoid) via Dual (M.Map Name (Maybe SomeLocal, ID, Cxt))
+-- TODO/REVIEW: is it worth trying to use a dependent map here?
+-- It would maybe make the testsuite lookupNonCaptured* better, as I could just
+-- lookup :: Cxt -> LocalName k -> Local k, and maybe that wouldn't have horrible "untouchable, can't unify" stuff...
+
 
 lookup :: Name -> Cxt -> Maybe (Maybe SomeLocal, ID, Cxt)
 lookup n (Cxt cxt) = M.lookup n cxt
@@ -541,7 +549,7 @@ runRedex = \case
     b <- freshLocalName' (S.map unLocalName (freeVarsTy ty) <> freeVars body)
     letType b (pure ty) $ letType a (tvar b) $ pure body
   ApplyPrimFun e -> e
-
+  
 runRedexTy :: MonadEvalFull l m => RedexType -> m (Type, EvalDetail)
 runRedexTy (InlineLetInType {ty,letID,varID,var}) = do
   ty' <- regenerateTypeIDs ty

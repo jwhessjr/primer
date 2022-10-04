@@ -83,5 +83,5 @@ evalFullStepCount tydefs env n d = go 0
 step :: MonadEvalFull l m => TypeDefMap -> DefMap -> Dir -> Expr -> Maybe (m Expr)
 step tydefs g d e = case findRedex tydefs g d e of
   Nothing -> Nothing
-  Just (RExpr ez r) -> Just $ unfocusExpr . flip replace ez <$> runRedex r
+  Just (RExpr ez r) -> Just $ unfocusExpr . flip replace ez  <$> runRedex r
   Just (RType et r) -> Just $ unfocusExpr . unfocusType . flip replace et . fst <$> runRedexTy r
