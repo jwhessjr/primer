@@ -769,7 +769,7 @@ unit_findNodeByID_capture =
  in do
   case findNodeByID varOcc Syn expr of
           Just (locals@(Cxt locals'), Left _)
-            | Map.size locals' == 1
+            | Map.size locals' == 2
             , Just (1, _) <- lookupCapturedLetrec "x" locals ->
                 pure ()
           Just (_, Left _) -> assertFailure "Expected let binding of 'x' to be reported as captured-if-inlined"
@@ -788,7 +788,7 @@ unit_findNodeByID_capture_type =
  in do
   case findNodeByID varOcc Syn expr of
           Just (locals@(Cxt locals'), Right _)
-            | Map.size locals' == 2
+            | Map.size locals' == 3
             , Just (1,_) <- lookupCapturedLetType "x" locals
             , Just (5, _) <- lookupCapturedLetType "z" locals ->
                 pure ()
