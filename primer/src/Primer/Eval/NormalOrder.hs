@@ -1,5 +1,6 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE OverloadedLabels #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 
 module Primer.Eval.NormalOrder (
   RedexWithContext (RExpr, RType),
@@ -10,7 +11,14 @@ import Foreword hiding (hoistAccum)
 import Foreword qualified
 
 import Control.Monad.Morph (generalize)
-import Control.Monad.Trans.Accum (Accum, AccumT, add, evalAccumT, look, readerToAccumT)
+import Control.Monad.Trans.Accum (
+  Accum,
+  AccumT,
+  add,
+  evalAccumT,
+  look,
+  readerToAccumT,
+ )
 import Data.Map qualified as M
 import Data.Set qualified as S
 import Data.Set.Optics (setOf)
@@ -107,6 +115,49 @@ viewLet dez@(_, ez) = case (target ez, exprChildren dez) of
   (LetType _ a ty _b, [bz]) -> bz `seq` Just (LSome $ LLetType a ty, bz)
   _ -> Nothing
 
+-- TODO: better docs
+-- not quite a normal fold map:
+-- - handle context & bidirectionality
+-- - go over every Expr node, but also every Type node
+-- - special handling for lets, because we need that for normal order
+-- goes in normal order modulo lets
+foldMapExpr :: forall f a. MonadPlus f => FMExpr (f a) -> Dir -> Expr -> f a
+foldMapExpr extract topDir = flip evalAccumT mempty . go . (topDir,) . focus
+  where
+    go :: (Dir, ExprZ) -> AccumT Cxt f a
+    go dez@(d, ez) =
+      readerToAccumT (ReaderT $ extract.expr ez d)
+        <|> case (extract.subst, viewLet dez) of
+          (Just goSubst, Just (l, bz)) -> (readerToAccumT . ReaderT . (\(d', b) -> goSubst l b d')) =<< hoistAccum bz
+          -- Since stuck things other than lets are stuck on the first child or
+          -- its type annotation, we can handle them all uniformly
+          _ ->
+            msum $
+              (goType =<< focusType' ez)
+                : map (go <=< hoistAccum) (exprChildren dez)
+    goType :: TypeZ -> AccumT Cxt f a
+    goType tz =
+      readerToAccumT (ReaderT $ extract.ty tz)
+        <|> case (extract.substTy, target tz) of
+          (Just goSubstTy, TLet _ a t _body)
+            | [_, bz] <- typeChildren tz -> (readerToAccumT . ReaderT . goSubstTy a t) =<< hoistAccum bz
+          _ -> msum $ map (goType <=< hoistAccum) $ typeChildren tz
+
+data FMExpr m = FMExpr
+  { expr :: ExprZ -> Dir -> Cxt -> m
+  , ty :: TypeZ -> Cxt -> m
+  , subst :: Maybe (SomeLocal -> ExprZ {- The body of the let-} -> Dir -> Cxt -> m)
+  , substTy :: Maybe (TyVarName -> Type -> TypeZ -> Cxt -> m)
+  }
+
+focusType' :: MonadPlus m => ExprZ -> AccumT Cxt m TypeZ
+-- Note that nothing in Expr binds a variable which scopes over a type child
+-- so we don't need to 'add' anything
+focusType' = lift . maybe empty pure . focusType
+
+hoistAccum :: Monad m => Accum Cxt b -> AccumT Cxt m b
+hoistAccum = Foreword.hoistAccum generalize
+
 -- We find the normal-order redex.
 -- Annoyingly this is not quite leftmost-outermost wrt our Expr type, as we
 -- are using 'let's to encode something similar to explicit substitution, and
@@ -127,37 +178,18 @@ findRedex ::
   Dir ->
   Expr ->
   Maybe RedexWithContext
-findRedex tydefs globals topDir = flip evalAccumT mempty . go . (topDir,) . focus
+findRedex tydefs globals =
+  foldMapExpr
+    ( FMExpr
+        { expr = \ez d -> runReader (RExpr ez <<$>> viewRedex tydefs globals d (target ez))
+        , ty = \tz -> runReader (RType tz <<$>> viewRedexType (target tz))
+        , subst = Just (\(LSome l) -> fmap evalAccumT . goSubst l)
+        , substTy = Just (\v t -> evalAccumT . goSubstTy v t)
+        }
+    )
   where
-    focusType' :: ExprZ -> AccumT Cxt Maybe TypeZ
-    -- Note that nothing in Expr binds a variable which scopes over a type child
-    -- so we don't need to 'add' anything
-    focusType' = lift . focusType
-    hoistAccum :: Accum Cxt a -> AccumT Cxt Maybe a
-    hoistAccum = Foreword.hoistAccum generalize
-    go :: (Dir, ExprZ) -> AccumT Cxt Maybe RedexWithContext
-    go dez@(d, ez) = do
-      hoistAccum (readerToAccumT $ viewRedex tydefs globals d (target ez)) >>= \case
-        Just r -> pure $ RExpr ez r
-        Nothing
-          | Just (LSome l, bz) <- viewLet (d, ez) -> goSubst l =<< hoistAccum bz
-          -- Since stuck things other than lets are stuck on the first child or
-          -- its type annotation, we can handle them all uniformly
-          | otherwise ->
-              msum $
-                (goType =<< focusType' ez)
-                  : map (go <=< hoistAccum) (exprChildren dez)
-    goType :: TypeZ -> AccumT Cxt Maybe RedexWithContext
-    goType tz = do
-      hoistAccum (readerToAccumT $ viewRedexType $ target tz) >>= \case
-        Just r -> pure $ RType tz r
-        Nothing
-          | TLet _ a t _body <- target tz
-          , [_, bz] <- typeChildren tz ->
-              goSubstTy a t =<< hoistAccum bz
-          | otherwise -> msum $ map (goType <=< hoistAccum) $ typeChildren tz
-    goSubst :: Local k -> (Dir, ExprZ) -> AccumT Cxt Maybe RedexWithContext
-    goSubst l dez@(d, ez) = do
+    goSubst :: Local k -> ExprZ -> Dir -> AccumT Cxt Maybe RedexWithContext
+    goSubst l ez d = do
       hoistAccum (readerToAccumT $ viewRedex tydefs globals d $ target ez) >>= \case
         -- We should inline such 'v' (note that we will not go under any 'v' binders)
         Just r@(InlineLet w _) | localName l == unLocalName w -> pure $ RExpr ez r
@@ -174,19 +206,19 @@ findRedex tydefs globals topDir = flip evalAccumT mempty . go . (topDir,) . focu
         Just r@(RenameSelfLetType w _ _) | elemOf _freeVarsLocal (unLocalName w) l -> pure $ RExpr ez r
         -- Switch to an inner let if substituting under it would cause capture
         Nothing
-          | Just (LSome l', bz) <- viewLet dez
+          | Just (LSome l', bz) <- viewLet (d, ez)
           , localName l' /= localName l
           , elemOf _freeVarsLocal (localName l') l ->
-              goSubst l' =<< hoistAccum bz
+              (\(d', b) -> goSubst l' b d') =<< hoistAccum bz
         -- We should not go under 'v' binders, but otherwise substitute in each child
         _ ->
-          let substChild c = do
-                guard $ S.notMember (localName l) $ getBoundHere (target ez) (Just $ target $ snd c)
-                goSubst l c
+          let substChild (d', c) = do
+                guard $ S.notMember (localName l) $ getBoundHere (target ez) (Just $ target c)
+                goSubst l c d'
               substTyChild c = case l of
                 LLetType v t -> goSubstTy v t c
                 _ -> mzero
-           in msum @[] $ (substTyChild =<< focusType' ez) : map (substChild <=< hoistAccum) (exprChildren dez)
+           in msum @[] $ (substTyChild =<< focusType' ez) : map (substChild <=< hoistAccum) (exprChildren (d, ez))
     goSubstTy :: TyVarName -> Type -> TypeZ -> AccumT Cxt Maybe RedexWithContext
     goSubstTy v t tz =
       let isFreeIn = elemOf (getting _freeVarsTy % _2)
