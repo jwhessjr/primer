@@ -151,7 +151,7 @@ import Primer.Def (
  )
 import Primer.Eval (EvalDetail)
 import Primer.Eval qualified as Eval
-import Primer.EvalFull (Dir, EvalFullError (TimedOut), EvalFullLog, TerminationBound, evalFull)
+import Primer.EvalFull (Dir(Syn), EvalFullError (TimedOut), EvalFullLog, TerminationBound, evalFull)
 import Primer.JSON
 import Primer.Log (ConvertLogMessage)
 import Primer.Module (
@@ -521,7 +521,7 @@ handleEvalRequest req = do
       pure
         EvalResp
           { evalRespExpr = expr
-          , evalRespRedexes = Set.toList $ Eval.redexes (Map.mapMaybe defPrim $ allDefs prog) expr
+          , evalRespRedexes = toList $ Eval.redexes (allTypes prog) (allDefs prog) Syn expr
           , evalRespDetail = detail
           }
 
