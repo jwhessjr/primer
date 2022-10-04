@@ -226,6 +226,8 @@ data RedexType
       ,origForall :: Type
       }
 
+-- TODO: common up names for orig* stuff
+
 data Local k where
   LLet :: LVarName -> Expr -> Local 'ATmVar
   LLetrec :: LVarName -> Expr -> Type -> Local 'ATmVar
