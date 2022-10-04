@@ -189,6 +189,9 @@ data Redex
     RenameSelfLetType TyVarName Type Expr
   | ApplyPrimFun (forall m. MonadFresh ID m => m Expr)
 
+-- TODO: should be consistent with using local or components in RenameSelfLetInType vs Elide...
+-- and RenameSelfLet* vs Elide... ; and Inline* also
+
 
 data RedexType 
   = InlineLetInType {
