@@ -256,7 +256,7 @@ children' z = case down z of
   Just z' -> z' : unfoldr (fmap (\x -> (x, x)) . right) z'
 
 exprChildren :: (Dir, ExprZ) -> [Accum Cxt (Dir, ExprZ)]
-exprChildren (_, ez) =
+exprChildren (d, ez) =
   children' ez <&> \c -> do
     let bs = getBoundHere' (target ez) (Just $ target c)
     let d' = case target ez of
@@ -264,6 +264,13 @@ exprChildren (_, ez) =
           APP _ f _ | f == target c -> Syn
           Case _ scrut _ | scrut == target c -> Syn
           Hole _ _ -> Syn
+          -- bodies of lets are the same direction as
+          -- the let themselves
+          Let _ _ e _ | e == target c -> Syn
+                      | otherwise -> d
+          LetType{} -> d
+          Letrec _ _ e _ _ | e == target c -> Chk
+                           | otherwise -> d
           _ -> Chk
     addBinds ez bs
     pure (d', c)
