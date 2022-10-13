@@ -113,7 +113,7 @@ instantiateValCons t = do
 instantiateValCons' ::
   TypeDefMap ->
   Type' () ->
-  Either TypeDefError (TyConName, ASTTypeDef, [(ValConName, forall m. MonadFresh NameCounter m =>  [m (Type' ())])])
+  Either TypeDefError (TyConName, ASTTypeDef, [(ValConName, forall m. MonadFresh NameCounter m => [m (Type' ())])])
 instantiateValCons' tyDefs t =
   getTypeDefInfo' tyDefs t
     >>= \(TypeDefInfo params tc def) -> case def of
@@ -125,7 +125,6 @@ instantiateValCons' tyDefs t =
             {- HLINT ignore instantiateValCons' "Avoid lambda" -}
             f c = (valConName c, map (\a -> substituteTypeVars (zip defparams params) a) $ valConArgs c)
         pure (tc, tda, map f $ astTypeDefConstructors tda)
-
 
 substituteTypeVars :: MonadFresh NameCounter m => [(TyVarName, Type' ())] -> Type' () -> m (Type' ())
 substituteTypeVars = flip $ foldrM (uncurry substTy)
