@@ -6,7 +6,11 @@ module Primer.Eval.NormalOrder (
   RedexWithContext (RExpr, RType),
   findRedex,
   foldMapExpr,
-  FMExpr(..)
+  FMExpr(..),
+  -- Exported for testing
+  singletonCxtLet,
+  singletonCxtLetType,
+  singletonCxtLetrec,
 ) where
 
 import Foreword hiding (hoistAccum)
@@ -19,7 +23,7 @@ import Control.Monad.Trans.Accum (
   add,
   evalAccumT,
   look,
-  readerToAccumT,
+  readerToAccumT, execAccum,
  )
 import Data.Map qualified as M
 import Data.Set qualified as S
@@ -52,7 +56,7 @@ import Primer.Core (
     TLet
   ),
   bindName,
-  getID,
+  HasID, getID, LVarName,
  )
 import Primer.Core.Utils (
   _freeVarsTy,
@@ -306,3 +310,14 @@ addBinds i' bs = do
         bs <&> \case
           Left n -> (n, (Nothing, i, cxt))
           Right ls@(LSome l) -> (localName l, (Just ls, i, cxt))
+
+-- TODO: cannot easily export Local as ctors conflict with old Locals
+-- so difficult to join these three into a singletonCxt to replace singletonLocal
+singletonCxtLet :: HasID i => i -> LVarName -> Expr -> Cxt
+singletonCxtLet i x e = addBinds i [Right $ LSome $ LLet x e] `execAccum`  mempty
+
+singletonCxtLetType :: HasID i => i -> TyVarName -> Type -> Cxt
+singletonCxtLetType i x t = addBinds i [Right $ LSome $ LLetType x t] `execAccum`  mempty
+
+singletonCxtLetrec :: HasID i => i -> LVarName -> Expr -> Type -> Cxt
+singletonCxtLetrec i x e t = addBinds i [Right $ LSome $  LLetrec x e t] `execAccum`  mempty

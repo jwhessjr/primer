@@ -50,7 +50,7 @@ import Optics (
   notElemOf,
   summing,
   to,
-  traverseOf_,
+  traverseOf_,(^..),filtered,
   (%),
   (<%),
   _1,
@@ -130,6 +130,12 @@ import Primer.Zipper (
   focus,
   getBoundHereDn,
  )
+import Primer.Eval.Detail (EvalDetail (LocalTypeVarInline, TLetRemoval, TLetRename, TForallRename)
+                          , LocalVarInlineDetail (LocalVarInlineDetail)
+                          , LetRemovalDetail (LetRemovalDetail)
+                          , LetRenameDetail (LetRenameDetail)
+                          ,ForallRenameDetail(ForallRenameDetail))
+import Primer.Eval.Detail qualified -- TODO: why needed?
 
 newtype EvalFullLog = InvariantFailure Text
   deriving newtype (Show, Eq)
@@ -536,15 +542,42 @@ runRedex = \case
     letType b (pure ty) $ letType a (tvar b) $ pure body
   ApplyPrimFun e -> e
 
-runRedexTy :: MonadEvalFull l m => RedexType -> m Type
-runRedexTy (InlineLetInType {ty}) = regenerateTypeIDs ty
+runRedexTy :: MonadEvalFull l m => RedexType -> m (Type, EvalDetail)
+runRedexTy (InlineLetInType {ty,letID,varID,var}) = do
+  ty' <- regenerateTypeIDs ty
+  let details = LocalVarInlineDetail {
+        letID, varID
+        ,valueID = getID ty,
+         bindingName = var
+        ,replacementID = getID ty'
+        ,isTypeVar = True
+                                          }
+  pure (ty',LocalTypeVarInline details)
 -- let a = s in t  ~>  t  if a does not appear in t
-runRedexTy (ElideLetInType {body}) = pure body
+runRedexTy (ElideLetInType {body, origLet,letBinding=(LLetType v _)}) = do
+  let details = LetRemovalDetail
+                { before = origLet
+                , after = body
+                , bindingName = unLocalName v
+                , letID = getID origLet
+                , bodyID = getID body
+                }
+  pure (body,TLetRemoval details)
 -- let a = s a in t a a  ~>  let b = s a in let a = b in t a a
-runRedexTy (RenameSelfLetInType {letBinding = LLetType a s,body}) = do
+runRedexTy (RenameSelfLetInType {letBinding = LLetType a s,body,origLet}) = do
   b <- freshLocalName (freeVarsTy s <> freeVarsTy body)
-  tlet b (pure s) $ tlet a (tvar b) $ pure body
-runRedexTy (RenameForall {meta, origBinder,kind,body,avoid}) = do
+  result <- tlet b (pure s) $ tlet a (tvar b) $ pure body
+  let details =               LetRenameDetail
+                { before = origLet
+                , after = result
+                , bindingNameOld = unLocalName a
+                , bindingNameNew = unLocalName b
+                , letID = getID origLet
+                , bindingOccurrences = getFreeOccurrancesTy a s
+                , bodyID = getID body
+                }
+  pure (result, TLetRename details)
+runRedexTy (RenameForall {meta, origBinder,kind,body,avoid,origForall}) = do
   -- It should never be necessary to try more than once, since
   -- we pick a new name disjoint from any that appear in @s@
   -- thus renaming will never capture (so @renameTyVar@ will always succeed).
@@ -553,7 +586,19 @@ runRedexTy (RenameForall {meta, origBinder,kind,body,avoid}) = do
   -- We do not log on retries
   let rename = do
         newBinder <- freshLocalName (avoid <> freeVarsTy body <> bindersBelowTy (focus body))
-        pure (newBinder, TForall meta newBinder kind <$> renameTyVar origBinder newBinder body)
+        let ret = renameTyVar origBinder newBinder body <&> \body' ->
+              let result = TForall meta newBinder kind body' in
+              (result
+              ,TForallRename $ ForallRenameDetail {
+                  before = origForall
+                  ,after = result
+                  ,bindingNameOld = unLocalName origBinder
+                  ,bindingNameNew = unLocalName newBinder
+                  ,forallID = getID origForall
+                  ,bindingOccurrences = getFreeOccurrancesTy origBinder body
+                  ,bodyID = getID body
+                                                  })
+        pure (newBinder, ret)
   rename >>= \case
     (_, Just t') -> pure t'
     (b, Nothing) -> do
@@ -564,6 +609,9 @@ runRedexTy (RenameForall {meta, origBinder,kind,body,avoid}) = do
             <> " for "
             <> show @_ @Text (meta, origBinder, kind, body, avoid)
       untilJustM $ snd <$> rename
+
+getFreeOccurrancesTy :: TyVarName -> Type -> [ID]
+getFreeOccurrancesTy a body = body ^.. getting _freeVarsTy % to (first getID) % filtered ((== a) . snd) % _1
 
 type MonadEvalFull l m =
   ( MonadFresh ID m

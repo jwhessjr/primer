@@ -30,7 +30,7 @@ import Primer.Core (
   Kind (KType),
   Type,
   getID,
-  _id, qualifyName, mkSimpleModuleName, unsafeMkGlobalName,
+  _id, qualifyName, mkSimpleModuleName, unsafeMkGlobalName, unLocalName,
  )
 import Primer.Core.DSL
 import Primer.Core.Utils (forgetMetadata, forgetTypeMetadata)
@@ -51,10 +51,10 @@ import Primer.Eval (
   RHSCaptured (Capture, NoCapture),
   findNodeByID,
   redexes,
-  singletonLocal,
+  singletonLocal,singletonCxtLetType,
   step,
   tryReduceExpr,
-  tryReduceType,
+  tryReduceType, Cxt,
  )
 import Primer.Module (Module (Module, moduleDefs, moduleName, moduleTypes), builtinModule, primitiveModule)
 import Primer.Primitives (PrimDef (EqChar, ToUpper), primitiveGVar, tChar)
@@ -78,8 +78,12 @@ import Primer.EvalFull (EvalFullLog)
 runTryReduce :: DefMap -> Locals -> (Expr, ID) -> Either EvalError (Expr, EvalDetail)
 runTryReduce globals locals (expr, i) = evalTestM i $ runExceptT $ tryReduceExpr globals locals expr
 
-runTryReduceType :: DefMap -> Locals -> (Type, ID) -> Either EvalError (Type, EvalDetail)
-runTryReduceType globals locals (ty, i) = evalTestM i $ runExceptT $ tryReduceType globals locals ty
+-- For use in assertions
+runTryReduceType :: DefMap -> Cxt -> (Type, ID) -> IO (Either EvalError (Type, EvalDetail))
+runTryReduceType globals locals (ty, i) = do
+  let (r,logs) = evalTestM i $ runPureLogT $ runExceptT $ tryReduceType @EvalFullLog globals locals ty
+  assertNoSevereLogs logs
+  pure r
 
 unit_tryReduce_no_redex :: Assertion
 unit_tryReduce_no_redex = do
@@ -266,8 +270,8 @@ unit_tryReduce_local_type_var :: Assertion
 unit_tryReduce_local_type_var = do
   -- We assume we're inside a larger expression (e.g. a let type) where the node that binds x has ID 5.
   let ((tyvar, val), i) = create $ (,) <$> tvar "x" <*> tcon' ["M"] "C"
-      locals = singletonLocal "x" (5, LLetType val)
-      result = runTryReduceType mempty locals (tyvar, i)
+      locals = singletonCxtLetType @ID 5 "x" val
+  result <- runTryReduceType mempty locals (tyvar, i)
   case result of
     Right (ty, LocalTypeVarInline detail) -> do
       ty ~~= val
@@ -374,8 +378,8 @@ unit_tryReduce_lettype_self_capture = do
 unit_tryReduce_tlet_elide :: Assertion
 unit_tryReduce_tlet_elide = do
   let (ty, i) = create $ tlet "x" (tcon' ["M"] "C") (tcon' ["M"] "D")
-      result = runTryReduceType mempty mempty (ty, i)
       expectedResult = create' $ tcon' ["M"] "D"
+  result <- runTryReduceType mempty mempty (ty, i)
   case result of
     Right (ty', TLetRemoval detail) -> do
       ty' ~~= expectedResult
@@ -387,12 +391,13 @@ unit_tryReduce_tlet_elide = do
       detail.bodyID @?= 2
     _ -> assertFailure $ show result
 
--- tlet x = x in x ==> tlet y = x in y
+-- tlet x = x in x ==> tlet y = x in  tlet x = y in x
 unit_tryReduce_tlet_self_capture :: Assertion
 unit_tryReduce_tlet_self_capture = do
   let (ty, i) = create $ tlet "x" (tvar "x") (tvar "x")
-      result = runTryReduceType mempty mempty (ty, i)
-      expectedResult = create' $ tlet "x0" (tvar "x") (tvar "x0")
+      n = "a3"
+      expectedResult = create' $ tlet n (tvar "x") $ tlet "x" (tvar n) (tvar "x")
+  result <- runTryReduceType mempty mempty (ty, i)
   case result of
     Right (ty', TLetRename detail) -> do
       ty' ~~= expectedResult
@@ -400,7 +405,7 @@ unit_tryReduce_tlet_self_capture = do
       detail.before @?= ty
       detail.after ~~= expectedResult
       detail.bindingNameOld @?= "x"
-      detail.bindingNameNew @?= "x0"
+      detail.bindingNameNew @?= unLocalName n
       detail.letID @?= 0
       detail.bindingOccurrences @?= [1]
       detail.bodyID @?= 2
@@ -652,9 +657,11 @@ unit_tryReduce_prim_fail_unreduced_args = do
       result = runTryReduce primDefs mempty (expr, i)
   result @?= Left NotRedex
 
-
-runStep :: ID -> DefMap -> (Expr, ID) -> Either EvalError (Expr, EvalDetail)
-runStep i' globals (expr, i) = evalTestM i' $ step globals expr i
+runStep :: ID -> DefMap  -> (Expr, ID) -> IO (Either EvalError (Expr, EvalDetail))
+runStep i' globals (e, i) = do
+  let (r,logs) = evalTestM i' $ runPureLogT $ step @EvalFullLog globals e i
+  assertNoSevereLogs logs
+  pure r
 
 -- One can call the eval-step api endpoint with an expression and ID
 -- of one of its nodes where that node is not a redex. This will call
@@ -674,8 +681,8 @@ unit_step_non_redex =
     notElem idX $ redexes mempty mempty Syn e1
   assertBool "Should not be in 'redexes', as would self-capture" $
     notElem idX $ redexes mempty mempty Syn e2
-  let s1 = runStep maxID mempty (e1, idX)
-  let s2 = runStep maxID mempty (e2 ,idX)
+  s1 <- runStep maxID mempty (e1, idX)
+  s2 <- runStep maxID mempty (e2 ,idX)
   case s1 of
     Left NotRedex -> pure ()
     s1' -> assertFailure $ show s1'
@@ -826,7 +833,7 @@ unit_findNodeByID_capture =
                 pure ()
           Just (_, Left _) -> assertFailure "Expected let binding of 'x' to be reported as captured-if-inlined"
           _ -> assertFailure "Expected to find the lvar 'x'"
-  let reduct = runStep maxID mempty (expr, varOcc)
+  reduct <- runStep maxID mempty (expr, varOcc)
   case reduct of
           Left NotRedex -> pure ()
           e -> assertFailure $ show e
@@ -846,7 +853,7 @@ unit_findNodeByID_capture_type =
                 pure ()
           Just (_, Right _) -> assertFailure "Expected lettype binding of 'x' and the tlet binding of 'z' to be reported as captured-if-inlined"
           _ -> assertFailure "Expected to find the lvar 'x'"
-  let reduct = runStep maxID mempty ( expr, varOcc )
+  reduct <- runStep maxID mempty ( expr, varOcc )
   case reduct of
           Left NotRedex -> pure ()
           e -> assertFailure $ show e

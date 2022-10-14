@@ -58,7 +58,7 @@ import Primer.Core (
   setID,
   _exprMeta,
   _exprTypeMeta,
-  _typeMeta,
+  _typeMeta, ID,
  )
 import Primer.Core.Utils (exprIDs)
 import Primer.Database (
@@ -159,6 +159,11 @@ assertNoSevereLogs logs =
 
 testNoSevereLogs :: (HasCallStack, MonadTest m, Eq l, Show l) => Seq (WithSeverity l) -> m ()
 testNoSevereLogs logs = Seq.filter isSevereLog logs === mempty
+
+-- recall that Assertion = IO ()
+-- TODO: was in old, pre-rebase branch. I think still used, but should be rewritten/moved/new idiom etc
+--evalTestMNoSevereLogs :: Show l => ID -> PureLogT (WithSeverity l) TestM a -> IO a
+--evalTestMNoSevereLogs i = evalTestM i . runPureLogT <&> \(a,msgs) -> assertNoSevereLogs msgs >> pure a
 
 -- Run 2 threads: one that serves a 'NullDb', and one that runs Primer
 -- API actions. This allows us to simulate a database and API service.
