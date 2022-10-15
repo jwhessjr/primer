@@ -278,6 +278,7 @@ _freeVarsLocal =
     -- Since letrec bound variables expand with a local letrec,
     -- we don't consider the recursively-bound variable free
     -- (since it will not be in the inlining)
+  -- TODO/REVIEW: these ^ docs are misleading now...
     `summing` ( _LLetrec
                   <% ( to (\(a, b, c) -> (a, (b, c)))
                         % isnd
