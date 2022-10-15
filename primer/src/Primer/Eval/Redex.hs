@@ -422,9 +422,20 @@ viewRedex ::
 viewRedex tydefs globals dir = \case
   Var _ (GlobalVarRef x) | Just (DefAST y) <- x `M.lookup` globals -> purer $ InlineGlobal x y
   (viewLets -> Just (fmap fst -> lets, body))
-    | S.disjoint (getBoundHereDn body)
-      (foldMap (S.singleton . someLocalName) lets <> setOf (folded % _freeVarsSomeLocal) lets)
+    | letBinders <- foldMap (S.singleton . someLocalName) lets
+    , S.disjoint (getBoundHereDn body)
+      (letBinders <> setOf (folded % _freeVarsSomeLocal) lets)
+      -- prefer to elide if possible
+    , allLetsUsed lets body
       -> purer $ PushLet lets body
+      where
+        -- Fold right-to-left calculating free var set and whether each
+        -- binder has been referenced
+        allLetsUsed ls b = snd $ foldr
+          (\l (fvs,allUsed) -> let n = someLocalName l
+                                   rhs = setOf _freeVarsSomeLocal l
+                               in (S.delete n fvs `S.union` rhs,allUsed && n `S.member` fvs))
+          (freeVars b, True) ls
   Let _ v e1 e2
     | Var _ (LocalVarRef w) <- e2 , v == w -> purer $ InlineLet (LLet v e1)
     -- TODO: we will recompute the freeVars set a lot (especially when doing EvalFull iterations)
