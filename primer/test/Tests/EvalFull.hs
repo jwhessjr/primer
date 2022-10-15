@@ -106,7 +106,7 @@ import TestUtils (
   zeroIDs,
  )
 import Tests.Action.Prog (runAppTestM)
-import Tests.Eval.Utils ((~=), testModules, genDirTm)
+import Tests.Eval.Utils ((~=), testModules, genDirTm, failWhenSevereLogs)
 import Tests.Gen.Core.Typed (checkTest)
 import Tests.Typecheck (runTypecheckTestM, runTypecheckTestMWithPrims)
 
@@ -1336,12 +1336,6 @@ evalFullTasty id_ tydefs globals n d e = do
   testNoSevereLogs logs
   let ids = r ^.. evalResultExpr % exprIDs
   ids === ordNub ids
-  pure r
-
-failWhenSevereLogs :: MonadTest m => PureLogT (WithSeverity EvalFullLog) m a -> m a
-failWhenSevereLogs m = do
-  (r, logs) <- runPureLogT m
-  testNoSevereLogs logs
   pure r
 
 unaryPrimTest :: PrimDef -> S Expr -> S Expr -> Assertion

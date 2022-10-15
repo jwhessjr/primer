@@ -1,9 +1,9 @@
 module Tests.Eval.Utils ((~=),(~~=),
-                        genDirTm,testModules) where
+                        genDirTm,testModules,failWhenSevereLogs) where
 
 import Foreword
 
-import Hedgehog ( PropertyT )
+import Hedgehog ( PropertyT, MonadTest )
 import Primer.Gen.Core.Typed
     ( genWTType, genSyn, genChk, forAllT, WT )
 import Primer.Eval (Dir (Chk, Syn))
@@ -16,6 +16,10 @@ import Test.Tasty.HUnit (Assertion, (@?=))
 import Primer.Core.Utils (generateIDs, forgetMetadata, forgetTypeMetadata)
 import Primer.Core.DSL ( create', tcon, tfun, lam, lvar ) 
 import Primer.Primitives (tChar)
+import Primer.Log (PureLogT, runPureLogT)
+import Control.Monad.Log (WithSeverity)
+import Primer.EvalFull (EvalFullLog)
+import TestUtils (testNoSevereLogs)
 
 -- | Generates
 --
@@ -70,3 +74,10 @@ x ~= y = forgetMetadata x @?= forgetMetadata y
 -- | Like '~=' but for types.
 (~~=) :: HasCallStack => Type -> Type -> Assertion
 x ~~= y = forgetTypeMetadata x @?= forgetTypeMetadata y
+
+failWhenSevereLogs :: MonadTest m => PureLogT (WithSeverity EvalFullLog) m a -> m a
+failWhenSevereLogs m = do
+  (r, logs) <- runPureLogT m
+  testNoSevereLogs logs
+  pure r
+
