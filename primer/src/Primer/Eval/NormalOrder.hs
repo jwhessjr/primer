@@ -161,19 +161,6 @@ hoistAccum :: Monad m => Accum Cxt b -> AccumT Cxt m b
 hoistAccum = Foreword.hoistAccum generalize
 
 -- We find the normal-order redex.
--- Annoyingly this is not quite leftmost-outermost wrt our Expr type, as we
--- are using 'let's to encode something similar to explicit substitution, and
--- reduce them by substituting one occurrance at a time, removing the 'let'
--- when there are no more substitutions to be done. Note that the 'let' itself
--- doesn't get "pushed down" in the tree.
--- example:
---   lettype a = Bool -> Bool in (λx.not x : a) True
--- reduces to
---   lettype a = Bool -> Bool in (λx.not x : Bool -> Bool) True
--- and then to
---   (λx.not x : Bool -> Bool) True
--- This can be seen as "leftmost-outermost" if you consider the location of the
--- "expand a" redex to be the 'lettype' rather than the variable occurrance.
 findRedex ::
   TypeDefMap ->
   DefMap ->
@@ -185,70 +172,10 @@ findRedex tydefs globals =
     ( FMExpr
         { expr = \ez d -> runReader (RExpr ez <<$>> viewRedex tydefs globals d (target ez))
         , ty = \tz -> runReader (RType tz <<$>> viewRedexType (target tz))
-        , subst = Just (\(LSome l) -> fmap evalAccumT . goSubst l)
-        , substTy = Just (\v t -> evalAccumT . goSubstTy v t)
+        , subst = Nothing
+        , substTy = Nothing
         }
     )
-  where
-    goSubst :: Local k -> ExprZ -> Dir -> AccumT Cxt Maybe RedexWithContext
-    goSubst l ez d = do
-      hoistAccum (readerToAccumT $ viewRedex tydefs globals d $ target ez) >>= \case
-        -- We should inline such 'v' (note that we will not go under any 'v' binders)
-        Just r@(InlineLet w _) | localName l == unLocalName w -> pure $ RExpr ez r
-        Just r@(InlineLetrec w _ _) | localName l == unLocalName w -> pure $ RExpr ez r
-        -- Elide a let only if it blocks the reduction
-        Just r@(ElideLet (LSome w) _) | elemOf _freeVarsLocal (localName w) l -> pure $ RExpr ez r
-        -- Rename a binder only if it blocks the reduction
-        Just r@(RenameBindingsLam _ w _ _) | elemOf _freeVarsLocal (unLocalName w) l -> pure $ RExpr ez r
-        Just r@(RenameBindingsLAM _ w _ _) | elemOf _freeVarsLocal (unLocalName w) l -> pure $ RExpr ez r
-        Just r@(RenameBindingsCase _ _ brs _)
-          | not $ S.disjoint (setOf _freeVarsLocal l) (setOf (folded % #_CaseBranch % _2 % folded % to bindName % to unLocalName) brs) ->
-              pure $ RExpr ez r
-        Just r@(RenameSelfLet w _ _) | elemOf _freeVarsLocal (unLocalName w) l -> pure $ RExpr ez r
-        Just r@(RenameSelfLetType w _ _) | elemOf _freeVarsLocal (unLocalName w) l -> pure $ RExpr ez r
-        -- Switch to an inner let if substituting under it would cause capture
-        Nothing
-          | Just (LSome l', bz) <- viewLet (d, ez)
-          , localName l' /= localName l
-          , elemOf _freeVarsLocal (localName l') l ->
-              (\(d', b) -> goSubst l' b d') =<< hoistAccum bz
-        -- We should not go under 'v' binders, but otherwise substitute in each child
-        _ ->
-          let substChild (d', c) = do
-                guard $ S.notMember (localName l) $ getBoundHere (target ez) (Just $ target c)
-                goSubst l c d'
-              substTyChild c = case l of
-                LLetType v t -> goSubstTy v t c
-                _ -> mzero
-           in msum @[] $ (substTyChild =<< focusType' ez) : map (substChild <=< hoistAccum) (exprChildren (d, ez))
-    goSubstTy :: TyVarName -> Type -> TypeZ -> AccumT Cxt Maybe RedexWithContext
-    goSubstTy v t tz =
-      let isFreeIn = elemOf (getting _freeVarsTy % _2)
-       in do
-            hoistAccum (readerToAccumT $ viewRedexType $ target tz) >>= \case
-              -- We should inline such 'v' (note that we will not go under any 'v' binders)
-              Just r@(InlineLetInType {var}) | var == v -> pure $ RType tz r
-              -- Elide a let only if it blocks the reduction
-              Just r@(ElideLetInType {letBinding = (LLetType w _)}) | w `isFreeIn` t -> pure $ RType tz r
-              -- Rename a binder only if it blocks the reduction
-              Just r@(RenameSelfLetInType {letBinding = (LLetType w _)}) | w `isFreeIn` t -> pure $ RType tz r
-              Just r@(RenameForall {origBinder}) | origBinder `isFreeIn` t -> pure $ RType tz r
-              -- We switch to an inner let if substituting under it would cause capture
-              Nothing
-                | TLet _ w s _ <- target tz
-                , [_, bz] <- typeChildren tz
-                , v /= w
-                , w `isFreeIn` t ->
-                    goSubstTy w s =<< hoistAccum bz
-              -- We should not go under 'v' binders, but otherwise substitute in each child
-              _ ->
-                let substChild c = do
-                      guard $
-                        S.notMember (unLocalName v) $
-                          S.map unLocalName $
-                            getBoundHereTy (target tz) (Just $ target c)
-                      goSubstTy v t c
-                 in msum $ map (substChild <=< hoistAccum) (typeChildren tz)
 
 children' :: IsZipper za a => za -> [za]
 children' z = case down z of

@@ -96,7 +96,7 @@ import Primer.Eval.Detail (
   tryReduceBETA,
   tryReduceBeta,
   tryReducePrim,
-  tryReducePush, RemoveAnnDetail (..), BindRenameDetail (..),
+  tryReducePush, RemoveAnnDetail (..), BindRenameDetail (..), PushLetDetail (..),
  )
 import Primer.Eval.EvalError (EvalError (..))
 import Primer.Eval.Utils (makeSafeTLetBinding)
@@ -120,7 +120,7 @@ import Primer.Zipper (
   unfocusType,
  )
 import Primer.Eval.Redex (Dir(..), viewRedex, viewRedexType, runRedexTy, Cxt(Cxt), runRedex, EvalFullLog, MonadEvalFull,
-                         Local(..),SomeLocal(LSome), getNonCapturedLocal, Redex (InlineGlobal, InlineLet, InlineLetrec, ElideLet, Beta, BETA, CaseRedex, Upsilon, RenameBindingsLam, RenameBindingsLAM, RenameBindingsCase, RenameSelfLet, RenameSelfLetType), localName)
+                         Local(..),SomeLocal(LSome), getNonCapturedLocal, Redex (InlineGlobal, InlineLet, ElideLet, Beta, BETA, CaseRedex, Upsilon, RenameBindingsLam, RenameBindingsLAM, RenameBindingsCase, PushLet), localName, localName', viewLets, someLocalName)
 import Primer.Eval.Redex qualified as Redex
 import Primer.TypeDef (TypeDefMap)
 import Primer.Eval.NormalOrder (foldMapExpr, FMExpr (FMExpr, subst, substTy, expr, ty)
@@ -411,22 +411,27 @@ tryReduceExpr tydefs globals cxt dir expr = case flip runReader cxt $ viewRedex 
   where
     details :: Redex -> Expr -> Expr -> Maybe EvalDetail
     details (InlineGlobal _ def) var after = pure $ GlobalVarInline GlobalVarInlineDetail{      def      , var      , after      }
-    details (InlineLet var e) (Var i (LocalVarRef _)) after
-      | Just (letID,_) <- runReader (getNonCapturedLocal var) cxt = pure $ LocalVarInline LocalVarInlineDetail {
-        letID
-        , varID = getID i
-        ,valueID = getID e -- TODO/REVIEW: I'm not sure this is a sensible notion, given the letrec rule -- what is the interest of the ID of e in letrec v = e : T in ...?
-        ,bindingName = var
+    details (InlineLet l) before after
+     | Just (varID,valueID) <- case before of
+            (Let _ _ val var) -> Just (getID val, getID var)
+            (Letrec _ _ val _ var) -> Just (getID val, getID var)
+            _ -> Nothing
+      = pure $ LocalVarInline LocalVarInlineDetail {
+        letID = getID before
+        ,varID
+        ,valueID -- TODO/REVIEW: I'm not sure this is a sensible notion, given the letrec rule -- what is the interest of the ID of e in letrec v = e : T in ...?
+        ,bindingName = localName' l
         ,replacementID = getID after
         ,isTypeVar = False}
-    details (InlineLetrec var e _t) (Var i (LocalVarRef _)) after
-      | Just (letID,_) <- runReader (getNonCapturedLocal var) cxt = pure $ LocalVarInline LocalVarInlineDetail {
-        letID
-        , varID = getID i
-        ,valueID = getID e -- TODO/REVIEW: I'm not sure this is a sensible notion, given the letrec rule -- what is the interest of the ID of e in letrec v = e : T in ...?
-        ,bindingName = var
-        ,replacementID = getID after
-        ,isTypeVar = False}                                                                                
+    details (PushLet lets e) before after
+      | Just (ls,_) <- viewLets before
+      = pure $ PushLetDown $ PushLetDetail
+      { before
+      , after
+      , letIDs = snd <$> toList ls
+      , letBindingNames = someLocalName <$> toList lets
+      , intoID = getID e
+      }
     details (ElideLet (LSome l) _) before after = pure $ LetRemoval LetRemovalDetail {
       before
       , after
@@ -495,22 +500,6 @@ tryReduceExpr tydefs globals cxt dir expr = case flip runReader cxt $ viewRedex 
       ,binderID = map getID binds
       ,renameLetID = rhs' `getLetsUntil` rhs
       ,bodyID = getID rhs
-      }
-    details (RenameSelfLet x _ body) before after@(Let _ y _ l) = pure $ BindRename BindRenameDetail {
-      before,after
-      ,bindingNameOld = [unLocalName x]
-      ,bindingNameNew = [unLocalName y]
-      ,binderID = [getID before]
-      ,renameLetID = [getID l]
-      ,bodyID = getID body
-      }
-    details (RenameSelfLetType a _ body) before after@(LetType _ b _ l) = pure $ BindRename BindRenameDetail {
-      before,after
-      ,bindingNameOld = [unLocalName a]
-      ,bindingNameNew = [unLocalName b]
-      ,binderID = [getID before]
-      ,renameLetID = [getID l]
-      ,bodyID = getID body
       }
     details (Redex.ApplyPrimFun _) before after
       | Just (name,args,_) <- tryPrimFun  (M.mapMaybe defPrim globals) before = pure $ ApplyPrimFun ApplyPrimFunDetail {

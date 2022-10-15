@@ -14,10 +14,13 @@ module Primer.Eval.Redex (
   Cxt (Cxt),
   SomeLocal (LSome),
   Local (..),
+  localName',
   localName,
+  someLocalName,
   _freeVarsLocal,
   EvalFullLog (..),
   MonadEvalFull,
+  viewLets,
   -- Exported for testing
   getNonCapturedLocal
 ) where
@@ -235,11 +238,14 @@ data Local k where
   LLetType :: TyVarName -> Type -> Local 'ATyVar
 deriving instance Show (Local k)
 
+localName' :: Local k -> LocalName k
+localName' = \case
+  LLet n _ -> n
+  LLetrec n _ _ -> n
+  LLetType n _ -> n
+
 localName :: Local k -> Name
-localName = \case
-  LLet n _ -> unLocalName n
-  LLetrec n _ _ -> unLocalName n
-  LLetType n _ -> unLocalName n
+localName = unLocalName . localName'
 
 _LLet :: AffineFold (Local k) (LVarName, Expr)
 _LLet = afolding $ \case LLet n e -> pure (n, e); _ -> Nothing
@@ -262,6 +268,9 @@ _freeVars' = _freeVars % to (either (unLocalName . snd) (unLocalName . snd))
 
 _freeVarsTy' :: Fold (Type' b) Name
 _freeVarsTy' = getting _freeVarsTy % _2 % to unLocalName
+
+_freeVarsLLetType :: Fold (Local 'ATyVar) TyVarName
+_freeVarsLLetType = _LLetType % _2 % getting _freeVarsTy % _2
 
 _freeVarsLocal :: Fold (Local k) Name
 _freeVarsLocal =
@@ -411,7 +420,7 @@ viewRedex ::
   Reader Cxt (Maybe Redex)
 viewRedex tydefs globals dir = \case
   Var _ (GlobalVarRef x) | Just (DefAST y) <- x `M.lookup` globals -> purer $ InlineGlobal x y
-  (viewLets -> Just (lets, body))
+  (viewLets -> Just (fmap fst -> lets, body))
     | S.disjoint (getBoundHereDn body)
       (foldMap (S.singleton . someLocalName) lets <> setOf (folded % _freeVarsSomeLocal) lets)
       -> purer $ PushLet lets body
@@ -457,16 +466,16 @@ viewRedex tydefs globals dir = \case
   Ann _ t ty | Chk <- dir, concreteTy ty -> purer $ Upsilon t ty
   _ -> pure Nothing
 
-viewLets :: Expr -> Maybe (NonEmpty SomeLocal, Expr)
+viewLets :: Expr -> Maybe (NonEmpty (SomeLocal, ID), Expr)
 viewLets ex = case viewLets' ex of
   ([],_) -> Nothing
   (l:ls,b) | isLeaf b -> Nothing
            | otherwise -> Just (l :| ls, b)
   where
    viewLets' = \case
-     Let _ v e b -> first (LSome (LLet v e) :) $ viewLets' b
-     Letrec _ v t ty b -> first (LSome (LLetrec v t ty) :) $ viewLets' b
-     LetType _ a ty b -> first (LSome (LLetType a ty) :) $ viewLets' b
+     Let m v e b -> first ((LSome (LLet v e),getID m) :) $ viewLets' b
+     Letrec m v t ty b -> first ((LSome (LLetrec v t ty),getID m) :) $ viewLets' b
+     LetType m a ty b -> first ((LSome (LLetType a ty),getID m) :) $ viewLets' b
      e -> ([],e)
    isLeaf = null . children
 
@@ -485,8 +494,8 @@ viewRedexType :: Type -> Reader Cxt (Maybe RedexType)
 viewRedexType = \case
   origTy | Just (bindingsWithID,intoTy) <- viewLetsTy origTy
          , (bindings,bindingIDs) <- NonEmpty.unzip bindingsWithID
-         , S.disjoint (S.map unLocalName $ getBoundHereDnTy intoTy)
-      (foldMap (S.singleton . localName) bindings <> setOf (folded % _freeVarsLocal) bindings)
+         , S.disjoint (getBoundHereDnTy intoTy)
+      (foldMap (S.singleton . localName') bindings <> setOf (folded % _freeVarsLLetType) bindings)
       -> purer $ PushLetType {    bindings,intoTy, origTy, bindingIDs}
   t@(TLet _ v ty body)
     | TVar _ var <- body, v == var -> purer $ InlineLetInType {
