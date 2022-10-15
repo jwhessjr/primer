@@ -605,13 +605,13 @@ runRedex = \case
   ApplyPrimFun e -> e
   where
     addLet :: MonadFresh ID m => SomeLocal -> Expr -> m Expr
-    addLet (LSome (LLet v e)) b = let_ v (pure e) (pure b)
-    addLet (LSome (LLetrec v t ty)) b = letrec v (pure t) (pure ty) (pure b)
-    addLet (LSome (LLetType v ty)) b = letType v (pure ty) (pure b)
+    addLet (LSome (LLet v e)) b = let_ v (regenerateExprIDs e) (pure b)
+    addLet (LSome (LLetrec v t ty)) b = letrec v (regenerateExprIDs t) (regenerateTypeIDs ty) (pure b)
+    addLet (LSome (LLetType v ty)) b = letType v (regenerateTypeIDs ty) (pure b)
     addLets :: MonadFresh ID m => NonEmpty SomeLocal -> Expr -> m Expr
     addLets ls e = foldrM addLet e ls
     addLetType :: MonadFresh ID m => SomeLocal -> Type -> m Type
-    addLetType (LSome (LLetType v ty)) b = tlet v (pure ty) (pure b)
+    addLetType (LSome (LLetType v ty)) b = tlet v (regenerateTypeIDs ty) (pure b)
     -- drop let bindings of term variables
     addLetType _ b = pure b
     addLetTypes ::  MonadFresh ID m => NonEmpty SomeLocal -> Type -> m Type
@@ -630,7 +630,7 @@ runRedexTy (InlineLetInType {ty,letID,varID,var}) = do
   pure (ty',LocalTypeVarInline details)
 runRedexTy (PushLetType {bindings,intoTy,origTy,bindingIDs}) = do
   let addTLet :: MonadFresh ID m => Local 'ATyVar -> Type -> m Type
-      addTLet (LLetType v ty) b = tlet v (pure ty) (pure b)
+      addTLet (LLetType v ty) b = tlet v (regenerateTypeIDs ty) (pure b)
       addTLets ls t = foldrM addTLet t ls
   ty' <- descendM (addTLets bindings) intoTy
   let details = PushLetDetail
