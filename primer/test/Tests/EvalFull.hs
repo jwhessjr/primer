@@ -148,20 +148,18 @@ unit_4 =
         s <- evalFullTest maxID mempty mempty 17 Syn expr
         s <~==> Right expected
 
--- This test is slightly unfortunate for two reasons
--- First, maybe we should do upsilon redexes more aggressively, to avoid the
--- inner annotation in the output
--- Second, writing [_] for embeddings we don't reduce [ e ] : T (and I'm not
--- sure if we should). This leads to the outer annotation in the output.
+-- This test is slightly unfortunate.
+-- Writing [_] for embeddings we don't reduce [ e ] : T (and I'm not
+-- sure if we should). This leads to the annotation in the output.
 -- See https://github.com/hackworthltd/primer/issues/12
 unit_5 :: Assertion
 unit_5 =
   let ((e, expt), maxID) = create $ do
         a <- letrec "x" (lvar "x") (tcon tBool) (lvar "x")
-        b <- letrec "x" (lvar "x") (tcon tBool) (lvar "x" `ann` tcon tBool) `ann` tcon tBool
+        b <- letrec "x" (lvar "x") (tcon tBool) (lvar "x") `ann` tcon tBool
         pure (a, b)
    in do
-        s <- evalFullTest maxID mempty mempty 100 Syn e
+        s <- evalFullTest maxID mempty mempty 101 Syn e
         s <~==> Left (TimedOut expt)
 
 unit_6 :: Assertion
