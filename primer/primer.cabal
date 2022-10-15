@@ -178,6 +178,7 @@ test-suite primer-test
     Tests.API
     Tests.App
     Tests.Database
+    Tests.Eval.Utils
     Tests.Eval
     Tests.EvalFull
     Tests.Examples

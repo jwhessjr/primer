@@ -66,6 +66,7 @@ import Primer.TypeDef (TypeDef (..), TypeDefMap,
                                    astTypeDefNameHints),ValCon(ValCon))
 import Primer.Zipper (target)
 import Test.Tasty.HUnit (Assertion, assertBool, assertFailure, (@?=))
+import Tests.Eval.Utils ((~=),(~~=))
 import TestM (evalTestM)
 import TestUtils (gvn, primDefs, vcn, assertNoSevereLogs)
 import Tests.Action.Prog (AppTestM,runAppTestM)
@@ -1114,13 +1115,4 @@ unit_eval_modules_scrutinize_imported_type =
         , moduleDefs = mempty
         }
 
--- * Misc helpers
 
--- | Like '@?=' but specifically for expressions.
--- Ignores IDs and metadata.
-(~=) :: HasCallStack => Expr -> Expr -> Assertion
-x ~= y = forgetMetadata x @?= forgetMetadata y
-
--- | Like '~=' but for types.
-(~~=) :: HasCallStack => Type -> Type -> Assertion
-x ~~= y = forgetTypeMetadata x @?= forgetTypeMetadata y
