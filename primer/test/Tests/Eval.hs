@@ -31,7 +31,7 @@ import Primer.Core (
   Kind (KType, KFun),
   Type,
   getID,
-  _id, qualifyName, mkSimpleModuleName, unsafeMkGlobalName, unLocalName, LocalName, Type' (TEmptyHole, TCon),
+  _id, qualifyName, mkSimpleModuleName, unsafeMkGlobalName, unLocalName, LocalName, Type' (TEmptyHole, TCon), Expr' (LetType),
  )
 import Primer.Core.DSL
 import Primer.Core.Utils (forgetMetadata, forgetTypeMetadata)
@@ -58,7 +58,7 @@ import Primer.Eval (
   tryReduceExpr,
   tryReduceType, Cxt(Cxt),Local(LLetrec, LLet, LLetType), SomeLocal (LSome)
  )
-import Primer.Module (Module (Module, moduleDefs, moduleName, moduleTypes), builtinModule, primitiveModule)
+import Primer.Module (Module (Module, moduleDefs, moduleName, moduleTypes), builtinModule, primitiveModule, moduleDefsQualified)
 import Primer.Primitives (PrimDef (EqChar, ToUpper), primitiveGVar, tChar)
 import Primer.Primitives.DSL (pfun)
 import Primer.TypeDef (TypeDef (..), TypeDefMap,
@@ -66,7 +66,7 @@ import Primer.TypeDef (TypeDef (..), TypeDefMap,
                                    astTypeDefNameHints),ValCon(ValCon))
 import Primer.Zipper (target)
 import Test.Tasty.HUnit (Assertion, assertBool, assertFailure, (@?=))
-import Tests.Eval.Utils ((~=),(~~=))
+import Tests.Eval.Utils ((~=),(~~=), genDirTm, failWhenSevereLogs)
 import TestM (evalTestM)
 import TestUtils (gvn, primDefs, vcn, assertNoSevereLogs)
 import Tests.Action.Prog (AppTestM,runAppTestM)
@@ -74,6 +74,13 @@ import qualified Tests.Action.Prog -- TODO: why needed?
 import Primer.Eval (Dir(Syn), getNonCapturedLocal)
 import Primer.Log (runPureLogT)
 import Primer.EvalFull (EvalFullLog)
+import Tasty ( Property, withDiscards, withTests )
+import Primer.Gen.Core.Typed (propertyWT, forAllT)
+import Primer.Typecheck (typeDefs)
+import Hedgehog (discard, failure, annotateShow, label, success, (===))
+import qualified Hedgehog.Gen as Gen
+import Data.Generics.Uniplate.Data (universe)
+import Tests.Gen.Core.Typed (checkTest)
 
 -- * 'tryReduce' tests
 
@@ -1115,4 +1122,27 @@ unit_eval_modules_scrutinize_imported_type =
         , moduleDefs = mempty
         }
 
+-- | Evaluation preserves types
+-- (assuming we don't end with a 'LetType' in the term, as the typechecker
+-- cannot currently deal with those)
+tasty_type_preservation :: Property
+tasty_type_preservation =
+  let testModules = [builtinModule, primitiveModule]
+  in withTests 200 $
+  withDiscards 2000 $
+    propertyWT testModules $ do
+      let globs = foldMap moduleDefsQualified testModules
+      tds <- asks typeDefs
+      (dir, t, ty) <- genDirTm
+      let rs = toList $ redexes tds globs dir t
+      when (null rs) discard
+      r <- forAllT $ Gen.element rs
+      s <- failWhenSevereLogs $ step tds globs t dir r
+      case s of
+        Left err -> annotateShow err >> failure
+        Right (s', _) -> if null [() | LetType{} <- universe s']
+                         then do
+          s'' <- checkTest ty s'
+          forgetMetadata s' === forgetMetadata s'' -- check no smart holes happened
+                         else label "skipped due to LetType" >> success
 
