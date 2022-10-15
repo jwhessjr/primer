@@ -129,11 +129,11 @@ unit_3 :: Assertion
 unit_3 =
   let ((expr, expected), maxID) = create $ do
         e <- letType "a" (tvar "b") $ emptyHole `ann` (tcon' ["M"] "T" `tapp` tvar "a" `tapp` tforall "a" KType (tvar "a") `tapp` tforall "b" KType (tcon' ["M"] "S" `tapp` tvar "a" `tapp` tvar "b"))
-        let b' = "a33" -- NB: fragile name a33
+        let b' = "a49" -- NB: fragile name
         expect <- emptyHole `ann` (tcon' ["M"] "T" `tapp` tvar "b" `tapp` tforall "a" KType (tvar "a") `tapp` tforall b' KType (tcon' ["M"] "S" `tapp` tvar "b" `tapp` tvar b'))
         pure (e, expect)
    in do
-        s <- evalFullTest maxID mempty mempty 5 Syn expr
+        s <- evalFullTest maxID mempty mempty 16 Syn expr
         s <~==> Right expected
 
 -- Check we don't have shadowing issues in terms
