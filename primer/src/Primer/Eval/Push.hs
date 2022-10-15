@@ -1,6 +1,6 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 
-module Primer.Eval.Push (PushAppIntoLetrecDetail (..), tryReducePush) where
+module Primer.Eval.Push (PushAppIntoLetrecDetail (..), tryReducePush, PushLetDetail(..)) where
 
 import Foreword
 
@@ -16,6 +16,7 @@ import Primer.Core (
 import Primer.Eval.Utils (annOf, annotate)
 import Primer.JSON (CustomJSON (CustomJSON), FromJSON, PrimerJSON, ToJSON)
 import Primer.Name.Fresh (isFresh, isFreshTy)
+import Primer.Name (Name)
 
 data PushAppIntoLetrecDetail = PushAppIntoLetrecDetail
   { before :: Expr
@@ -78,3 +79,18 @@ tryReducePush = \case
           }
       )
   _ -> Nothing
+
+data PushLetDetail k = PushLetDetail
+  { before :: k
+  -- ^ the expression before reduction
+  , after :: k
+  -- ^ the expression after reduction
+  , letIDs :: [ID]
+  -- ^ the ID of each let
+  , letBindingNames :: [Name]
+  -- ^ The name of the variables bound by the lets
+  , intoID :: ID
+  -- ^ the ID of term we push into
+  }
+  deriving (Eq, Show, Generic)
+  deriving (FromJSON, ToJSON) via PrimerJSON (PushLetDetail k)

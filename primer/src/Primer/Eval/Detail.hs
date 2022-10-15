@@ -44,6 +44,8 @@ data EvalDetail
   | -- | ID of let(rec)
     LetRemoval (LetRemovalDetail Expr)
   | TLetRemoval (LetRemovalDetail Type)
+  | PushLetDown (PushLetDetail Expr)
+  | PushLetDownTy (PushLetDetail Type)
   | -- | Renaming of binding in let x = ...x... in ...x...x...
     BindRename (BindRenameDetail Expr) -- TODO: use this more, eg for TForall
 --  | LetRename (LetRenameDetail Expr)

@@ -71,18 +71,14 @@ import Primer.Eval.Redex (
   Redex (
     ElideLet,
     InlineLet,
-    InlineLetrec,
     RenameBindingsCase,
     RenameBindingsLAM,
-    RenameBindingsLam,
-    RenameSelfLet,
-    RenameSelfLetType
+    RenameBindingsLam
   ),
   RedexType (
     ElideLetInType,
     InlineLetInType,
-    RenameForall,
-    RenameSelfLetInType, var, letBinding, origBinder
+    RenameForall, var, letBinding, origBinder
   ),
   SomeLocal (LSome),
   localName,
