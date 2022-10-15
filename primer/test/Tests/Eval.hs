@@ -7,7 +7,7 @@ import Foreword
 
 import Data.Map.Strict qualified as Map
 import Data.Set qualified as Set
-import Optics ((^.))
+import Optics ((^.), elemOf)
 import Primer.App (
   EvalReq (EvalReq, evalReqExpr, evalReqRedex),
   EvalResp (EvalResp, evalRespExpr),
@@ -34,7 +34,7 @@ import Primer.Core (
   _id, qualifyName, mkSimpleModuleName, unsafeMkGlobalName, unLocalName, LocalName, Type' (TEmptyHole, TCon), Expr' (LetType),
  )
 import Primer.Core.DSL
-import Primer.Core.Utils (forgetMetadata, forgetTypeMetadata)
+import Primer.Core.Utils (forgetMetadata, forgetTypeMetadata, exprIDs)
 import Primer.Def (ASTDef (..), Def (..), DefMap, defPrim)
 import Primer.Eval (
   ApplyPrimFunDetail (..),
@@ -77,10 +77,12 @@ import Primer.EvalFull (EvalFullLog)
 import Tasty ( Property, withDiscards, withTests )
 import Primer.Gen.Core.Typed (propertyWT, forAllT)
 import Primer.Typecheck (typeDefs)
-import Hedgehog (discard, failure, annotateShow, label, success, (===))
+import Hedgehog (discard, failure, annotateShow, label, success, (===), assert)
 import qualified Hedgehog.Gen as Gen
 import Data.Generics.Uniplate.Data (universe)
 import Tests.Gen.Core.Typed (checkTest)
+import Data.List (delete)
+import Primer.Pretty (prettyPrintExpr, compact)
 
 -- * 'tryReduce' tests
 
@@ -1146,3 +1148,34 @@ tasty_type_preservation =
           forgetMetadata s' === forgetMetadata s'' -- check no smart holes happened
                          else label "skipped due to LetType" >> success
 
+-- | Reductions do not interfere with each other
+-- if @i,j ∈ redexes e@  (and @i /= j@), and @e@ reduces to @e'@ via redex @i@
+-- then @j ∈ redexes e'@,
+-- unless @j@ no longer exists in @e'@ or @j@ was a rename-binding which is no longer required
+tasty_redex_independent :: Property
+tasty_redex_independent =
+  let testModules = [builtinModule, primitiveModule]
+  in withTests 200 $
+  withDiscards 2000 $
+    propertyWT testModules $ do
+      let globs = foldMap moduleDefsQualified testModules
+      tds <- asks typeDefs
+      (dir, t, _) <- genDirTm
+      annotateShow dir
+      annotateShow t
+      let rs = toList $ redexes tds globs dir t
+      when (length rs <= 1) discard
+      i <- forAllT $ Gen.element rs
+      j <- forAllT $ Gen.element $ delete i rs
+      s <- failWhenSevereLogs $ step tds globs t dir i
+      case s of
+        Left err -> annotateShow err >> failure
+        Right (s', _) -> do
+          annotateShow s'
+          if elemOf exprIDs j s'
+            then do
+              sj <- failWhenSevereLogs $ step tds globs t dir j
+              case sj of
+                Right (_, BindRename{}) -> success
+                _ -> assert $ j `elem` redexes tds globs dir s'
+            else success 
