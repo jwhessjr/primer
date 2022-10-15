@@ -141,11 +141,11 @@ unit_4 :: Assertion
 unit_4 =
   let ((expr, expected), maxID) = create $ do
         e <- let_ "a" (lvar "b") $ con' ["M"] "C" `app` lvar "a" `app` lam "a" (lvar "a") `app` lam "b" (con' ["M"] "D" `app` lvar "a" `app` lvar "b")
-        let b' = "a29" -- NB: fragile name a29
+        let b' = "a40" -- NB: fragile name
         expect <- con' ["M"] "C" `app` lvar "b" `app` lam "a" (lvar "a") `app` lam b' (con' ["M"] "D" `app` lvar "b" `app` lvar b')
         pure (e, expect)
    in do
-        s <- evalFullTest maxID mempty mempty 7 Syn expr
+        s <- evalFullTest maxID mempty mempty 17 Syn expr
         s <~==> Right expected
 
 -- This test is slightly unfortunate for two reasons
