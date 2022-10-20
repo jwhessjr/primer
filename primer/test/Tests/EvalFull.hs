@@ -109,6 +109,7 @@ import Tests.Action.Prog (runAppTestM)
 import Tests.Eval.Utils ((~=), testModules, genDirTm, failWhenSevereLogs)
 import Tests.Gen.Core.Typed (checkTest)
 import Tests.Typecheck (runTypecheckTestM, runTypecheckTestMWithPrims)
+import Primer.Pretty (prettyPrintExpr, compact)
 
 unit_1 :: Assertion
 unit_1 =
@@ -205,11 +206,31 @@ unit_8 =
         expect <- list_ tBool (take n $ cycle [con cTrue, con cFalse]) `ann` (tcon tList `tapp` tcon tBool)
         pure (globs, expr, expect)
    in do
-        evalFullTest maxID builtinTypes (M.fromList globals) 500 Syn e >>= \case
+        evalFullTest maxID builtinTypes (M.fromList globals) 1000 Syn e >>= \case
           Left (TimedOut _) -> pure ()
           x -> assertFailure $ show x
-        s <- evalFullTest maxID builtinTypes (M.fromList globals) 1000 Syn e
+        s <- evalFullTest maxID builtinTypes (M.fromList globals) 2000 Syn e
         s <~==> Right expected
+
+
+tmp :: Int -> TerminationBound -> IO ()
+tmp n s =
+  let modName = mkSimpleModuleName "TestModule"
+      ((globals, e, expected), maxID) = create $ do
+        (mapName, mapDef) <- Examples.map modName
+        (evenName, evenDef) <- Examples.even modName
+        (oddName, oddDef) <- Examples.odd modName
+        let lst = list_ tNat $ take n $ iterate (con cSucc `app`) (con cZero)
+        expr <- gvar mapName `aPP` tcon tNat `aPP` tcon tBool `app` gvar evenName `app` lst
+        let globs = [(mapName, mapDef), (evenName, evenDef), (oddName, oddDef)]
+        expect <- list_ tBool (take n $ cycle [con cTrue, con cFalse]) `ann` (tcon tList `tapp` tcon tBool)
+        pure (globs, expr, expect)
+   in do
+        evalFullTest maxID builtinTypes (M.fromList globals) s Syn e >>= \case
+          Left (TimedOut e') -> do
+            print "TIMED OUT"
+            prettyPrintExpr compact e'
+          Right e' ->             prettyPrintExpr compact e'
 
 -- A worker/wrapper'd map
 unit_9 :: Assertion
