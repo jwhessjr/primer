@@ -15,12 +15,13 @@ import Primer.Action (Action (Move, SetCursor), ActionError (IDNotFound), Moveme
 import Primer.App (
   EvalResp (EvalResp, evalRespDetail, evalRespExpr, evalRespRedexes),
   Log (..),
-  NodeSelection (..),
+  NodeSelection' (..),
   NodeType (..),
   Prog (..),
   ProgAction (BodyAction, MoveToDef),
   ProgError (NoDefSelected),
-  Selection (..),
+  Selection,
+  Selection' (..),
   defaultLog,
  )
 import Primer.Builtins (tNat)

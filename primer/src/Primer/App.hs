@@ -102,9 +102,11 @@ import Primer.Action.ProgError (ProgError (..))
 import Primer.App.Base (
   Editable (..),
   Level (..),
-  NodeSelection (..),
+  NodeSelection,
+  NodeSelection' (..),
   NodeType (..),
-  Selection (..),
+  Selection,
+  Selection' (..),
  )
 import Primer.Core (
   Bind' (Bind),
