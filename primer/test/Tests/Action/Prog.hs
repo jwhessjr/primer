@@ -37,7 +37,7 @@ import Primer.Action (
 import Primer.App (
   App,
   Log (..),
-  NodeSelection' (..),
+  NodeSelection (..),
   NodeType (..),
   Prog (..),
   ProgAction (..),
