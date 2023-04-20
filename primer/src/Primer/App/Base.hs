@@ -10,8 +10,7 @@ module Primer.App.Base (
   NodeType (..),
   Selection,
   Selection' (..),
-  NodeSelection,
-  NodeSelection' (..),
+  NodeSelection (..),
 ) where
 
 import Protolude
@@ -62,23 +61,21 @@ type Selection = Selection' (Either ExprMeta TypeMeta)
 data Selection' a = Selection
   { def :: GVarName
   -- ^ the ID of some ASTDef
-  , node :: Maybe (NodeSelection' a)
+  , node :: Maybe (NodeSelection a)
   }
-  deriving stock (Eq, Show, Read, Generic, Data)
+  deriving stock (Eq, Show, Read, Functor, Generic, Data)
   deriving (FromJSON, ToJSON) via PrimerJSON (Selection' a)
   deriving anyclass (NFData)
 
 -- | A selected node, in the body or type signature of some definition.
 -- We have the following invariant: @nodeType = SigNode ==> isRight meta@
-type NodeSelection = NodeSelection' (Either ExprMeta TypeMeta)
-
-data NodeSelection' a = NodeSelection
+data NodeSelection a = NodeSelection
   { nodeType :: NodeType
   , meta :: a
   }
-  deriving stock (Eq, Show, Read, Generic, Data)
-  deriving (FromJSON, ToJSON) via PrimerJSON (NodeSelection' a)
+  deriving stock (Eq, Show, Read, Functor, Generic, Data)
+  deriving (FromJSON, ToJSON) via PrimerJSON (NodeSelection a)
   deriving anyclass (NFData)
 
-instance HasID a => HasID (NodeSelection' a) where
+instance HasID a => HasID (NodeSelection a) where
   _id = lens (getID . (.meta)) (flip $ over #meta . set _id)
