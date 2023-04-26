@@ -56,6 +56,10 @@ module Primer.Action.Priorities (
   constructTypeApp,
   constructForall,
 
+  -- * Type def actions.
+  addCon,
+  addConField,
+
   -- * Generic actions.
   rename,
   duplicate,
@@ -150,3 +154,9 @@ raise _ = 300
 
 delete :: Level -> Int
 delete _ = maxBound
+
+addCon :: Level -> Int
+addCon _ = 10
+
+addConField :: Level -> Int
+addConField _ = 10
