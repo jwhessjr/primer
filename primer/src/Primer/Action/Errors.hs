@@ -63,6 +63,12 @@ data ActionError
   | NeedLocal Available.Option
   | NeedInt Available.Option
   | NeedChar Available.Option
+  | NeedTermDef
+  | NeedTermDefSelection
+  | NeedTypeDefSelection
+  | NeedTypeDefNodeSelection
+  | NeedTypeDefConsSelection
+  | NeedTypeDefParamSelection
   | NoNodeSelection
   deriving stock (Eq, Show, Read, Generic)
   deriving (FromJSON, ToJSON) via PrimerJSON ActionError
