@@ -38,6 +38,7 @@ import Primer.Action.Available (InputAction (MakeConSat), NoInputAction (Raise),
 import Primer.Action.Available qualified as Available
 import Primer.App (
   App,
+  DefSelection (..),
   EditAppM,
   Editable (..),
   Level (Beginner, Intermediate),
@@ -167,16 +168,16 @@ mkTests deps (defName, DefAST def') =
         Available.Input a ->
           Input a
             . fromMaybe (error "id not found")
-            $ Available.options typeDefs defs cxt level def id a
+            $ Available.options typeDefs defs cxt level (Right def) id a
    in testGroup testName $
         enumeratePairs
           <&> \(level, mut) ->
-            let defActions = map (offered level $ Selection defName Nothing) $ Available.forDef defs level mut d
+            let defActions = map (offered level $ SelectionDef $ DefSelection defName Nothing) $ Available.forDef defs level mut d
                 bodyActions =
                   map
                     ( \id ->
                         ( id
-                        , map (offered level $ Selection defName $ Just $ NodeSelection BodyNode id) $
+                        , map (offered level $ SelectionDef $ DefSelection defName $ Just $ NodeSelection BodyNode id) $
                             Available.forBody
                               typeDefs
                               level
@@ -191,7 +192,7 @@ mkTests deps (defName, DefAST def') =
                   map
                     ( \id ->
                         ( id
-                        , map (offered level (Selection defName $ Just $ NodeSelection SigNode id)) $ Available.forSig level mut (astDefType def) id
+                        , map (offered level (SelectionDef $ DefSelection defName $ Just $ NodeSelection SigNode id)) $ Available.forSig level mut (astDefType def) id
                         )
                     )
                     . toListOf (_typeMeta % _id)
@@ -255,7 +256,7 @@ tasty_available_actions_accepted = withTests 500 $
         DefAST{} -> label "AST"
         DefPrim{} -> label "Prim"
       (loc, acts) <-
-        fmap (first (Selection defName) . snd) . forAllWithT fst $
+        fmap (first (SelectionDef . DefSelection defName) . snd) . forAllWithT fst $
           Gen.frequency $
             catMaybes
               [ Just (1, pure ("actionsForDef", (Nothing, Available.forDef (snd <$> allDefs) l defMut defName)))
@@ -282,7 +283,7 @@ tasty_available_actions_accepted = withTests 500 $
               def' <- maybe (annotate "primitive def" >> failure) pure $ defAST def
               progActs <-
                 either (\e -> annotateShow e >> failure) pure $
-                  toProgActionNoInput (map snd $ progAllDefs $ appProg a) def' loc act'
+                  toProgActionNoInput (map snd $ progAllDefs $ appProg a) (Right def') loc act'
               actionSucceeds (handleEditRequest progActs) a
             Available.Input act' -> do
               def' <- maybe (annotate "primitive def" >> failure) pure $ defAST def
@@ -293,7 +294,7 @@ tasty_available_actions_accepted = withTests 500 $
                     (map snd $ progAllDefs $ appProg a)
                     (progCxt $ appProg a)
                     l
-                    def'
+                    (Right def')
                     loc
                     act'
               let opts' = [Gen.element $ (Offered,) <$> opts | not (null opts)]
@@ -307,7 +308,7 @@ tasty_available_actions_accepted = withTests 500 $
                 [] -> annotate "no options" >> success
                 options -> do
                   opt <- forAllT $ Gen.choice options
-                  progActs <- either (\e -> annotateShow e >> failure) pure $ toProgActionInput def' loc (snd opt) act'
+                  progActs <- either (\e -> annotateShow e >> failure) pure $ toProgActionInput (Right def') loc (snd opt) act'
                   actionSucceedsOrCapture (fst opt) (handleEditRequest progActs) a
   where
     runEditAppMLogs ::
@@ -420,7 +421,7 @@ offeredActionTest sh l inputExpr position action expectedOutput = do
   let cxt = buildTypingContextFromModules modules sh
   let defs = foldMap' moduleDefsQualified modules
   let offered = Available.forBody cxt.typeDefs l Editable expr id
-  let options = Available.options cxt.typeDefs defs cxt l exprDef (Just (BodyNode, id))
+  let options = Available.options cxt.typeDefs defs cxt l (Right exprDef) (SelectionDef $ DefSelection exprDefName $ Just $ NodeSelection BodyNode id)
   let assertElem msg x xs =
         assertBool
           ( msg
@@ -433,14 +434,14 @@ offeredActionTest sh l inputExpr position action expectedOutput = do
   action' <- case action of
     Left a -> do
       assertOffered $ Available.NoInput a
-      pure $ toProgActionNoInput (foldMap' moduleDefsQualified $ progModules prog) exprDef (Selection exprDefName $ Just $ NodeSelection BodyNode id) a
+      pure $ toProgActionNoInput (foldMap' moduleDefsQualified $ progModules prog) (Right exprDef) (SelectionDef $ DefSelection exprDefName $ Just $ NodeSelection BodyNode id) a
     Right (a, o) -> do
       assertOffered $ Available.Input a
       case options a of
         Nothing -> assertFailure "Available.options returned Nothing"
         Just os -> do
           assertElem "Requested option not offered: " o os.opts
-          pure $ toProgActionInput exprDef (Selection exprDefName $ Just $ NodeSelection BodyNode id) o a
+          pure $ toProgActionInput (Right exprDef) (SelectionDef $ DefSelection exprDefName $ Just $ NodeSelection BodyNode id) o a
   action'' <- case action' of
     Left err -> assertFailure $ show err
     Right a -> pure a
