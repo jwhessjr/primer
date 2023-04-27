@@ -14,6 +14,7 @@ let
       , "^Primer.Log.logEmergency"
       , "^Primer.Log.logWarning"
       , "^Primer.Log.runDiscardLog"
+      , "^Primer.Database.Selda.Test.Util"
       ]
 
 in  { roots = [ "^Main.main$" ] # tmpRoots # ignoreRoots, type-class-roots = True }
