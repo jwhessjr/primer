@@ -1,3 +1,4 @@
+{-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE OverloadedLabels #-}
 
 module Tests.Action.Available where
@@ -12,6 +13,7 @@ import Data.Text qualified as T
 import Data.Text.Lazy qualified as TL
 import GHC.Err (error)
 import Hedgehog (
+  GenT,
   PropertyT,
   annotate,
   annotateShow,
@@ -23,7 +25,7 @@ import Hedgehog (
   (===),
  )
 import Hedgehog.Gen qualified as Gen
-import Hedgehog.Internal.Property (forAllWithT)
+import Hedgehog.Internal.Property (LabelName (LabelName), forAllWithT)
 import Hedgehog.Range qualified as Range
 import Optics (ix, toListOf, (%), (.~), (^..), _head)
 import Primer.Action (
@@ -63,6 +65,7 @@ import Primer.Core (
   HasID (_id),
   ID,
   ModuleName (ModuleName),
+  TyConName,
   getID,
   mkSimpleModuleName,
   moduleNamePretty,
@@ -238,70 +241,81 @@ tasty_available_actions_accepted = withTests 500 $
       let isMutable = \case
             Editable -> True
             NonEditable -> False
-      (defName, (defMut, def)) <- case partition (isMutable . fst . snd) $ Map.toList allDefs of
-        ([], []) -> discard
-        (mut, []) -> label "all mut" >> forAllT (Gen.element mut)
-        ([], immut) -> label "all immut" >> forAllT (Gen.element immut)
-        (mut, immut) -> label "mixed mut/immut" >> forAllT (Gen.frequency [(9, Gen.element mut), (1, Gen.element immut)])
-      collect defMut
-      case def of
-        DefAST{} -> label "AST"
-        DefPrim{} -> label "Prim"
-      (loc, acts) <-
-        fmap (first (SelectionDef . DefSelection defName) . snd) . forAllWithT fst $
-          Gen.frequency $
-            catMaybes
-              [ Just (1, pure ("actionsForDef", (Nothing, Available.forDef (snd <$> allDefs) l defMut defName)))
-              , defAST def <&> \d' -> (2,) $ do
-                  let ty = astDefType d'
-                      ids = ty ^.. typeIDs
-                  i <- Gen.element ids
-                  let hedgehogMsg = "actionsForDefSig id " <> show i
-                  pure (hedgehogMsg, (Just $ NodeSelection SigNode i, Available.forSig l defMut ty i))
-              , defAST def <&> \d' -> (7,) $ do
-                  let expr = astDefExpr d'
-                      ids = expr ^.. exprIDs
-                  i <- Gen.element ids
-                  let hedgehogMsg = "actionsForDefBody id " <> show i
-                  pure (hedgehogMsg, (Just $ NodeSelection BodyNode i, Available.forBody (snd <$> progAllTypeDefs (appProg a)) l defMut expr i))
-              ]
-      case acts of
-        [] -> label "no offered actions" >> success
-        acts' -> do
-          action <- forAllT $ Gen.element acts'
-          collect action
-          case action of
-            Available.NoInput act' -> do
-              def' <- maybe (annotate "primitive def" >> failure) pure $ defAST def
-              progActs <-
-                either (\e -> annotateShow e >> failure) pure $
-                  toProgActionNoInput (map snd $ progAllDefs $ appProg a) (Right def') loc act'
-              actionSucceeds (handleEditRequest progActs) a
-            Available.Input act' -> do
-              def' <- maybe (annotate "primitive def" >> failure) pure $ defAST def
-              Available.Options{Available.opts, Available.free} <-
-                maybe (annotate "id not found" >> failure) pure $
-                  Available.options
-                    (map snd $ progAllTypeDefs $ appProg a)
-                    (map snd $ progAllDefs $ appProg a)
-                    (progCxt $ appProg a)
-                    l
-                    (Right def')
-                    loc
-                    act'
-              let opts' = [Gen.element $ (Offered,) <$> opts | not (null opts)]
-              let opts'' =
-                    opts' <> case free of
-                      Available.FreeNone -> []
-                      Available.FreeVarName -> [(StudentProvided,) . flip Available.Option Nothing <$> (unName <$> genName)]
-                      Available.FreeInt -> [(StudentProvided,) . flip Available.Option Nothing <$> (show <$> Gen.integral (Range.linear @Integer 0 1_000_000_000))]
-                      Available.FreeChar -> [(StudentProvided,) . flip Available.Option Nothing . T.singleton <$> Gen.unicode]
-              case opts'' of
-                [] -> annotate "no options" >> success
-                options -> do
-                  opt <- forAllT $ Gen.choice options
-                  progActs <- either (\e -> annotateShow e >> failure) pure $ toProgActionInput (Right def') loc (snd opt) act'
-                  actionSucceedsOrCapture (fst opt) (handleEditRequest progActs) a
+      let t1 =
+            case partition (isMutable . fst . snd) $ Map.toList allDefs of
+              ([], []) -> pure Nothing
+              (mut, []) -> Just . ("all mut",) <$> Gen.element mut
+              ([], immut) -> Just . ("all immut",) <$> Gen.element immut
+              (mut, immut) -> Just . ("mixed mut/immut",) <$> Gen.frequency [(9, Gen.element mut), (1, Gen.element immut)]
+      t0 <- forAllT do
+        second Right
+          <<$>> Gen.choice
+            [ t1
+            , undefined
+            ]
+      t2 <- maybe discard (\(t, x) -> label t >> pure x) t0
+      case t2 of
+        Left (ty :: ()) -> undefined
+        Right (defName, (defMut, def)) -> do
+          collect defMut
+          case def of
+            DefAST{} -> label "AST"
+            DefPrim{} -> label "Prim"
+          (loc, acts) <-
+            fmap (first (SelectionDef . DefSelection defName) . snd) . forAllWithT fst $
+              Gen.frequency $
+                catMaybes
+                  [ Just (1, pure ("actionsForDef", (Nothing, Available.forDef (snd <$> allDefs) l defMut defName)))
+                  , defAST def <&> \d' -> (2,) $ do
+                      let ty = astDefType d'
+                          ids = ty ^.. typeIDs
+                      i <- Gen.element ids
+                      let hedgehogMsg = "actionsForDefSig id " <> show i
+                      pure (hedgehogMsg, (Just $ NodeSelection SigNode i, Available.forSig l defMut ty i))
+                  , defAST def <&> \d' -> (7,) $ do
+                      let expr = astDefExpr d'
+                          ids = expr ^.. exprIDs
+                      i <- Gen.element ids
+                      let hedgehogMsg = "actionsForDefBody id " <> show i
+                      pure (hedgehogMsg, (Just $ NodeSelection BodyNode i, Available.forBody (snd <$> progAllTypeDefs (appProg a)) l defMut expr i))
+                  ]
+          case acts of
+            [] -> label "no offered actions" >> success
+            acts' -> do
+              action <- forAllT $ Gen.element acts'
+              collect action
+              case action of
+                Available.NoInput act' -> do
+                  def' <- maybe (annotate "primitive def" >> failure) pure $ defAST def
+                  progActs <-
+                    either (\e -> annotateShow e >> failure) pure $
+                      toProgActionNoInput (map snd $ progAllDefs $ appProg a) (Right def') loc act'
+                  actionSucceeds (handleEditRequest progActs) a
+                Available.Input act' -> do
+                  def' <- maybe (annotate "primitive def" >> failure) pure $ defAST def
+                  Available.Options{Available.opts, Available.free} <-
+                    maybe (annotate "id not found" >> failure) pure $
+                      Available.options
+                        (map snd $ progAllTypeDefs $ appProg a)
+                        (map snd $ progAllDefs $ appProg a)
+                        (progCxt $ appProg a)
+                        l
+                        (Right def')
+                        loc
+                        act'
+                  let opts' = [Gen.element $ (Offered,) <$> opts | not (null opts)]
+                  let opts'' =
+                        opts' <> case free of
+                          Available.FreeNone -> []
+                          Available.FreeVarName -> [(StudentProvided,) . flip Available.Option Nothing <$> (unName <$> genName)]
+                          Available.FreeInt -> [(StudentProvided,) . flip Available.Option Nothing <$> (show <$> Gen.integral (Range.linear @Integer 0 1_000_000_000))]
+                          Available.FreeChar -> [(StudentProvided,) . flip Available.Option Nothing . T.singleton <$> Gen.unicode]
+                  case opts'' of
+                    [] -> annotate "no options" >> success
+                    options -> do
+                      opt <- forAllT $ Gen.choice options
+                      progActs <- either (\e -> annotateShow e >> failure) pure $ toProgActionInput (Right def') loc (snd opt) act'
+                      actionSucceedsOrCapture (fst opt) (handleEditRequest progActs) a
   where
     runEditAppMLogs ::
       HasCallStack =>
