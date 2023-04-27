@@ -68,6 +68,7 @@ data ActionError
   | NeedTypeDefSelection
   | NeedTypeDefNodeSelection
   | NeedTypeDefConsSelection
+  | NeedTypeDefConsFieldSelection
   | NeedTypeDefParamSelection
   | NoNodeSelection
   deriving stock (Eq, Show, Read, Generic)
