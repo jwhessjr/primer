@@ -545,7 +545,7 @@ handleMutationRequest = \case
 -- Note that a successful edit resets the redo log.
 handleEditRequest :: forall m l. MonadEditApp l ProgError m => [ProgAction] -> m Prog
 handleEditRequest actions = do
-  (prog, _) <- gets appProg >>= \p -> foldlM go (p, Nothing) actions
+  (prog, _) <- gets appProg >>= \p -> foldlM go (p, selectedDef <$> progSelection p) actions
   let l = progLog prog
   let prog' = prog{progLog = push actions l, redoLog = defaultLog}
   modify (\s -> s & #currentState % #prog .~ prog')
