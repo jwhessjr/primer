@@ -17,24 +17,18 @@ library
     Primer.Action
     Primer.Action.Available
     Primer.Action.Priorities
-    Primer.API
-    Primer.API.NodeFlavor
-    Primer.API.RecordPair
     Primer.App
     Primer.App.Base
-    Primer.App.Utils
     Primer.Builtins
     Primer.Builtins.DSL
     Primer.Core
     Primer.Core.DSL
     Primer.Core.Transform
     Primer.Core.Utils
-    Primer.Database
     Primer.Def
     Primer.Def.Utils
     Primer.Eval
     Primer.EvalFull
-    Primer.Examples
     Primer.JSON
     Primer.Log
     Primer.Module
