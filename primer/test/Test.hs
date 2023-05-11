@@ -17,7 +17,7 @@ import Hedgehog (
   failure,
   label,
   success,
-  (===), Gen, forAll,
+  (===), Gen, forAll, Seed (Seed), recheckAt,
  )
 import Hedgehog.Gen qualified as Gen
 import Hedgehog.Main (defaultMain)
@@ -78,7 +78,8 @@ import Tests.Typecheck (TypeCacheAlpha (TypeCacheAlpha))
 import Primer.TypeDef (ASTTypeDef(ASTTypeDef))
 
 main :: IO ()
-main = defaultMain [ check tasty_undo_redo ]
+--main = defaultMain [ check tasty_undo_redo ]
+main = recheckAt (Seed 11179484540861538616 16916482896198407115) "241:aDf" tasty_undo_redo
 
 -- | A helper type for 'tasty_available_actions_actions',
 -- describing where a particular option came from.
