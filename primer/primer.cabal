@@ -232,38 +232,17 @@ test-suite primer-test
 
   else
     build-depends:
-      , aeson
-      , aeson-pretty                 ^>=0.8.9
-      , async                        ^>=2.2.4
       , base
-      , bytestring
       , containers
-      , exceptions
       , extra
-      , filepath
-      , generic-optics
       , hedgehog
-      , hedgehog-classes             ^>=0.2.5.3
-      , hspec                        ^>=2.10
-      , hspec-megaparsec             ^>=2.2.0
       , logging-effect
-      , mmorph
-      , mtl
       , optics
-      , pretty-simple                ^>=4.1
-      , prettyprinter
-      , prettyprinter-ansi-terminal
       , primer
       , primer-hedgehog
       , primer-testlib
       , protolude
-      , stm
-      , stm-containers
       , text
-      , time
-      , transformers
-      , uniplate
-      , uuid
 
 --TODO This currently breaks with haskell.nix, so we manually add it to `flake.nix` instead.
 -- See: https://github.com/input-output-hk/haskell.nix/issues/839
