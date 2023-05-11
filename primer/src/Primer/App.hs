@@ -10,24 +10,14 @@ module Primer.App (
   defaultLog,
   App,
   mkApp,
-  mkAppSafe,
   appProg,
   appIdCounter,
   appNameCounter,
   appInit,
-  newApp,
-  newEmptyApp,
-  checkAppWellFormed,
-  checkProgWellFormed,
   EditAppM,
   QueryAppM,
   runEditAppM,
-  runQueryAppM,
   Prog (..),
-  defaultProg,
-  newEmptyProg',
-  newProg,
-  newProg',
   progAllModules,
   progAllDefs,
   progAllTypeDefs,
@@ -36,17 +26,11 @@ module Primer.App (
   progCxt,
   tcWholeProg,
   tcWholeProgWithImports,
-  nextProgID,
   ProgAction (..),
   ProgError (..),
   Question (..),
-  handleQuestion,
-  handleGetProgramRequest,
   handleMutationRequest,
   handleEditRequest,
-  handleEvalRequest,
-  handleEvalFullRequest,
-  importModules,
   MutationRequest (..),
   Selection (..),
   NodeSelection (..),
@@ -62,14 +46,13 @@ import Foreword hiding (mod)
 
 import Control.Monad.Fresh (MonadFresh (..))
 import Control.Monad.Log (MonadLog, WithSeverity)
-import Control.Monad.NestedError (MonadNestedError, throwError')
+import Control.Monad.NestedError (MonadNestedError)
 import Data.Data (Data)
 import Data.Generics.Uniplate.Operations (descendM, transform, transformM)
 import Data.Generics.Uniplate.Zipper (
   fromZipper,
  )
-import Data.List (intersect, (\\))
-import Data.List.Extra (anySame, disjoint, (!?))
+import Data.List.Extra ((!?))
 import Data.Map.Strict qualified as Map
 import Data.Set qualified as Set
 import Optics (
@@ -95,7 +78,6 @@ import Optics (
   _Left,
   _Right,
  )
-import Optics.State.Operators ((<<%=))
 import Primer.Action (
   Action,
   ActionError (..),
@@ -131,7 +113,6 @@ import Primer.Core (
   TypeMeta,
   ValConName,
   getID,
-  mkSimpleModuleName,
   qualifyName,
   typesInExpr,
   unModuleName,
@@ -142,7 +123,7 @@ import Primer.Core (
   _synthed,
   _typeMetaLens,
  )
-import Primer.Core.DSL (S, ann, create, emptyHole, hole, tEmptyHole, tvar)
+import Primer.Core.DSL (ann, hole, tEmptyHole, tvar)
 import Primer.Core.DSL qualified as DSL
 import Primer.Core.Transform (foldApp, renameVar, unfoldAPP, unfoldApp, unfoldTApp)
 import Primer.Core.Utils (freeVars, generateTypeIDs, regenerateExprIDs, regenerateTypeIDs, _freeTmVars, _freeTyVars, _freeVarsTy)
@@ -153,33 +134,22 @@ import Primer.Def (
   defAST,
  )
 import Primer.Def.Utils (globalInUse)
-import Primer.Eval qualified as Eval
 import Primer.Eval.Detail (EvalDetail)
-import Primer.Eval.Redex (EvalLog)
-import Primer.EvalFull (Dir (Syn), EvalFullError (TimedOut), TerminationBound, evalFull)
+import Primer.EvalFull (Dir, TerminationBound)
 import Primer.JSON
-import Primer.Log (ConvertLogMessage)
 import Primer.Module (
-  Module (Module, moduleDefs, moduleName, moduleTypes),
-  builtinModule,
+  Module (moduleDefs, moduleName, moduleTypes),
   deleteDef,
   insertDef,
   moduleDefsQualified,
   moduleTypesQualified,
-  nextModuleID,
-  primitiveModule,
   qualifyDefName,
   renameModule,
   renameModule',
  )
 import Primer.Name (Name (unName), NameCounter, freshName, unsafeMkName)
-import Primer.Prelude (prelude)
 import Primer.Questions (
   Question (..),
-  generateNameExpr,
-  generateNameTy,
-  variablesInScopeExpr,
-  variablesInScopeTy,
  )
 import Primer.TypeDef (
   ASTTypeDef (..),
@@ -192,7 +162,7 @@ import Primer.TypeDef (
 import Primer.Typecheck (
   CheckEverythingRequest (CheckEverything, toCheck, trusted),
   Cxt,
-  SmartHoles (NoSmartHoles, SmartHoles),
+  SmartHoles (NoSmartHoles),
   TypeError,
   buildTypingContextFromModules,
   checkEverything,
@@ -262,11 +232,6 @@ pop l = case unlog l of
   [] -> Nothing
   (as : l') -> Just (as, Log l')
 
--- | The default 'Prog'. It has no imports, no definitions, no current
--- 'Selection', and an empty 'Log'. Smart holes are enabled.
-defaultProg :: Prog
-defaultProg = Prog mempty mempty Nothing SmartHoles defaultLog defaultLog
-
 progAllModules :: Prog -> [Module]
 progAllModules p = progModules p <> progImports p
 
@@ -290,109 +255,6 @@ progAllDefs p =
 -- All modules in a @Prog@ shall be well-typed, in the appropriate scope:
 -- all the imports are in one mutual dependency group
 -- the @progModule@ has all the imports in scope
-
--- | A triple of 'Prog', 'ID', and 'NameCounter'.
---
--- The 'Prog' is a program with no imports and an editable module
--- named @Main@. The editable module contains a single top-level
--- definition named @main@ whose type and term are both empty holes.
---
--- The 'ID' is the next available 'ID' in module @Main@.
---
--- The 'NameCounter' is a safe value for seeding an 'App''s name
--- counter when using 'newEmptyProg' as the app's program.
-newEmptyProgImporting :: [S Module] -> (Prog, ID, NameCounter)
-newEmptyProgImporting imported =
-  let defName = "main"
-      moduleName = mkSimpleModuleName "Main"
-      ((imported', defs), nextID) = create $ do
-        mainExpr <- emptyHole
-        mainType <- tEmptyHole
-        let astDefs =
-              Map.singleton
-                defName
-                ( ASTDef
-                    { astDefExpr = mainExpr
-                    , astDefType = mainType
-                    }
-                )
-        (,fmap DefAST astDefs) <$> sequence imported
-   in ( defaultProg
-          { progModules =
-              [ Module
-                  { moduleName
-                  , moduleTypes = mempty
-                  , moduleDefs = defs
-                  }
-              ]
-          , progImports = imported'
-          , progSelection =
-              Just
-                Selection
-                  { selectedDef = qualifyName moduleName defName
-                  , selectedNode = Nothing
-                  }
-          }
-      , nextID
-      , toEnum 0
-      )
-
--- | Like 'newEmptyProg', but drop the 'ID' and 'NameCounter'.
---
--- This value should probably only be used for testing.
-newEmptyProg' :: Prog
-newEmptyProg' = let (p, _, _) = newEmptyProgImporting [] in p
-
--- | A triple of 'Prog' and 'ID'.
---
--- The 'Prog' is identical to the one returned by 'newEmptyProg',
--- except that its import list includes all builtin and primitive
--- modules defined by Primer.
---
--- The 'ID' is the next available 'ID' in module @Main@.
---
--- The 'NameCounter' is a safe value for seeding an 'App''s name
--- counter when using 'newProg' as the app's program.
-newProg :: (Prog, ID, NameCounter)
-newProg =
-  let (p, nextID, nc) =
-        newEmptyProgImporting
-          [ prelude
-          , builtinModule
-          , pure primitiveModule
-          ]
-   in ( p
-      , nextID
-      , nc
-      )
-
--- | Like 'newProg', but drop the 'ID' and 'NameCounter'.
---
--- This value should probably only be used for testing.
-newProg' :: Prog
-newProg' = let (p, _, _) = newProg in p
-
--- | Imports some explicitly-given modules, ensuring that they are well-typed
--- (and all their dependencies are already imported)
-importModules :: MonadEditApp l ProgError m => [Module] -> m ()
-importModules ms = do
-  p <- gets appProg
-  -- Module names must be unique
-  let currentModules = progAllModules p
-  let currentNames = moduleName <$> currentModules
-  let newNames = moduleName <$> ms
-  unless (disjoint currentNames newNames && not (anySame newNames)) $
-    throwError $
-      ActionError $
-        ImportNameClash $
-          (currentNames `intersect` newNames) <> (newNames \\ ordNub newNames)
-  -- Imports must be well-typed (and cannot depend on the editable modules)
-  checkedImports <-
-    liftError (ActionError . ImportFailed ()) $
-      checkEverything NoSmartHoles $
-        CheckEverything{trusted = progImports p, toCheck = ms}
-  let p' = p & #progImports %~ (<> checkedImports)
-  modify (\a -> a & #currentState % #prog .~ p')
 
 -- | Get all type definitions from all modules (including imports)
 allTypes :: Prog -> TypeDefMap
@@ -485,31 +347,6 @@ data EvalFullResp
 
 -- * Request handlers
 
--- | Handle a question
--- Note that these only consider the non-imported module as a location of which
--- to ask a question. However, they will return variables which are in scope by
--- dint of being imported.
-handleQuestion :: MonadQueryApp m => Question a -> m a
-handleQuestion = \case
-  VariablesInScope defid exprid -> do
-    node <- focusNode' defid exprid
-    defs <- asks $ allDefs . appProg
-    let (tyvars, termvars, globals) = case node of
-          Left zE -> variablesInScopeExpr defs zE
-          Right zT -> (variablesInScopeTy zT, [], [])
-    pure ((tyvars, termvars), globals)
-  GenerateName defid nodeid typeKind -> do
-    prog <- asks appProg
-    names <-
-      focusNode' defid nodeid <&> \case
-        Left zE -> generateNameExpr typeKind zE
-        Right zT -> generateNameTy typeKind zT
-    pure $ runReader names $ progCxt prog
-  where
-    focusNode' defname nodeid = do
-      prog <- asks appProg
-      focusNode prog defname nodeid
-
 -- This only looks in the editable modules, not in any imports
 focusNode :: MonadError ProgError m => Prog -> GVarName -> ID -> m (Either (Either ExprZ TypeZ) TypeZip)
 focusNode prog = focusNodeDefs $ foldMap' moduleDefsQualified $ progModules prog
@@ -528,10 +365,6 @@ focusNodeDefs defs defname nodeid =
        in case fmap Left mzE <|> fmap Right mzT of
             Nothing -> throwError $ ActionError (IDNotFound nodeid)
             Just x -> pure x
-
--- | Handle a request to retrieve the current program
-handleGetProgramRequest :: MonadReader App m => m Prog
-handleGetProgramRequest = asks appProg
 
 -- | Handle a request to mutate the app state
 handleMutationRequest :: MonadEditApp l ProgError m => MutationRequest -> m Prog
@@ -555,37 +388,6 @@ handleEditRequest actions = do
     go (prog, mdef) a =
       applyProgAction prog mdef a <&> \prog' ->
         (prog', selectedDef <$> progSelection prog')
-
--- | Handle an eval request (we assume that all such requests are implicitly in a synthesisable context)
-handleEvalRequest ::
-  ( MonadEditApp l e m
-  , MonadNestedError Eval.EvalError e m
-  , ConvertLogMessage EvalLog l
-  ) =>
-  EvalReq ->
-  m EvalResp
-handleEvalRequest req = do
-  prog <- gets appProg
-  result <- Eval.step (allTypes prog) (allDefs prog) (evalReqExpr req) Syn (evalReqRedex req)
-  case result of
-    Left err -> throwError' err
-    Right (expr, detail) -> do
-      redexes <- Eval.redexes (allTypes prog) (allDefs prog) Syn expr
-      pure
-        EvalResp
-          { evalRespExpr = expr
-          , evalRespRedexes = redexes
-          , evalRespDetail = detail
-          }
-
--- | Handle an eval-to-normal-form request
-handleEvalFullRequest :: (MonadEditApp l e m, ConvertLogMessage EvalLog l) => EvalFullReq -> m EvalFullResp
-handleEvalFullRequest (EvalFullReq{evalFullReqExpr, evalFullCxtDir, evalFullMaxSteps}) = do
-  prog <- gets appProg
-  result <- evalFull (allTypes prog) (allDefs prog) evalFullMaxSteps evalFullCxtDir evalFullReqExpr
-  pure $ case result of
-    Left (TimedOut e) -> EvalFullRespTimedOut e
-    Right nf -> EvalFullRespNormal nf
 
 -- | Handle a 'ProgAction'
 -- The 'GVarName' argument is the currently-selected definition, which is
@@ -1108,7 +910,6 @@ type MonadEdit m e = (MonadFresh ID m, MonadFresh NameCounter m, MonadError e m)
 
 -- | A shorthand for the constraints we need when performing read-only
 -- operations on the application.
-type MonadQueryApp m = (Monad m, MonadReader App m, MonadError ProgError m)
 
 -- | The 'EditApp' monad.
 --
@@ -1133,12 +934,6 @@ runEditAppM (EditAppM m) appState =
 -- here for compatibility with 'EditApp'.
 newtype QueryAppM a = QueryAppM (ReaderT App (Except ProgError) a)
   deriving newtype (Functor, Applicative, Monad, MonadReader App, MonadError ProgError)
-
--- | Run a 'QueryAppM' action, returning a result.
-runQueryAppM :: QueryAppM a -> App -> Either ProgError a
-runQueryAppM (QueryAppM m) appState = case runExcept (runReaderT m appState) of
-  Left err -> Left err
-  Right res -> Right res
 
 -- | The student's application's state.
 --
@@ -1208,17 +1003,6 @@ mkApp i n p =
   let s = AppState i n p
    in App s s
 
--- | A safe(r) version of 'mkApp'. It will only return an 'App' if the
--- provided 'Prog' is well-formed per 'checkAppWellFormed'; otherwise,
--- it returns a 'ProgError'.
---
--- Regarding the provided 'NameCounter', see the corresponding
--- documentation for 'mkApp'.
-mkAppSafe :: NameCounter -> Prog -> Either ProgError App
-mkAppSafe n p =
-  let nextID = nextProgID p
-   in checkAppWellFormed (mkApp nextID n p)
-
 -- | Given an 'App', return the next 'ID' that should be used to
 -- create a new node.
 appIdCounter :: App -> ID
@@ -1237,72 +1021,6 @@ appInit :: App -> App
 appInit a =
   let s = initialState a
    in App s s
-
--- | An initial app whose program is completely empty.
-newEmptyApp :: App
-newEmptyApp =
-  let (p, id_, nc) = newEmptyProgImporting []
-   in mkApp id_ nc p
-
--- | An initial app whose program includes some useful definitions.
-newApp :: App
-newApp =
-  let (p, id_, nc) = newProg
-   in mkApp id_ nc p
-
--- | Ensure the provided 'App' is well-formed.
---
--- Currently, "well-formed" means that the 'App''s 'Prog' typechecks,
--- including both its imported modules and its editable modules. Later
--- versions of this function may perform additional checks, as well.
---
--- In the event that the 'App' is well-formed, then the 'App' that is
--- returned is identical to the one that was provided, except that the
--- modules in its 'Prog' are guaranteed to have up-to-date cached type
--- information.
---
--- If the 'App' is not well-formed, then 'checkAppWellFormed' returns
--- a 'ProgError'.
-checkAppWellFormed :: App -> Either ProgError App
-checkAppWellFormed app =
-  -- Ideally, we would do an additional check here to
-  -- ensure that the next name generated by the
-  -- 'NameCounter' won't conflict with an existing name.
-  -- However, there are bigger issues with our current
-  -- automatic name generation scheme which make that
-  -- check rather pointless. See:
-  --
-  -- https://github.com/hackworthltd/primer/issues/510
-  runTC app $ traverseOf (#currentState % #prog) (liftError ActionError . checkProgWellFormed) app
-
-newtype M e a = M {unM :: StateT (ID, NameCounter) (Except e) a}
-  deriving newtype (Functor, Applicative, Monad, MonadError e)
-instance MonadFresh ID (M e) where
-  fresh = M $ _1 <<%= succ
-instance MonadFresh NameCounter (M e) where
-  fresh = M $ _2 <<%= succ
-runTC :: App -> M e a -> Either e a
-runTC a = runExcept . flip evalStateT (appIdCounter a, appNameCounter a) . unM
-
-checkProgWellFormed ::
-  ( MonadFresh ID m
-  , MonadFresh NameCounter m
-  , MonadNestedError TypeError e (ReaderT Cxt m)
-  ) =>
-  Prog ->
-  m Prog
-checkProgWellFormed p =
-  let
-    -- We are careful to turn smartholes off for this check, as
-    -- we want to return an error if there is a problem, rather
-    -- than try to correct it.
-    p' = p{progSmartHoles = NoSmartHoles}
-   in
-    do
-      checkedProg <- tcWholeProgWithImports p'
-      -- Ideally, we would do an additional check here to
-      -- ensure that the 'ID' is unique across all modules.
-      pure $ checkedProg{progSmartHoles = progSmartHoles p}
 
 -- | Construct a new, empty expression
 newExpr :: MonadFresh ID m => m Expr
@@ -1628,11 +1346,3 @@ allValConNames = snd <=< allConNames
 
 allTyConNames :: Prog -> [TyConName]
 allTyConNames = fmap fst . allConNames
-
--- | Given a 'Prog', return the next 'ID' that's safe to use when
--- editing it.
---
--- Note: do not rely on the implementation of this function, as it may
--- change in the future.
-nextProgID :: Prog -> ID
-nextProgID p = foldl' (\id_ m -> max (nextModuleID m) id_) minBound (progModules p)
