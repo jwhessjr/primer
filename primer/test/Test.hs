@@ -6,19 +6,7 @@ import Control.Monad.Log (WithSeverity)
 import Data.List.Extra (enumerate, partition)
 import Data.Map qualified as Map
 import Data.Text qualified as T
-import Hedgehog (
-  check,
-  PropertyT,
-  Property, withDiscards, withTests,
-  annotate,
-  annotateShow,
-  collect,
-  discard,
-  failure,
-  label,
-  success,
-  (===), Gen, forAll,
- )
+import Hedgehog
 import Hedgehog.Gen qualified as Gen
 import Hedgehog.Main (defaultMain)
 import Hedgehog.Range qualified as Range
@@ -78,7 +66,8 @@ import Tests.Typecheck (TypeCacheAlpha (TypeCacheAlpha))
 import Primer.TypeDef (ASTTypeDef(ASTTypeDef))
 
 main :: IO ()
-main = defaultMain [ check tasty_undo_redo ]
+--main = defaultMain [ check tasty_undo_redo ]
+main = recheckAt (Seed 11087148197968773465 7784360380252669127) "369:eDbKaC2o" tasty_undo_redo
 
 -- | A helper type for 'tasty_available_actions_actions',
 -- describing where a particular option came from.
