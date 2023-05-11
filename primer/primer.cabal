@@ -166,8 +166,6 @@ library primer-hedgehog
     , mtl
     , primer
     , primer-testlib
-    , tasty-discover  ^>=5.0
-    , tasty-hedgehog  ^>=1.4
 
 library primer-testlib
   visibility:         public
@@ -204,7 +202,6 @@ library primer-testlib
     , primer
     , stm
     , stm-containers
-    , tasty-hunit     ^>=0.10.0
 
 test-suite primer-test
   type:               exitcode-stdio-1.0
@@ -262,11 +259,6 @@ test-suite primer-test
       , protolude
       , stm
       , stm-containers
-      , tasty                        ^>=1.4.2.1
-      , tasty-discover
-      , tasty-golden                 ^>=2.3.5
-      , tasty-hedgehog
-      , tasty-hunit
       , text
       , time
       , transformers

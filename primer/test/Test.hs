@@ -7,6 +7,7 @@ import Data.List.Extra (enumerate, partition)
 import Data.Map qualified as Map
 import Data.Text qualified as T
 import Hedgehog (
+  check,
   PropertyT,
   Property, withDiscards, withTests,
   annotate,
@@ -19,6 +20,7 @@ import Hedgehog (
   (===), Gen, forAll,
  )
 import Hedgehog.Gen qualified as Gen
+import Hedgehog.Main (defaultMain)
 import Hedgehog.Range qualified as Range
 import Optics (toListOf)
 import Primer.Action (
@@ -74,11 +76,9 @@ import Primer.Typecheck (
  )
 import Tests.Typecheck (TypeCacheAlpha (TypeCacheAlpha))
 import Primer.TypeDef (ASTTypeDef(ASTTypeDef))
-import Test.Tasty
-import Test.Tasty.Hedgehog
 
 main :: IO ()
-main = defaultMain $ testProperty "undo_redo" $ tasty_undo_redo
+main = defaultMain [ check tasty_undo_redo ]
 
 -- | A helper type for 'tasty_available_actions_actions',
 -- describing where a particular option came from.
