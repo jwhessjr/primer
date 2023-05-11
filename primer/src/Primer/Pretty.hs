@@ -4,8 +4,6 @@ module Primer.Pretty (
   prettyPrintExpr,
   prettyPrintType,
   PrettyOptions (..),
-  sparse,
-  compact,
 ) where
 
 import Foreword hiding (group, list)
@@ -58,28 +56,6 @@ data PrettyOptions = PrettyOptions
   , inlineForAll :: Bool
   -- ^ Attempt to print @for all@ and associated type sig on one line
   }
-
--- | Default PrettyOptions - makes no attempt to group text
-sparse :: PrettyOptions
-sparse =
-  PrettyOptions
-    { fullyQualify = False
-    , inlineHoles = False
-    , inlineLet = False
-    , inlineLambda = False
-    , inlineForAll = False
-    }
-
--- | Groups whenever possible
-compact :: PrettyOptions
-compact =
-  PrettyOptions
-    { fullyQualify = False
-    , inlineHoles = True
-    , inlineLet = True
-    , inlineLambda = True
-    , inlineForAll = True
-    }
 
 -- | Pretty prints @Expr'@ using Prettyprinter library
 prettyExpr :: PrettyOptions -> Expr' a b -> Doc AnsiStyle
