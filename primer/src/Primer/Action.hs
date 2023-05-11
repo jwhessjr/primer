@@ -973,6 +973,9 @@ toProgActionNoInput defs def0 sel0 = \case
   Available.AddConField -> do
     (defName, sel) <- conSel
     pure [AddConField defName sel.con 0 $ TEmptyHole ()]
+  Available.DeleteTypeDef -> do
+    sel <- typeSel
+    pure [DeleteTypeDef sel.def]
   where
     termSel = case sel0 of
       SelectionDef s -> pure s

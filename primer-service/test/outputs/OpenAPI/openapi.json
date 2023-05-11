@@ -303,7 +303,8 @@
                     "DeleteType",
                     "DuplicateDef",
                     "DeleteDef",
-                    "AddConField"
+                    "AddConField",
+                    "DeleteTypeDef"
                 ],
                 "type": "string"
             },

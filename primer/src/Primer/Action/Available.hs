@@ -135,6 +135,7 @@ data NoInputAction
   | DuplicateDef
   | DeleteDef
   | AddConField
+  | DeleteTypeDef
   deriving stock (Eq, Ord, Show, Read, Enum, Bounded, Generic)
   deriving (ToJSON, FromJSON) via PrimerJSON NoInputAction
 
@@ -317,6 +318,7 @@ forTypeDef l Editable =
     l
     [ Input RenameType
     , Input AddCon
+    , NoInput DeleteTypeDef -- TODO we should only offer this when not in use
     ]
 
 forTypeDefParamNode ::
@@ -552,6 +554,7 @@ sortByPriority l =
         DuplicateDef -> P.duplicate
         DeleteDef -> P.delete
         AddConField -> P.addConField
+        DeleteTypeDef -> P.delete
       Input a -> case a of
         MakeConSat -> P.useSaturatedValueCon
         MakeInt -> P.makeInt

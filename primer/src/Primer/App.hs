@@ -65,23 +65,29 @@ import Foreword hiding (mod)
 import Control.Monad.Fresh (MonadFresh (..))
 import Control.Monad.Log (MonadLog, WithSeverity)
 import Control.Monad.NestedError (MonadNestedError, throwError')
-import Data.Generics.Uniplate.Operations (transform, transformM)
+import Data.Data (Data)
+import Data.Generics.Uniplate.Operations (transform, transformM, universe)
 import Data.Generics.Uniplate.Zipper (
   fromZipper,
  )
 import Data.List (intersect, (\\))
 import Data.List.Extra (anySame, disjoint, (!?))
 import Data.Map.Strict qualified as Map
+import Data.Set qualified as S
 import Data.Set qualified as Set
 import Optics (
   Field1 (_1),
   Field2 (_2),
   Field3 (_3),
   ReversibleOptic (re),
+  anyOf,
+  folded,
   ifoldMap,
   mapped,
   over,
   set,
+  to,
+  toListOf,
   traverseOf,
   traversed,
   view,
@@ -125,6 +131,7 @@ import Primer.Core (
   CaseBranch' (CaseBranch),
   Expr,
   Expr' (Case, Con, EmptyHole, Hole, Var),
+  ExprMeta,
   GVarName,
   GlobalName (baseName, qualifiedModule),
   ID (..),
@@ -171,6 +178,7 @@ import Primer.Module (
   Module (Module, moduleDefs, moduleName, moduleTypes),
   builtinModule,
   deleteDef,
+  deleteTypeDef,
   insertDef,
   moduleDefsQualified,
   moduleTypesQualified,
@@ -882,6 +890,14 @@ applyProgAction prog mdefName = \case
               binds' <- maybe (throwError $ IndexOutOfRange index) pure $ insertAt index (Bind m' newName) binds
               pure $ CaseBranch vc binds' e
             else pure cb
+  DeleteTypeDef d -> editModuleCross (qualifiedModule d) prog $ \(m, ms) ->
+    case deleteTypeDef m d of
+      Nothing -> throwError $ TypeDefNotFound d
+      Just mod' -> do
+        when (typeInUse d (foldMap' moduleTypes $ mod' : ms) (foldMap' moduleDefs $ mod' : ms))
+          . throwError
+          $ TypeDefInUse d
+        pure (mod' : ms, Nothing)
   BodyAction actions -> editModuleOf mdefName prog $ \m defName def -> do
     let smartHoles = progSmartHoles prog
     res <- applyActionsToBody smartHoles (progAllModules prog) def actions
@@ -1694,3 +1710,48 @@ allTyConNames = fmap fst . allConNames
 -- change in the future.
 nextProgID :: Prog -> ID
 nextProgID p = foldl' (\id_ m -> max (nextModuleID m) id_) minBound (progModules p)
+
+-- TODO move to util module, analogously to `globalInUse`?
+-- TODO it's not just the type constructor - we also need to check whether any of its valcons are used anywhere
+-- typeInUse :: (Foldable f, Foldable g) => TyConName -> f (TypeDef b) -> g Def -> Bool
+typeInUse :: (Foldable f, Foldable g, Data b, Ord b) => TyConName -> f (TypeDef b) -> g Def -> Bool
+typeInUse v ts ds =
+  anyOf
+    (folded % #_DefAST % to tyConsInDef)
+    (Set.member v . Set.map fst)
+    ds
+    || anyOf
+      (folded % #_DefAST % to tyConsInDef)
+      (Set.member v . Set.map fst)
+      ds
+    || anyOf
+      (folded % #_TypeDefAST % to tyConsInTypeDef)
+      (Set.member v . Set.map fst)
+      ts
+
+-- TODO we don't actually make use of the returned metadata, but it seems useful to make these more widely-applicable
+-- at some point we'd want to be able to return the actual use sites
+-- this also ensures that we think about this if/when we consider removing IDs (add to issue?)
+-- should we just return IDs instead of full metadata? would avoid new `Ord`s, but make this unapplicable to `()`
+-- TODO move?
+-- TODO inline and avoid creating set at all? i.e. just traverse
+-- would go from O(n log n) to O(n)
+-- actually, I will probably need to reuse these for calculating available actions
+tyConsInExpr :: (Data a, Data b, Ord b) => Expr' a b -> Set (TyConName, b)
+tyConsInExpr =
+  Set.unions . map tyConsInType . concatMap (toListOf typesInExpr) . universe
+tyConsInType :: (Data a, Ord a) => Type' a -> Set (TyConName, a)
+tyConsInType t =
+  S.fromList [(n, m) | TCon m n <- universe t]
+tyConsInDef :: ASTDef -> Set (TyConName, TypeMeta)
+tyConsInDef d =
+  tyConsInExpr (astDefExpr d) `Set.union` tyConsInType (astDefType d)
+tyConsInTypeDef :: (Data a, Ord a) => ASTTypeDef a -> Set (TyConName, a)
+tyConsInTypeDef =
+  Set.unions . map (Set.unions . map tyConsInType . valConArgs) . astTypeDefConstructors
+valConsInExpr :: (Data a, Data b, Ord a) => Expr' a b -> Set (ValConName, a)
+valConsInExpr e =
+  S.fromList [(n, m) | Con m n _ <- universe e]
+valConsInDef :: ASTDef -> Set (ValConName, ExprMeta)
+valConsInDef =
+  valConsInExpr . astDefExpr

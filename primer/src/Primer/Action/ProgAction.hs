@@ -43,6 +43,8 @@ data ProgAction
     SetConFieldType TyConName ValConName Int (Type' ())
   | -- | Add a new field, at the given index, to the given constructor
     AddConField TyConName ValConName Int (Type' ())
+  | -- | Delete a type definition
+    DeleteTypeDef TyConName
   | -- | Execute a sequence of actions on the body of the definition
     BodyAction [Action]
   | -- | Execute a sequence of actions on the type annotation of the definition

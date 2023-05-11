@@ -13,6 +13,7 @@ module Primer.Module (
   builtinModule,
   builtinTypes,
   primitiveModule,
+  deleteTypeDef,
 ) where
 
 import Foreword
@@ -99,6 +100,13 @@ deleteDef :: Module -> GVarName -> Maybe Module
 deleteDef m d =
   if d `member` moduleDefsQualified m
     then Just $ m{moduleDefs = delete (baseName d) (moduleDefs m)}
+    else Nothing
+
+-- TODO document or inline (where else is `deleteDef` used?)
+deleteTypeDef :: Module -> TyConName -> Maybe Module
+deleteTypeDef m d =
+  if d `member` moduleTypesQualified m
+    then Just $ m{moduleTypes = delete (baseName d) (moduleTypes m)}
     else Nothing
 
 -- | Renames a module and any references to it (in the given 'Traversable' of

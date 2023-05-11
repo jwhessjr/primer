@@ -56,7 +56,7 @@ data Type' a
       -- ^ type the variable is bound to; the variable itself is not in scope, this is a non-recursive let
       (Type' a)
       -- ^ body of the let; binding scopes over this
-  deriving stock (Eq, Show, Read, Data, Generic)
+  deriving stock (Eq, Ord, Show, Read, Data, Generic)
   deriving (FromJSON, ToJSON) via PrimerJSON (Type' a)
   deriving anyclass (NFData)
 
