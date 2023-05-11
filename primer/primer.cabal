@@ -170,8 +170,6 @@ library primer-hedgehog
 library primer-testlib
   visibility:         public
   exposed-modules:
-    Primer.Test.App
-    Primer.Test.Expected
     Primer.Test.TestM
     Primer.Test.Util
 
