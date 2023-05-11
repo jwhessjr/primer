@@ -17,14 +17,11 @@ module Primer.Gen.Core.Typed (
   genSyn,
   genChk,
   genInstApp,
-  genCxtExtendingGlobal,
-  genCxtExtendingLocal,
   genPrimCon,
   genTypeDefGroup,
   forAllT,
   propertyWT,
   freshNameForCxt,
-  freshLVarNameForCxt,
   freshTyVarNameForCxt,
 ) where
 
@@ -47,7 +44,6 @@ import Primer.Core (
   Bind' (Bind),
   CaseBranch' (CaseBranch),
   Expr' (..),
-  GVarName,
   GlobalName (qualifiedModule),
   ID (),
   Kind (..),
@@ -64,7 +60,7 @@ import Primer.Core (
  )
 import Primer.Core.DSL (S)
 import Primer.Core.Utils (freeVarsTy)
-import Primer.Gen.Core.Raw (genLVarName, genModuleName, genName, genTyVarName)
+import Primer.Gen.Core.Raw (genLVarName, genModuleName, genTyVarName)
 import Primer.Module (Module (..))
 import Primer.Name (Name, NameCounter, freshName, unName, unsafeMkName)
 import Primer.Refine (Inst (InstAPP, InstApp, InstUnconstrainedAPP), refine)
@@ -155,10 +151,6 @@ freshNameForCxt = do
   globs <- getGlobalBaseNames
   locals <- asks $ M.keysSet . localCxt
   freshName $ globs <> locals
-
-freshLVarNameForCxt :: GenT WT LVarName
-freshLVarNameForCxt = LocalName <$> freshNameForCxt
-
 freshTyVarNameForCxt :: GenT WT TyVarName
 freshTyVarNameForCxt = LocalName <$> freshNameForCxt
 
@@ -471,14 +463,6 @@ genWTType k = do
 genWTKind :: GenT WT Kind
 genWTKind = Gen.recursive Gen.choice [pure KType] [KFun <$> genWTKind <*> genWTKind]
 
--- NB: we are only generating the context entries, and so don't
--- need definitions for the symbols!
-genGlobalCxtExtension :: GenT WT [(GVarName, TypeG)]
-genGlobalCxtExtension =
-  local forgetLocals $
-    Gen.list (Range.linear 1 5) $
-      (,) <$> (qualifyName <$> genModuleName <*> genName) <*> genWTType KType
-
 -- We are careful to not let generated globals depend on whatever
 -- locals may be in the cxt
 forgetLocals :: Cxt -> Cxt
@@ -533,42 +517,6 @@ genTypeDefGroup mod = local forgetLocals $ do
 
 addTypeDefs :: [(TyConName, TypeDef ())] -> Cxt -> Cxt
 addTypeDefs = extendTypeDefCxt . M.fromList
-
-extendGlobals :: [(GVarName, TypeG)] -> Cxt -> Cxt
-extendGlobals nts cxt = cxt{globalCxt = globalCxt cxt <> M.fromList nts}
-
--- Generate an extension of the base context (from the reader monad) with more
--- typedefs and globals.
--- (It is probably worth seeding with some interesting types, to ensure decent
--- coverage)
-genCxtExtendingGlobal :: GenT WT Cxt
-genCxtExtendingGlobal = do
-  tds <- genTypeDefGroup Nothing
-  globals <- local (addTypeDefs tds) genGlobalCxtExtension
-  asks $ extendGlobals globals . addTypeDefs tds
-
--- Generate an extension of the base context (from the reader monad) with more
--- local term and type vars.
--- Note that here we need to generate fresh names, as we test that the
--- whole context typechecks. Since we represent contexts as a 'Map'
--- for efficiency, we do not keep track of scoping, and need to not
--- overwrite previous elements.  For instance, we cannot faithfully
--- represent the context @x : TYPE, y : x, x : TYPE -> TYPE@: we would
--- forget the first @x@, and thus it would appear that @y@ is
--- ill-typed (a term variable must have a type of kind TYPE).
-genCxtExtendingLocal :: GenT WT Cxt
-genCxtExtendingLocal = do
-  n <- Gen.int $ Range.linear 1 10
-  go n
-  where
-    go 0 = ask
-    go n = do
-      cxtE <-
-        Gen.choice
-          [ curry extendLocalCxtTy <$> freshTyVarNameForCxt <*> genWTKind
-          , curry extendLocalCxt <$> freshLVarNameForCxt <*> genWTType KType
-          ]
-      local cxtE $ go (n - 1)
 
 -- We have to be careful to only generate primitive constructors which are
 -- in scope (i.e. their type is in scope)

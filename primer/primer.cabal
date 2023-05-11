@@ -139,7 +139,6 @@ test-suite primer-test
   main-is:            Test.hs
   hs-source-dirs:     test
   other-modules:
-    Tests.Gen.Core.Typed
     Tests.Typecheck
     Primer.Gen.App
     Primer.Gen.Core.Raw
