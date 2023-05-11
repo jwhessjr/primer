@@ -6,6 +6,7 @@ module Tests.Gen.Core.Typed where
 import Data.Map qualified as M
 import Foreword hiding (diff)
 import Hedgehog (
+  Property, withDiscards, withTests,
   PropertyT,
   annotateShow,
   diff,
@@ -51,7 +52,6 @@ import Primer.Typecheck (
   synth,
   synthKind,
  )
-import Tasty (Property, withDiscards, withTests)
 
 inExtendedGlobalCxt :: PropertyT WT a -> PropertyT WT a
 inExtendedGlobalCxt p = do

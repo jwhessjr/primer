@@ -141,7 +141,6 @@ library primer-hedgehog
     Primer.Gen.App
     Primer.Gen.Core.Raw
     Primer.Gen.Core.Typed
-    Tasty
 
   other-modules:
   hs-source-dirs:     gen

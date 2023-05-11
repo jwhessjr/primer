@@ -8,6 +8,7 @@ import Data.Map qualified as Map
 import Data.Text qualified as T
 import Hedgehog (
   PropertyT,
+  Property, withDiscards, withTests,
   annotate,
   annotateShow,
   collect,
@@ -71,14 +72,13 @@ import Primer.Test.Util (testNoSevereLogs)
 import Primer.Typecheck (
   SmartHoles (SmartHoles),
  )
-import Tasty (Property, withDiscards, withTests, unProperty)
 import Tests.Typecheck (TypeCacheAlpha (TypeCacheAlpha))
 import Primer.TypeDef (ASTTypeDef(ASTTypeDef))
 import Test.Tasty
 import Test.Tasty.Hedgehog
 
 main :: IO ()
-main = defaultMain $ testProperty "undo_redo" $ unProperty tasty_undo_redo
+main = defaultMain $ testProperty "undo_redo" $ tasty_undo_redo
 
 -- | A helper type for 'tasty_available_actions_actions',
 -- describing where a particular option came from.
@@ -257,7 +257,6 @@ tasty_undo_redo = withTests 500 $
         Un -> runEditAppMLogs (handleMutationRequest Undo) a
         Re -> runEditAppMLogs (handleMutationRequest Redo) a
         Avail -> fromMaybe a <$> runRandomAvailableAction l a
-
 
 iterateNM :: Monad m => Int -> a -> (a -> m a) -> m a
 iterateNM n a f

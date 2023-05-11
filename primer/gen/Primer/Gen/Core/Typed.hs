@@ -35,6 +35,7 @@ import Control.Monad.Morph (hoist)
 import Control.Monad.Reader (mapReaderT)
 import Data.Map qualified as M
 import Hedgehog (
+  Property, property,
   GenT,
   MonadGen,
   PropertyT,
@@ -104,7 +105,6 @@ import Primer.Typecheck (
   primConInScope,
   typeDefs,
  )
-import Tasty (Property, property)
 
 {-
 Generate well scoped and typed expressions.
