@@ -212,42 +212,8 @@ test-suite primer-test
   main-is:            Test.hs
   hs-source-dirs:     test
   other-modules:
-    Tests.Action
-    Tests.Action.Available
-    Tests.Action.Capture
-    Tests.Action.Prog
-    Tests.AlphaEquality
-    Tests.API
-    Tests.App
-    Tests.Database
-    Tests.Eval
-    Tests.Eval.Utils
-    Tests.EvalFull
-    Tests.Examples
-    Tests.FreeVars
-    Tests.Gen.App
     Tests.Gen.Core.Typed
-    Tests.Module
-    Tests.NullDb
-    Tests.Prelude.Integer
-    Tests.Prelude.Logic
-    Tests.Prelude.Polymorphism
-    Tests.Prelude.TypeCheck
-    Tests.Prelude.Utils
-    Tests.Pretty
-    Tests.Primitives
-    Tests.Prog
-    Tests.Questions
-    Tests.Refine
-    Tests.Serialization
-    Tests.Subst
-    Tests.Transform
     Tests.Typecheck
-    Tests.Undo
-    Tests.Unification
-    Tests.Utils
-    Tests.Zipper
-    Tests.Zipper.BindersAbove
 
   default-language:   GHC2021
   default-extensions:

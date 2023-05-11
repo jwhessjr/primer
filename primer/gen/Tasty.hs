@@ -1,4 +1,4 @@
-module Tasty (Property, property, withTests, withDiscards) where
+module Tasty (Property(unProperty), property, withTests, withDiscards) where
 
 import Foreword
 
