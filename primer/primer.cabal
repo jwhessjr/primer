@@ -137,7 +137,6 @@ library
 library primer-hedgehog
   visibility:         public
   exposed-modules:
-    Primer.Gen.API
     Primer.Gen.App
     Primer.Gen.Core.Raw
     Primer.Gen.Core.Typed
