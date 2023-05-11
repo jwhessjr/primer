@@ -192,13 +192,9 @@ library primer-testlib
   build-depends:
     , base
     , containers
-    , exceptions
     , hedgehog
     , logging-effect
-    , optics
     , primer
-    , stm
-    , stm-containers
 
 test-suite primer-test
   type:               exitcode-stdio-1.0
