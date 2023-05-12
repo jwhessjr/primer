@@ -144,6 +144,10 @@ forDef ::
 forDef _ NonEditable _ = mempty
 forDef defs Editable defName =
     [Input RenameDef]
+      <> mwhen
+        -- ensure the definition is not in use, otherwise the action will not succeed
+        (not $ globalInUse defName $ Map.delete defName defs)
+        [NoInput DeleteDef]
 
 forBody ::
   TypeDefMap ->
