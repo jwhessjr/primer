@@ -69,15 +69,23 @@ import Hedgehog.Internal.Runner (checkReport)
 import Hedgehog.Internal.Property (Property(propertyConfig, propertyTest), Skip(SkipToShrink), TestCount, ShrinkPath)
 import qualified Hedgehog.Internal.Seed as Seed
 import Hedgehog.Internal.Report (reportStatus, Report (reportSeed, reportTests), Result (..), FailureReport (failureShrinkPath))
+import Numeric.Natural (Natural)
+import qualified Data.Map.Strict as M
+import Data.List.Extra (enumerate)
 
 main :: IO ()
-main = runAndRecheck >>= \case
-  RunPass -> die "Initial run passed"
-  RunDefeat -> die "Initial run gave up"
-  RecheckPass -> die "Rechecking run passed"
-  RecheckDefeat -> die "Rechecking run gave up"
-  RecheckRefind -> putStrLn @Text "Rechecking found an error"
+main = do
+  let n = 10
+  rs <- replicateM (fromIntegral n) runAndRecheck
+  let cs = count rs
+  void $ M.traverseWithKey (\ri c -> putStrLn $ showPad ri <> " : " <> show c) cs
+  if (cs M.! RecheckPass) + (cs M.! RecheckDefeat) > n `div` 2
+    then putStrLn @Text "This tickled non-replay bug > 50%"
+    else die "This did not tickle non-replay bug much"
 
+-- Bounded & Enum: we explicitly give counts of 0 for those which did not appear
+count :: (Bounded a, Enum a, Ord a) => [a] -> Map a Natural
+count as = M.unionsWith (+) $ M.fromList [(a,0) | a <- enumerate] : fmap (`M.singleton` 1) as
 
 -- This runs the test once with a random seed, and
 -- - if it fails then rechecks it with the reported skip/shrink, reporting whether it finds an error again
@@ -104,6 +112,10 @@ data RRInfo
   | RecheckPass
   | RecheckDefeat
   | RecheckRefind -- rechecking finds /an/ error, not asserted /the same/ error
+  deriving stock (Show, Eq, Ord, Enum, Bounded)
+
+showPad :: RRInfo -> Text
+showPad ri = let s = show ri in s <> T.replicate (13 - T.length s) " "
 
 data RunInfo
   = Passed
