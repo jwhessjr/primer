@@ -7,24 +7,17 @@ module Primer.Core.DSL (
   app,
   aPP,
   con,
-  lvar,
-  gvar,
   var,
   lam,
   lAM,
   let_,
   letrec,
-  letType,
   case_,
   branch,
   prim,
-  char,
-  int,
   tEmptyHole,
-  thole,
   tcon,
   tforall,
-  tlet,
   tfun,
   tapp,
   tvar,
@@ -32,63 +25,40 @@ module Primer.Core.DSL (
   meta',
   create,
   create',
-  setMeta,
   S,
-  tcon',
-  con',
-  gvar',
-  branch',
-  apps,
   apps',
 ) where
 
 import Foreword
 
 import Control.Monad.Fresh (MonadFresh)
-import Optics (set)
 import Primer.Core (
   Bind' (..),
   CaseBranch,
   CaseBranch' (..),
   Expr,
   Expr' (..),
-  GVarName,
   ID,
   LVarName,
-  ModuleName (ModuleName),
   PrimCon (..),
   TmVarRef (..),
   TyVarName,
   Type,
   TypeCache,
   ValConName,
-  Value,
-  qualifyName,
-  _metadata,
  )
 import Primer.Core.DSL.Meta (S, create, create', meta, meta')
 import Primer.Core.DSL.Type (
   tEmptyHole,
   tapp,
   tcon,
-  tcon',
   tforall,
   tfun,
-  thole,
-  tlet,
   tvar,
  )
-import Primer.Name (Name)
-
-setMeta :: Functor m => Value -> m Expr -> m Expr
-setMeta m e = set _metadata (Just m) <$> e
 
 app :: MonadFresh ID m => m Expr -> m Expr -> m Expr
 app e1 e2 = App <$> meta <*> e1 <*> e2
-
--- | `app` for multiple args
-apps :: MonadFresh ID m => m Expr -> [m Expr] -> m Expr
-apps e es = apps' e (map Left es)
 
 -- | `apps` for expressions and types
 apps' :: MonadFresh ID m => m Expr -> [Either (m Expr) (m Type)] -> m Expr
@@ -112,12 +82,6 @@ ann e t = Ann <$> meta <*> e <*> t
 con :: MonadFresh ID m => ValConName -> m Expr
 con c = Con <$> meta <*> pure c
 
-lvar :: MonadFresh ID m => LVarName -> m Expr
-lvar v = Var <$> meta <*> pure (LocalVarRef v)
-
-gvar :: MonadFresh ID m => GVarName -> m Expr
-gvar name = Var <$> meta <*> pure (GlobalVarRef name)
-
 var :: MonadFresh ID m => TmVarRef -> m Expr
 var v = Var <$> meta <*> pure v
 
@@ -133,9 +97,6 @@ let_ v a b = Let <$> meta <*> pure v <*> a <*> b
 letrec :: MonadFresh ID m => LVarName -> m Expr -> m Type -> m Expr -> m Expr
 letrec v a tA b = Letrec <$> meta <*> pure v <*> a <*> tA <*> b
 
-letType :: MonadFresh ID m => TyVarName -> m Type -> m Expr -> m Expr
-letType v t e = LetType <$> meta <*> pure v <*> t <*> e
-
 case_ :: MonadFresh ID m => m Expr -> [m CaseBranch] -> m Expr
 case_ e brs = Case <$> meta <*> e <*> sequence brs
 
@@ -146,18 +107,3 @@ branch c vs e = CaseBranch c <$> mapM binding vs <*> e
 
 prim :: MonadFresh ID m => PrimCon -> m Expr
 prim p = PrimCon <$> meta <*> pure p
-
-char :: MonadFresh ID m => Char -> m Expr
-char = prim . PrimChar
-
-int :: MonadFresh ID m => Integer -> m Expr
-int = prim . PrimInt
-
-con' :: MonadFresh ID m => NonEmpty Name -> Name -> m Expr
-con' m n = con $ qualifyName (ModuleName m) n
-
-gvar' :: MonadFresh ID m => NonEmpty Name -> Name -> m Expr
-gvar' m n = gvar $ qualifyName (ModuleName m) n
-
-branch' :: MonadFresh ID m => (NonEmpty Name, Name) -> [(LVarName, Maybe TypeCache)] -> m Expr -> m CaseBranch
-branch' (m, n) = branch $ qualifyName (ModuleName m) n
