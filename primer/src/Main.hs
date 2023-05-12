@@ -66,7 +66,7 @@ import Primer.TypeDef (ASTTypeDef(..), TypeDef (..))
 import Control.Monad.Fresh (fresh, MonadFresh)
 import Primer.Core.DSL
 import Hedgehog.Internal.Runner (checkReport)
-import Hedgehog.Internal.Property (Property(propertyConfig, propertyTest), Skip(SkipToShrink))
+import Hedgehog.Internal.Property (Property(propertyConfig, propertyTest), Skip(SkipToShrink), TestCount, ShrinkPath)
 import qualified Hedgehog.Internal.Seed as Seed
 import Hedgehog.Internal.Report (reportStatus, Report (reportSeed, reportTests), Result (..), FailureReport (failureShrinkPath))
 
@@ -76,26 +76,32 @@ import Hedgehog.Internal.Report (reportStatus, Report (reportSeed, reportTests),
 main :: IO ()
 main = do
   seed <- Seed.random
-  report <- checkReport (propertyConfig tasty_undo_redo) 0 seed (propertyTest tasty_undo_redo) $ const $ pure ()
+  shrink <- runProp seed tasty_undo_redo >>= \case
+    Passed -> die "Passed"
+    Defeat -> die "GaveUp"
+    Fail tc sp -> pure $ SkipToShrink tc sp
+  -- This is essentially "recheckAt", with the skip/shrink info from above
+  runProp seed (withSkip shrink tasty_undo_redo) >>= \case
+    Passed -> die "rechecking passed"
+    Defeat -> die "rechecking gave up"
+    Fail _ _ -> putStrLn @Text "rechecking found the error"
+
+data RunInfo
+  = Passed
+  | Defeat
+  | Fail TestCount ShrinkPath
+
+runProp :: Seed -> Property -> IO RunInfo
+runProp seed prop = do
+  report <- checkReport (propertyConfig prop) 0 seed (propertyTest prop) $ const $ pure ()
   let testcount = reportTests report
   let seed' = reportSeed report
-  let (status, sp) = case reportStatus report of
-        GaveUp -> ("GaveUp" :: Text, Nothing)
-        OK -> ("Passed", Nothing)
-        Failed x -> ("Failed, with shrink path: " <> show (failureShrinkPath x), Just $ failureShrinkPath x)
-  putStrLn status
-  print testcount
-  print (seed, seed', seed == seed')
-  case sp of
-    Nothing -> die "did not find a failure"
-    Just sp' -> do
-      -- This is essentially "recheckAt", with the skip/shrink info from above
-      let prop = withSkip (SkipToShrink testcount sp') tasty_undo_redo
-      report2 <- checkReport (propertyConfig prop) 0 seed' (propertyTest prop) $ const $ pure ()
-      case reportStatus report2 of
-        GaveUp -> die "rechecking gave up"
-        OK -> die "rechecking passed"
-        Failed _ -> putStrLn @Text "rechecking found the error"
+  -- check my understanding
+  unless (seed == seed') $ die "seed /= seed'"
+  pure $ case reportStatus report of
+        GaveUp -> Defeat
+        OK -> Passed
+        Failed x -> Fail testcount $ failureShrinkPath x
 
 -- | A helper type for 'tasty_available_actions_actions',
 -- describing where a particular option came from.
