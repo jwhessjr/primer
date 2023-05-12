@@ -1,6 +1,6 @@
 cradle:
   cabal:
-    - path: "primer/src/Test.hs"
+    - path: "primer/src/Main.hs"
       component: "primer:exe:primer-test"
 
     - path: "primer/src/Control/Monad/Fresh.hs"

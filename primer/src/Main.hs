@@ -1,5 +1,7 @@
 {-# LANGUAGE OverloadedLabels #-}
 
+module Main (main) where
+
 import Foreword
 
 import Control.Monad.Log (WithSeverity)
