@@ -3,7 +3,7 @@
 import Foreword
 
 import Control.Monad.Log (WithSeverity)
-import Data.List.Extra (enumerate, partition)
+import Data.List.Extra (partition)
 import Data.Map qualified as Map
 import Data.Text qualified as T
 import Hedgehog
@@ -21,9 +21,9 @@ import Primer.App (
   App,
   EditAppM,
   Editable (..),
-  Level,
+  Level (..),
   NodeType (..),
-  Prog (progLog, redoLog),
+  Prog (..),
   ProgError (ActionError, DefAlreadyExists),
   MutationRequest(Edit),
   appProg,
@@ -32,12 +32,12 @@ import Primer.App (
   progAllTypeDefs,
   progCxt,
   progModules,
-  runEditAppM, handleMutationRequest, MutationRequest (Undo, Redo), Log (unlog),
+  runEditAppM, handleMutationRequest, MutationRequest (Undo, Redo), Log (..), tcWholeProgWithImports, mkApp,
  )
 import Primer.Core (
   GVarName,
   ID,
-  qualifyName,
+  qualifyName, ModuleName (..),
  )
 import Primer.Core.Utils (
   exprIDs,
@@ -48,27 +48,27 @@ import Primer.Def (
   Def (DefAST),
   defAST,
  )
-import Primer.Gen.App (extendCxtByModules, genApp)
+import Primer.Gen.App (extendCxtByModules)
 import Primer.Gen.Core.Raw (genName)
-import Primer.Gen.Core.Typed (WT, forAllT, propertyWT, freshNameForCxt)
+import Primer.Gen.Core.Typed (WT, forAllT, propertyWT, freshNameForCxt, isolateWT)
 import Primer.Log (PureLog, runPureLog)
 import Primer.Module (
-  Module (moduleName),
-  builtinModule,
-  primitiveModule,
+  Module (..),
  )
 import Primer.Name (Name (unName))
 import Primer.Test.Util (testNoSevereLogs)
 import Primer.Typecheck (
-  SmartHoles (SmartHoles),
+  SmartHoles (SmartHoles), TypeError,
  )
 import Tests.Typecheck (TypeCacheAlpha (TypeCacheAlpha))
-import Primer.TypeDef (ASTTypeDef(ASTTypeDef))
+import Primer.TypeDef (ASTTypeDef(..), TypeDef (..))
+import Control.Monad.Fresh (fresh, MonadFresh)
+import Primer.Core.DSL
 
 main :: IO ()
 main = defaultMain [ check tasty_undo_redo ]
---main = recheckAt (Seed 11087148197968773465 7784360380252669127) "369:eDbKaC2o" tasty_undo_redo
---main = recheckAt (Seed 7821100195500719741 16942824065656170451) "21:eD2h2F3eFmBCb" tasty_undo_redo
+--main = recheckAt (Seed 9701331813554010028 14839848710226094279) "87:b3A3k2" tasty_undo_redo
+--main = recheckAt (Seed 14048740289421623188 5783122199880849279) "34:cA3bKj" tasty_undo_redo
 
 -- | A helper type for 'tasty_available_actions_actions',
 -- describing where a particular option came from.
@@ -190,17 +190,48 @@ data Act = AddTm | AddTy
   | Un | Re | Avail
   deriving stock Show
 
+prog :: MonadFresh ID m => m Prog
+prog = do
+  let modName =  ModuleName { unModuleName = "M" :| [ "0" ] }
+      a = qualifyName modName "a6"
+  e <- lam "x" (case_ emptyHole [] `ann` tEmptyHole) `ann` (tcon a `tfun` tcon a)
+  t <- tcon a `tfun` tcon a
+  let m = Module
+                { moduleName = modName
+                , moduleTypes =
+                    Map.fromList
+                      [ ( "a6"
+                        , TypeDefAST
+                            ASTTypeDef
+                              { astTypeDefParameters = []
+                              , astTypeDefConstructors = []
+                              , astTypeDefNameHints = []
+                              }
+                        )]
+                , moduleDefs = Map.fromList [ ( "a" , DefAST $ ASTDef e t)]
+                }
+  pure $ Prog
+        { progImports = []
+        , progModules = [m]
+        , progSelection = Nothing
+        , progSmartHoles = SmartHoles
+        , progLog = Log { unlog = [] }
+        , redoLog = Log { unlog = [] }
+        }
+
 tasty_undo_redo :: Property
 tasty_undo_redo = withTests 500 $
   withDiscards 2000 $
     propertyWT [] $ do
-      l <- forAllT $ Gen.element enumerate
-      cxt <- forAllT $ Gen.choice $ map sequence [[], [builtinModule], [builtinModule, pure primitiveModule]]
+      let l = Expert
       -- We only test SmartHoles mode (which is the only supported user-facing
       -- mode - NoSmartHoles is only used for internal sanity testing etc)
       let annotateShow' :: HasCallStack => App -> PropertyT WT ()
           annotateShow' = withFrozenCallStack $ annotateShow . (\p -> (progModules p, progLog p, redoLog p)) . appProg
-      a <- forAllT $ genApp SmartHoles cxt
+      Right p' <- runExceptT @TypeError $ tcWholeProgWithImports =<< prog
+      i <- lift $ isolateWT fresh
+      nc <- lift $ isolateWT fresh
+      let a = mkApp i nc p'
       annotateShow' a
       n <- forAll $ Gen.int $ Range.linear 1 20
       a' <- iterateNM n a $ \a' -> runRandomAction l a'

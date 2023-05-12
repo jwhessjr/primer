@@ -6,7 +6,7 @@ module Primer.Core.Meta (
   ModuleName (ModuleName, unModuleName),
   mkSimpleModuleName,
   GlobalNameKind (..),
-  GlobalName (qualifiedModule, baseName),
+  GlobalName (GlobalName, qualifiedModule, baseName),
   qualifyName,
   unsafeMkGlobalName,
   TyConName,

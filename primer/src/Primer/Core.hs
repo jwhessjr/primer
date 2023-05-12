@@ -44,7 +44,7 @@ import Optics (
  )
 import Primer.Core.Meta (
   GVarName,
-  GlobalName (baseName, qualifiedModule),
+  GlobalName (GlobalName, baseName, qualifiedModule),
   GlobalNameKind (..),
   HasID (..),
   HasMetadata (_metadata),
