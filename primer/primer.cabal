@@ -35,7 +35,6 @@ library
     Primer.Name.Fresh
     Primer.Pretty
     Primer.Primitives
-    Primer.Primitives.DSL
     Primer.Questions
     Primer.Refine
     Primer.Subst
