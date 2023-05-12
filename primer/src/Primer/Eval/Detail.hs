@@ -1,14 +1,5 @@
-{-# LANGUAGE DuplicateRecordFields #-}
-
 module Primer.Eval.Detail (
-  EvalDetail (..),
-  module Ann,
-  module Beta,
-  module Bind,
-  module Inline,
-  module Case,
-  module Let,
-  module Prim,
+  EvalDetail,
 ) where
 
 import Foreword
@@ -16,13 +7,14 @@ import Foreword
 import Primer.Core (Expr)
 import Primer.Core.Meta (LocalNameKind (..))
 import Primer.Core.Type (Kind, Type)
-import Primer.Eval.Ann as Ann
-import Primer.Eval.Beta as Beta
-import Primer.Eval.Bind as Bind
-import Primer.Eval.Case as Case
-import Primer.Eval.Inline as Inline
-import Primer.Eval.Let as Let
-import Primer.Eval.Prim as Prim
+import Primer.Eval.Ann ( RemoveAnnDetail )
+import Primer.Eval.Beta ( BetaReductionDetail )
+import Primer.Eval.Bind ( BindRenameDetail )
+import Primer.Eval.Case ( CaseReductionDetail )
+import Primer.Eval.Inline
+    ( GlobalVarInlineDetail, LocalVarInlineDetail )
+import Primer.Eval.Let ( LetRemovalDetail )
+import Primer.Eval.Prim ( ApplyPrimFunDetail )
 import Primer.JSON (CustomJSON (CustomJSON), FromJSON, PrimerJSON, ToJSON)
 
 -- | Detailed information about a reduction step

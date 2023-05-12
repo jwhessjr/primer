@@ -27,7 +27,6 @@ library
     Primer.Core.Utils
     Primer.Def
     Primer.Def.Utils
-    Primer.Eval
     Primer.EvalFull
     Primer.JSON
     Primer.Log
@@ -73,7 +72,6 @@ library
     Primer.Eval.EvalError
     Primer.Eval.Inline
     Primer.Eval.Let
-    Primer.Eval.NormalOrder
     Primer.Eval.Prim
     Primer.Eval.Redex
     Primer.Primitives.PrimDef
