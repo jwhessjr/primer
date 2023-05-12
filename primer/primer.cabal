@@ -33,11 +33,6 @@ library
     Primer.Module
     Primer.Name
     Primer.Name.Fresh
-    Primer.Prelude
-    Primer.Prelude.Integer
-    Primer.Prelude.Logic
-    Primer.Prelude.Polymorphism
-    Primer.Prelude.Utils
     Primer.Pretty
     Primer.Primitives
     Primer.Primitives.DSL
