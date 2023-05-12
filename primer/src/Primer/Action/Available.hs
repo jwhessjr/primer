@@ -190,15 +190,11 @@ forExpr tydefs l expr =
   universalActions <> synOnly <> case expr of
     EmptyHole{} ->
       annotate
-        <> [ Input MakeVar
-           , Input MakeCon
-           ]
     Hole{} ->
       delete
         <> annotate
     Ann{} ->
       delete
-        <> mwhen (l == Expert) [NoInput RemoveAnn]
     Lam{} ->
       delete
         <> annotate
@@ -218,17 +214,13 @@ forExpr tydefs l expr =
   where
     universalActions = case l of
       Beginner ->
-        [ Input MakeLam
+        [
         ]
       Intermediate ->
-        [ Input MakeLam
-        , NoInput MakeApp
+        [
         ]
       Expert ->
-        [ NoInput MakeApp
-        , NoInput MakeAPP
-        , Input MakeLam
-        , Input MakeLAM
+        [
         ]
     -- We assume that the input program is type-checked, in order to
     -- filter some actions by Syn/Chk
@@ -237,8 +229,8 @@ forExpr tydefs l expr =
         Left TDIHoleType{} -> []
         Right (TypeDefInfo _ _ TypeDefAST{}) -> []
         _ -> []
-    annotate = mwhen (l == Expert) [NoInput MakeAnn]
-    delete = [NoInput DeleteExpr]
+    annotate = mwhen (l == Expert) []
+    delete = []
 
 forType :: Level -> Type -> [Action]
 forType l type_ =
@@ -247,7 +239,7 @@ forType l type_ =
     TForall{} ->
       delete
     TFun{} ->
-      delete <> [NoInput AddInput]
+      delete
     _ ->
       delete
   where
@@ -255,8 +247,7 @@ forType l type_ =
       [NoInput MakeFun]
         <> mwhen
           (l == Expert)
-          [ Input MakeForall
-          , NoInput MakeTApp
+          [
           ]
     delete = [NoInput DeleteType]
 
