@@ -75,7 +75,7 @@ import Data.List.Extra (enumerate)
 
 main :: IO ()
 main = do
-  let n = 10
+  let n = 100
   rs <- replicateM (fromIntegral n) runAndRecheck
   let cs = count rs
   void $ M.traverseWithKey (\ri c -> putStrLn $ showPad ri <> " : " <> show c) cs

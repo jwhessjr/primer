@@ -41,4 +41,4 @@ data ProgError
   | ModuleNotFound ModuleName
   | -- | Cannot edit an imported module
     ModuleReadonly ModuleName
-  deriving stock (Eq, Show, Read, Generic)
+  deriving stock (Eq, Show, Read)

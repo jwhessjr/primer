@@ -1,5 +1,7 @@
 module Primer.Module (
   Module (..),
+  _moduleTypes,
+  _moduleDefs,
   qualifyTyConName,
   moduleTypesQualified,
   qualifyDefName,
@@ -29,13 +31,20 @@ import Primer.Def (
  )
 import Primer.Name (Name)
 import Primer.TypeDef (TypeDef (..), TypeDefMap, forgetTypeDefMetadata)
+import Optics (Lens', lens)
 
 data Module = Module
   { moduleName :: ModuleName
   , moduleTypes :: Map Name (TypeDef TypeMeta)
   , moduleDefs :: Map Name Def -- The current program: a set of definitions indexed by Name
   }
-  deriving stock (Eq, Show, Read, Data, Generic)
+  deriving stock (Eq, Show, Read, Data)
+
+_moduleTypes :: Lens' Module (Map Name (TypeDef TypeMeta))
+_moduleTypes = lens moduleTypes (\m t -> m {moduleTypes = t})
+
+_moduleDefs :: Lens' Module (Map Name Def)
+_moduleDefs = lens moduleDefs (\m d -> m {moduleDefs = d})
 
 qualifyTyConName :: Module -> Name -> TyConName
 qualifyTyConName m = qualifyName (moduleName m)

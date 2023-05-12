@@ -26,4 +26,4 @@ data LetRemovalDetail t = LetRemovalDetail
   , bodyID :: ID
   -- ^ the right hand side of the let
   }
-  deriving stock (Eq, Show, Read, Generic)
+  deriving stock (Eq, Show, Read)

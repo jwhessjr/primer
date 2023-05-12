@@ -31,4 +31,4 @@ data BetaReductionDetail k domain codomain = BetaReductionDetail
   , bodyID :: ID
   , types :: (domain, codomain)
   }
-  deriving stock (Eq, Show, Read, Generic)
+  deriving stock (Eq, Show, Read)

@@ -93,7 +93,7 @@ import Primer.Zipper (
 data Action
   = NoInput NoInputAction
   | Input InputAction
-  deriving stock (Eq, Ord, Show, Read, Generic)
+  deriving stock (Eq, Ord, Show, Read)
 
 -- | An action which can be applied without requiring further input.
 data NoInputAction
@@ -114,7 +114,7 @@ data NoInputAction
   | DeleteType
   | DuplicateDef
   | DeleteDef
-  deriving stock (Eq, Ord, Show, Read, Enum, Bounded, Generic)
+  deriving stock (Eq, Ord, Show, Read, Enum, Bounded)
 
 -- | An action which requires extra data (often a name) before it can be applied.
 data InputAction
@@ -135,7 +135,7 @@ data InputAction
   | MakeForall
   | RenameForall
   | RenameDef
-  deriving stock (Eq, Ord, Show, Read, Enum, Bounded, Generic)
+  deriving stock (Eq, Ord, Show, Read, Enum, Bounded)
 
 forDef ::
   DefMap ->
@@ -283,7 +283,7 @@ data Option = Option
   { option :: Text
   , context :: Maybe (NonEmpty Text)
   }
-  deriving stock (Eq, Show, Read, Generic)
+  deriving stock (Eq, Show, Read)
 
 -- | The available sorts of free-form input for an 'InputAction'.
 data FreeInput
@@ -295,14 +295,14 @@ data FreeInput
     FreeInt
   | -- | A free-form string input is allowed, and represents a primitive character
     FreeChar
-  deriving stock (Show, Read, Generic, Bounded, Enum)
+  deriving stock (Show, Read, Bounded, Enum)
 
 -- | The available inputs for an 'InputAction'.
 data Options = Options
   { opts :: [Option]
   , free :: FreeInput
   }
-  deriving stock (Show, Read, Generic)
+  deriving stock (Show, Read)
 
 options ::
   TypeDefMap ->

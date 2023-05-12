@@ -27,4 +27,4 @@ data TypeError
     WrongCaseBranches TyConName [ValConName]
   | CaseBranchWrongNumberPatterns
   | KindError KindError
-  deriving stock (Eq, Show, Read, Generic)
+  deriving stock (Eq, Show, Read)

@@ -63,3 +63,4 @@ data ActionError
   | NeedChar Available.Option
   | NoNodeSelection
   deriving stock (Eq, Show, Read, Generic)
+-- cannot remove generic here as is used in MonadNestedError

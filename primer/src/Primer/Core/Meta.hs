@@ -47,8 +47,8 @@ import Primer.Name (Name, unsafeMkName)
 -- on them. (Internally, we rely on 'Ord' and 'Bounded', but that may
 -- change in the future and is more or less not visible to external
 -- consumers of this type.)
-newtype ID = ID {unID :: Int}
-  deriving stock (Eq, Generic, Data)
+newtype ID = ID Int
+  deriving stock (Eq, Data)
   deriving newtype (Show, Read, Num, Ord, Enum, Bounded)
 
 data Meta a = Meta ID a (Maybe Value)

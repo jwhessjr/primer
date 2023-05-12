@@ -10,6 +10,9 @@ module Primer.Zipper (
   updateCaseBind,
   unfocusCaseBind,
   caseBindZFocus,
+  caseBindZRhs,
+  caseBindAllBindings,
+  caseBindZUpdate,
   IsZipper (asZipper),
   Loc,
   Loc' (..),
@@ -152,12 +155,14 @@ type TypeZip' b = Zipper (Type' b) (Type' b)
 -- This type contains a Zipper for a 'Type' and a function that will place the
 -- unzippered type back into the wider expression zipper, keeping its place.
 data TypeZ' a b = TypeZ (TypeZip' b) (Type' b -> ExprZ' a b)
-  deriving stock (Generic)
+
+tzpos1 :: Lens' (TypeZ' a b) (TypeZip' b)
+tzpos1 = lens (\(TypeZ z _) -> z) (\(TypeZ _ f) z -> TypeZ z f)
 
 type TypeZ = TypeZ' ExprMeta TypeMeta
 
 instance HasID b => HasID (TypeZ' a b) where
-  _id = position @1 % _id
+  _id = tzpos1 % _id
 
 -- | A zipper for variable bindings in case branches.
 -- This type focuses on a particular binding in a particular branch.
@@ -179,7 +184,10 @@ data CaseBindZ' a b = CaseBindZ
   , caseBindZUpdate :: Bind' a -> Expr' a b -> ExprZ' a b -> ExprZ' a b
   -- ^ a function to update the focused binding and rhs simultaneously
   }
-  deriving stock (Generic)
+
+_caseBindZFocus :: Lens' (CaseBindZ' a b) (Bind' a)
+_caseBindZFocus = lens caseBindZFocus (\cb f -> cb {caseBindZFocus = f})
+
 
 type CaseBindZ = CaseBindZ' ExprMeta TypeMeta
 
@@ -203,7 +211,7 @@ updateCaseBind (CaseBindZ z bind rhs bindings update) f =
      in CaseBindZ z' bind' rhs' bindings update
 
 instance HasID a => HasID (CaseBindZ' a b) where
-  _id = #caseBindZFocus % _id
+  _id = _caseBindZFocus % _id
 
 -- | A specific location in our AST.
 -- This can either be in an expression, type, or binding.
@@ -214,7 +222,6 @@ data Loc' a b
     InType (TypeZ' a b)
   | -- | A binding (currently just case bindings)
     InBind (BindLoc' a b)
-  deriving stock (Generic)
 
 type Loc = Loc' ExprMeta TypeMeta
 
@@ -236,12 +243,14 @@ instance (HasID a, HasID b) => HasID (Loc' a b) where
 {- HLINT ignore BindLoc' "Use newtype instead of data" -}
 data BindLoc' a b
   = BindCase (CaseBindZ' a b)
-  deriving stock (Generic)
+
+blpos1 :: Lens' (BindLoc' a b) (CaseBindZ' a b)
+blpos1 = lens (\(BindCase b) -> b) (\_ b -> BindCase b)
 
 type BindLoc = BindLoc' ExprMeta TypeMeta
 
 instance HasID a => HasID (BindLoc' a b) where
-  _id = position @1 % _id
+  _id = blpos1 % _id
 
 -- | Switch from an 'Expr' zipper to a 'Type' zipper, focusing on the type in
 -- the current target. This expects that the target is an @Ann@, @App@,
@@ -285,13 +294,13 @@ focusOnlyType :: TypeZ' a b -> TypeZip' b
 focusOnlyType (TypeZ zt _) = zt
 
 instance Data b => IsZipper (TypeZ' a b) (Type' b) where
-  asZipper = position @1
+  asZipper = tzpos1
 
 -- 'CaseBindZ' is sort of a fake zipper which can only focus on one thing: the case binding.
 -- It's a bit fiddly to make it appear as a zipper like this, but it's convenient to have a
 -- consistent interface for 'ExprZ', 'TypeZ' and 'CaseBindZ'.
 instance IsZipper CaseBindZ (Bind' ExprMeta) where
-  asZipper = #caseBindZFocus % iso zipper fromZipper
+  asZipper = _caseBindZFocus % iso zipper fromZipper
 
 -- | Convert an 'Expr' to a 'Loc' which focuses on the top of the expression.
 focusLoc :: Expr -> Loc
@@ -455,4 +464,4 @@ data SomeNode
   | TypeNode Type
   | -- | If/when we model all bindings with 'Bind'', we will want to generalise this.
     CaseBindNode Bind
-  deriving stock (Eq, Show, Read, Generic)
+  deriving stock (Eq, Show, Read)

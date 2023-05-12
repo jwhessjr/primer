@@ -60,11 +60,13 @@ import Optics (
   Field2 (_2),
   Field3 (_3),
   ReversibleOptic (re),
+  Setter',
   ifoldMap,
   lens,
   mapped,
   over,
   set,
+  sets,
   traverseOf,
   traversed,
   view,
@@ -76,7 +78,7 @@ import Optics (
   (^?),
   _Just,
   _Left,
-  _Right,
+  _Right, Getter, to,
  )
 import Primer.Action (
   Action,
@@ -129,7 +131,10 @@ import Primer.Core.Transform (foldApp, renameVar, unfoldAPP, unfoldApp, unfoldTA
 import Primer.Core.Utils (freeVars, generateTypeIDs, regenerateExprIDs, regenerateTypeIDs, _freeTmVars, _freeTyVars, _freeVarsTy)
 import Primer.Def (
   ASTDef (..),
+  _astDefExpr,
+  _astDefType,
   Def (..),
+  _DefAST,
   DefMap,
   defAST,
  )
@@ -138,6 +143,8 @@ import Primer.Eval.Detail (EvalDetail)
 import Primer.EvalFull (Dir, TerminationBound)
 import Primer.Module (
   Module (moduleDefs, moduleName, moduleTypes),
+  _moduleTypes,
+  _moduleDefs,
   deleteDef,
   insertDef,
   moduleDefsQualified,
@@ -152,9 +159,14 @@ import Primer.Questions (
  )
 import Primer.TypeDef (
   ASTTypeDef (..),
+  _astTypeDefConstructors,
+  _astTypeDefParameters,
   TypeDef (..),
+  _TypeDefAST,
   TypeDefMap,
   ValCon (..),
+  _valConArgs,
+  _valConName,
   generateTypeDefIDs,
   typeDefAST,
  )
@@ -211,7 +223,22 @@ data Prog = Prog
   -- reset whenever an action is performed; i.e., redos are not
   -- preserved across edits.
   }
-  deriving stock (Eq, Show, Read, Generic)
+  deriving stock (Eq, Show, Read)
+
+_progImports :: Setter' Prog [Module]
+_progImports = sets $ \f p -> p {progImports = f $ progImports p}
+
+_progModules :: Setter' Prog [Module]
+_progModules = sets $ \f p -> p {progModules = f $ progModules p}
+
+_progSelection :: Setter' Prog (Maybe Selection)
+_progSelection = sets $ \f p -> p {progSelection = f $ progSelection p}
+
+_progSmartHoles :: Setter' Prog SmartHoles
+_progSmartHoles = sets $ \f p -> p {progSmartHoles = f $ progSmartHoles p}
+
+_redoLog :: Setter' Prog Log
+_redoLog = sets $ \f p -> p {redoLog = f $ redoLog p}
 
 -- | Push a compound action onto the given 'Log', returning the new
 -- 'Log'.
@@ -267,7 +294,7 @@ allDefs = fmap snd . progAllDefs
 --  Each item is a sequence of Core actions which should be applied atomically.
 --  Items are stored in reverse order so it's quick to add new ones.
 newtype Log = Log {unlog :: [[ProgAction]]}
-  deriving stock (Eq, Show, Read, Generic)
+  deriving stock (Eq, Show, Read)
   deriving newtype (Semigroup, Monoid)
 
 -- | The default (empty) 'Log'.
@@ -281,7 +308,13 @@ data Selection = Selection
   -- ^ the ID of some ASTDef
   , selectedNode :: Maybe NodeSelection
   }
-  deriving stock (Eq, Show, Read, Generic, Data)
+  deriving stock (Eq, Show, Read, Data)
+
+_selectedDef :: Getter Selection GVarName
+_selectedDef = to selectedDef
+
+_selectedNode :: Getter Selection (Maybe NodeSelection)
+_selectedNode = to selectedNode
 
 -- | A selected node, in the body or type signature of some definition.
 -- We have the following invariant: @nodeType = SigNode ==> isRight meta@
@@ -289,46 +322,49 @@ data NodeSelection = NodeSelection
   { nodeType :: NodeType
   , meta :: Either ExprMeta TypeMeta
   }
-  deriving stock (Eq, Show, Read, Generic, Data)
+  deriving stock (Eq, Show, Read, Data)
+
+_meta :: Setter' NodeSelection (Either ExprMeta TypeMeta)
+_meta = sets $ \f ns -> ns {meta = f $ meta ns}
 
 instance HasID NodeSelection where
   _id =
     lens
       (either getID getID . meta)
-      (flip $ \id -> over #meta $ bimap (set _id id) (set _id id))
+      (flip $ \id -> over _meta $ bimap (set _id id) (set _id id))
 
 -- | The type of requests which can mutate the application state.
 data MutationRequest
   = Undo
   | Redo
   | Edit [ProgAction]
-  deriving stock (Eq, Show, Read, Generic)
+  deriving stock (Eq, Show, Read)
 
 data EvalReq = EvalReq
   { evalReqExpr :: Expr
   , evalReqRedex :: ID
   }
-  deriving stock (Eq, Show, Read, Generic)
+  deriving stock (Eq, Show, Read)
 
 data EvalResp = EvalResp
   { evalRespExpr :: Expr
   , evalRespRedexes :: [ID]
   , evalRespDetail :: EvalDetail
   }
-  deriving stock (Eq, Show, Read, Generic)
+  deriving stock (Eq, Show, Read)
 
 data EvalFullReq = EvalFullReq
   { evalFullReqExpr :: Expr
   , evalFullCxtDir :: Dir -- is this expression in a syn/chk context, so we can tell if is an embedding.
   , evalFullMaxSteps :: TerminationBound
   }
-  deriving stock (Eq, Show, Read, Generic)
+  deriving stock (Eq, Show, Read)
 
 -- If we time out, we still return however far we got
 data EvalFullResp
   = EvalFullRespTimedOut Expr
   | EvalFullRespNormal Expr
-  deriving stock (Eq, Show, Read, Generic)
+  deriving stock (Eq, Show, Read)
 
 -- * Request handlers
 
@@ -366,7 +402,7 @@ handleEditRequest actions = do
   (prog, _) <- gets appProg >>= \p -> foldlM go (p, Nothing) actions
   let l = progLog prog
   let prog' = prog{progLog = push actions l, redoLog = defaultLog}
-  modify (\s -> s & #currentState % #prog .~ prog')
+  modify (\s -> s & _currentState % _prog .~ prog')
   pure prog'
   where
     go :: (Prog, Maybe GVarName) -> ProgAction -> m (Prog, Maybe GVarName)
@@ -383,7 +419,7 @@ applyProgAction prog mdefName = \case
     m <- lookupEditableModule (qualifiedModule d) prog
     case Map.lookup d $ moduleDefsQualified m of
       Nothing -> throwError $ DefNotFound d
-      Just _ -> pure $ prog & #progSelection ?~ Selection d Nothing
+      Just _ -> pure $ prog & _progSelection ?~ Selection d Nothing
   DeleteDef d -> editModuleCross (qualifiedModule d) prog $ \(m, ms) ->
     case deleteDef m d of
       Nothing -> throwError $ DefNotFound d
@@ -403,7 +439,7 @@ applyProgAction prog mdefName = \case
         renamedModules <-
           maybe (throwError $ ActionError NameCapture) pure $
             traverseOf
-              (traversed % #moduleDefs % traversed % #_DefAST % #astDefExpr)
+              (traversed % _moduleDefs % traversed % _DefAST % _astDefExpr)
               (renameVar (GlobalVarRef d) (GlobalVarRef newName))
               (m' : ms)
         pure (renamedModules, Just $ Selection newName Nothing)
@@ -440,9 +476,9 @@ applyProgAction prog mdefName = \case
         )
   RenameType old (unsafeMkName -> nameRaw) -> editModuleSameSelectionCross (qualifiedModule old) prog $ \(m, ms) -> do
     when (new `elem` allTyConNames prog) $ throwError $ TypeDefAlreadyExists new
-    m' <- traverseOf #moduleTypes updateType m
-    let renamedInTypes = over (traversed % #moduleTypes) updateRefsInTypes $ m' : ms
-    pure $ over (traversed % #moduleDefs % traversed % #_DefAST) (updateDefBody . updateDefType) renamedInTypes
+    m' <- traverseOf _moduleTypes updateType m
+    let renamedInTypes = over (traversed % _moduleTypes) updateRefsInTypes $ m' : ms
+    pure $ over (traversed % _moduleDefs % traversed % _DefAST) (updateDefBody . updateDefType) renamedInTypes
     where
       new = qualifyName (qualifiedModule old) nameRaw
       updateType m = do
@@ -455,17 +491,17 @@ applyProgAction prog mdefName = \case
         pure $ Map.insert nameRaw (TypeDefAST d0) $ Map.delete (baseName old) m
       updateRefsInTypes =
         over
-          (traversed % #_TypeDefAST % #astTypeDefConstructors % traversed % #valConArgs % traversed)
+          (traversed % _TypeDefAST % _astTypeDefConstructors % traversed % _valConArgs % traversed)
           $ transform
           $ over (#_TCon % _2) updateName
       updateDefType =
         over
-          #astDefType
+          _astDefType
           $ transform
           $ over (#_TCon % _2) updateName
       updateDefBody =
         over
-          #astDefExpr
+          _astDefExpr
           $ transform
           $ over typesInExpr
           $ transform
@@ -475,19 +511,19 @@ applyProgAction prog mdefName = \case
     editModuleSameSelectionCross (qualifiedModule type_) prog $ \(m, ms) -> do
       when (new `elem` allValConNames prog) $ throwError $ ConAlreadyExists new
       m' <- updateType m
-      pure $ over (mapped % #moduleDefs) updateDefs (m' : ms)
+      pure $ over (mapped % _moduleDefs) updateDefs (m' : ms)
     where
       updateType =
         alterTypeDef
           ( traverseOf
-              #astTypeDefConstructors
+              _astTypeDefConstructors
               ( maybe (throwError $ ConNotFound old) pure
-                  . findAndAdjust ((== old) . valConName) (#valConName .~ new)
+                  . findAndAdjust ((== old) . valConName) (_valConName .~ new)
               )
           )
           type_
       updateDefs =
-        over (traversed % #_DefAST % #astDefExpr) $
+        over (traversed % _DefAST % _astDefExpr) $
           transform $
             over (#_Con % _2) updateName
               . over (#_Case % _3 % traversed % #_CaseBranch % _1) updateName
@@ -506,15 +542,15 @@ applyProgAction prog mdefName = \case
         when (nameRaw `elem` map (baseName . valConName) (astTypeDefConstructors def)) $ throwError $ ValConParamClash nameRaw
         def
           & traverseOf
-            #astTypeDefParameters
+            _astTypeDefParameters
             ( maybe (throwError $ ParamNotFound old) pure
                 . findAndAdjust ((== old) . fst) (_1 .~ new)
             )
       updateConstructors =
         traverseOf
-          ( #astTypeDefConstructors
+          ( _astTypeDefConstructors
               % traversed
-              % #valConArgs
+              % _valConArgs
               % traversed
           )
           $ traverseOf _freeVarsTy
@@ -525,7 +561,7 @@ applyProgAction prog mdefName = \case
       when (con `elem` allValConNames prog) $ throwError $ ConAlreadyExists con
       m' <- updateType m
       traverseOf
-        (traversed % #moduleDefs % traversed % #_DefAST % #astDefExpr)
+        (traversed % _moduleDefs % traversed % _DefAST % _astDefExpr)
         updateDefs
         $ m' : ms
     where
@@ -535,30 +571,30 @@ applyProgAction prog mdefName = \case
       updateType =
         alterTypeDef
           ( traverseOf
-              #astTypeDefConstructors
+              _astTypeDefConstructors
               (maybe (throwError $ IndexOutOfRange index) pure . insertAt index (ValCon con []))
           )
           type_
   SetConFieldType type_ con index new ->
     editModuleSameSelectionCross (qualifiedModule type_) prog $ \(m, ms) -> do
       m' <- updateType m
-      traverseOf (traversed % #moduleDefs) updateDefs (m' : ms)
+      traverseOf (traversed % _moduleDefs) updateDefs (m' : ms)
     where
       updateType =
         alterTypeDef
-          ( traverseOf #astTypeDefConstructors $
+          ( traverseOf _astTypeDefConstructors $
               maybe (throwError $ ConNotFound con) pure
                 <=< findAndAdjustA
                   ((== con) . valConName)
                   ( traverseOf
-                      #valConArgs
+                      _valConArgs
                       ( maybe (throwError $ IndexOutOfRange index) pure
                           <=< adjustAtA index (const $ generateTypeIDs new)
                       )
                   )
           )
           type_
-      updateDefs = traverseOf (traversed % #_DefAST % #astDefExpr) (updateDecons <=< updateCons)
+      updateDefs = traverseOf (traversed % _DefAST % _astDefExpr) (updateDecons <=< updateCons)
       updateCons e = case unfoldApp e of
         (h, args) -> case unfoldAPP h of
           (Con _ con', _tyArgs) | con' == con -> do
@@ -618,16 +654,16 @@ applyProgAction prog mdefName = \case
   AddConField type_ con index new ->
     editModuleSameSelectionCross (qualifiedModule type_) prog $ \(m, ms) -> do
       m' <- updateType m
-      traverseOf (traversed % #moduleDefs) updateDefs (m' : ms)
+      traverseOf (traversed % _moduleDefs) updateDefs (m' : ms)
     where
       updateType =
         alterTypeDef
-          ( traverseOf #astTypeDefConstructors $
+          ( traverseOf _astTypeDefConstructors $
               maybe (throwError $ ConNotFound con) pure
                 <=< findAndAdjustA
                   ((== con) . valConName)
                   ( traverseOf
-                      #valConArgs
+                      _valConArgs
                       ( maybe (throwError $ IndexOutOfRange index) pure
                           <=< liftA2 (insertAt index) (generateTypeIDs new) . pure
                       )
@@ -637,7 +673,7 @@ applyProgAction prog mdefName = \case
       -- NB: we must updateDecons first, as transformCaseBranches may do
       -- synthesis of the scrutinee's type, using the old typedef. Thus we must
       -- not update the scrutinee before this happens.
-      updateDefs = traverseOf (traversed % #_DefAST % #astDefExpr) (updateCons <=< updateDecons)
+      updateDefs = traverseOf (traversed % _DefAST % _astDefExpr) (updateCons <=< updateDecons)
       updateCons e = case unfoldApp e of
         (h, args) -> case unfoldAPP h of
           (Con _ con', _tyArgs) | con' == con -> do
@@ -697,7 +733,7 @@ applyProgAction prog mdefName = \case
                         }
               )
   SetSmartHoles smartHoles ->
-    pure $ prog & #progSmartHoles .~ smartHoles
+    pure $ prog & _progSmartHoles .~ smartHoles
   CopyPasteSig fromIds setup -> case mdefName of
     Nothing -> throwError NoDefSelected
     Just i -> copyPasteSig prog fromIds i setup
@@ -719,8 +755,8 @@ applyProgAction prog mdefName = \case
                 then
                   pure $
                     prog
-                      & #progModules .~ editable renamedMods
-                      & #progSelection % _Just %~ renameModule' oldName n
+                      & _progModules .~ editable renamedMods
+                      & _progSelection % _Just %~ renameModule' oldName n
                 else
                   throwError $
                     -- It should never happen that the action edits an
@@ -849,7 +885,7 @@ handleUndoRequest = do
     (a : as) -> do
       runEditAppM (replay (reverse as)) start >>= \case
         (Right _, app') -> do
-          put $ app' & #currentState % #prog % #redoLog .~ push a (redoLog prog)
+          put $ app' & _currentState % _prog % _redoLog .~ push a (redoLog prog)
           gets appProg
         (Left err, _) -> throwError err
 
@@ -872,7 +908,7 @@ handleRedoRequest = do
     Just (a, redoLog') -> do
       runEditAppM (handleEditRequest a) app >>= \case
         (Right _, app') -> do
-          put $ app' & #currentState % #prog % #redoLog .~ redoLog'
+          put $ app' & _currentState % _prog % _redoLog .~ redoLog'
           gets appProg
         (Left err, _) -> throwError err
 
@@ -928,7 +964,10 @@ data App = App
   { currentState :: AppState
   , initialState :: AppState
   }
-  deriving stock (Eq, Show, Read, Generic)
+  deriving stock (Eq, Show, Read)
+
+_currentState :: Setter' App AppState
+_currentState = sets $ \f a -> a {currentState = f $ currentState a}
 
 -- Internal app state. Note that this type is not exported, as we want
 -- to guarantee that the counters are kept in sync with the 'Prog',
@@ -939,7 +978,16 @@ data AppState = AppState
   , nameCounter :: NameCounter
   , prog :: Prog
   }
-  deriving stock (Eq, Show, Read, Generic)
+  deriving stock (Eq, Show, Read)
+
+_idCounter :: Setter' AppState ID
+_idCounter = sets $ \f as -> as {idCounter = f $ idCounter as}
+
+_nameCounter :: Setter' AppState NameCounter
+_nameCounter = sets $ \f as -> as {nameCounter = f $ nameCounter as}
+
+_prog :: Setter' AppState Prog
+_prog = sets $ \f as -> as {prog = f $ prog as}
 
 -- | Construct an 'App' from an 'ID' and a 'Prog'.
 --
@@ -1019,7 +1067,7 @@ newType = do
 instance Monad m => MonadFresh ID (EditAppM m e) where
   fresh = do
     id_ <- gets appIdCounter
-    modify (\s -> s & #currentState % #idCounter .~ id_ + 1)
+    modify (\s -> s & _currentState % _idCounter .~ id_ + 1)
     pure id_
 
 -- | Support for generating names. Basically just a counter so we don't
@@ -1027,7 +1075,7 @@ instance Monad m => MonadFresh ID (EditAppM m e) where
 instance Monad m => MonadFresh NameCounter (EditAppM m e) where
   fresh = do
     nc <- gets appNameCounter
-    modify (\s -> s & #currentState % #nameCounter .~ succ nc)
+    modify (\s -> s & _currentState % _nameCounter .~ succ nc)
     pure nc
 
 copyPasteSig :: MonadEdit m ProgError => Prog -> (GVarName, ID) -> GVarName -> [Action] -> m Prog
@@ -1136,8 +1184,8 @@ tcWholeProg p = do
   newSel <- case oldSel of
     Nothing -> pure Nothing
     Just s -> do
-      let defName_ = s ^. #selectedDef
-      updatedNode <- case s ^. #selectedNode of
+      let defName_ = s ^. _selectedDef
+      updatedNode <- case s ^. _selectedNode of
         Nothing -> pure Nothing
         Just sel@NodeSelection{nodeType} -> do
           n <- runExceptT $ focusNode p' defName_ $ getID sel
@@ -1163,7 +1211,7 @@ tcWholeProgWithImports ::
   m Prog
 tcWholeProgWithImports p = do
   imports <- checkEverything (progSmartHoles p) CheckEverything{trusted = mempty, toCheck = progImports p}
-  tcWholeProg $ p & #progImports .~ imports
+  tcWholeProg $ p & _progImports .~ imports
 
 copyPasteBody :: MonadEdit m ProgError => Prog -> (GVarName, ID) -> GVarName -> [Action] -> m Prog
 copyPasteBody p (fromDefName, fromId) toDefName setup = do
@@ -1275,7 +1323,7 @@ alterTypeDef ::
 alterTypeDef f type_ m = do
   unless (qualifiedModule type_ == moduleName m) $ throwError $ TypeDefNotFound type_
   traverseOf
-    #moduleTypes
+    _moduleTypes
     ( Map.alterF
         ( maybe
             (throwError $ TypeDefNotFound type_)

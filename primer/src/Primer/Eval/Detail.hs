@@ -42,4 +42,4 @@ data EvalDetail
     RemoveAnn RemoveAnnDetail
   | -- | Apply a primitive function
     ApplyPrimFun ApplyPrimFunDetail
-  deriving stock (Eq, Show, Read, Generic)
+  deriving stock (Eq, Show, Read)

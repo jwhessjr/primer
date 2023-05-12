@@ -17,4 +17,4 @@ data RemoveAnnDetail = RemoveAnnDetail
   , typeID :: ID
   -- ^ the ID of the type annotation
   }
-  deriving stock (Eq, Show, Read, Generic)
+  deriving stock (Eq, Show, Read)

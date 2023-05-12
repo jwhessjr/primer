@@ -22,10 +22,10 @@ data Level
     Intermediate
   | -- | All features.
     Expert
-  deriving stock (Eq, Read, Show, Enum, Bounded, Generic)
+  deriving stock (Eq, Read, Show, Enum, Bounded)
 
 data Editable = Editable | NonEditable
   deriving stock (Bounded, Enum, Show)
 
 data NodeType = BodyNode | SigNode
-  deriving stock (Eq, Show, Read, Bounded, Enum, Generic, Data)
+  deriving stock (Eq, Show, Read, Bounded, Enum, Data)

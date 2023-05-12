@@ -20,4 +20,4 @@ data ApplyPrimFunDetail = ApplyPrimFunDetail
   , argIDs :: [ID]
   -- ^ the IDs of the arguments to the application
   }
-  deriving stock (Eq, Show, Read, Generic)
+  deriving stock (Eq, Show, Read)
