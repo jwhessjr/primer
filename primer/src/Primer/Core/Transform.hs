@@ -92,7 +92,6 @@ renameVar x y expr = case expr of
   App{} -> substAllChildren
   APP{} -> substAllChildren
   Con{} -> substAllChildren
-  PrimCon{} -> substAllChildren
   -- We assume the term is well-scoped, so do not have any references to the
   -- term vars x,y inside any type child (e.g. annotation), so no need to
   -- consider renaming inside them. However, but we do need to worry about
@@ -204,7 +203,6 @@ renameTyVarExpr x y expr = case expr of
   App{} -> substAllChildren
   APP{} -> substAllChildren
   Con{} -> substAllChildren
-  PrimCon{} -> substAllChildren
   where
     substAllChildren = descendM (renameTyVarExpr x y) =<< descendTypeM (renameTyVar x y) expr
     -- NB: cannot use descendBiM here: I want only immediate type

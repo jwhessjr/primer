@@ -68,11 +68,16 @@ import Primer.Core.DSL
 main :: IO ()
 main = defaultMain [ check tasty_undo_redo ]
 -- NB: these two give different non-replay outputs:
--- one says "✓ <interactive> passed 110 tests."
--- the other says   "⚐ <interactive> gave up after 0 discards, passed 57 tests."
+-- one says "✓ <interactive> passed 43 tests."
+-- the other says   "⚐ <interactive> gave up after 0 discards, passed 63 tests."
 -- I would expect them to both find a failing test, since they came from Hedgehog's output after finding a failing test
---main = recheckAt (Seed 4195382447644610221 1776702242676743617) "110:b" tasty_undo_redo
---main =  recheckAt (Seed 1515607086776039261 8253938518069764919) "57:bAfB" tasty_undo_redo
+--main = recheckAt (Seed 6908339241222328337 3287419477091939665) "43:bKa" tasty_undo_redo
+--main = recheckAt (Seed 17180548447945897768 10835732386502211389) "63:iBa2Bc" tasty_undo_redo
+--
+-- on the other hand, the following are found which do replay fine (this did not seem to happen before I ripped out primitives/builtins!)
+--main = recheckAt (Seed 16153558878078727539 1302402656052769935) "36:mJbLcA2" tasty_undo_redo
+--main = recheckAt (Seed 6243298434994001189 6674793301017129269) "14:cG" tasty_undo_redo
+
 
 -- | A helper type for 'tasty_available_actions_actions',
 -- describing where a particular option came from.

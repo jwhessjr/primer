@@ -4,7 +4,6 @@ module Primer.Core.Meta (
   HasMetadata (_metadata),
   ID (ID),
   ModuleName (ModuleName, unModuleName),
-  mkSimpleModuleName,
   GlobalNameKind (..),
   GlobalName (GlobalName, qualifiedModule, baseName),
   qualifyName,
@@ -65,10 +64,6 @@ trivialMeta id = Meta id Nothing Nothing
 
 newtype ModuleName = ModuleName {unModuleName :: NonEmpty Name}
   deriving stock (Eq, Ord, Show, Read, Data, Generic)
-
--- | Helper function for simple (non-hierarchical) module names.
-mkSimpleModuleName :: Name -> ModuleName
-mkSimpleModuleName n = ModuleName $ n :| []
 
 -- | Tags for 'GlobalName'
 data GlobalNameKind

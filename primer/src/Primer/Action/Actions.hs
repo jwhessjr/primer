@@ -8,7 +8,6 @@ import Foreword
 
 import Data.Aeson (Value)
 import Primer.Action.Movement (Movement (..))
-import Primer.Core (PrimCon)
 import Primer.Core.Meta (ID, TmVarRef)
 
 -- We split this module to increase parallelism in our build.
@@ -59,8 +58,6 @@ data Action
     ConstructLAM (Maybe Text)
   | -- | Put a constructor in an empty hole
     ConstructCon QualifiedText
-  | -- | Put a literal in an empty hole
-    ConstructPrim PrimCon
   | -- | Put a constructor applied to a saturated spine in an empty hole
     ConstructSaturatedCon QualifiedText
   | -- | Put a constructor in an empty hole, and infer what it should be applied to

@@ -52,9 +52,6 @@ instance (Eq (TypeCacheAlpha a), Eq b) => Eq (TypeCacheAlpha (Expr' (Meta a) b))
 instance Eq (TypeCacheAlpha Def) where
   TypeCacheAlpha (DefAST (ASTDef e1 t1)) == TypeCacheAlpha (DefAST (ASTDef e2 t2)) =
     TypeCacheAlpha e1 == TypeCacheAlpha e2 && t1 == t2
-  TypeCacheAlpha (DefPrim p1) == TypeCacheAlpha (DefPrim p2) =
-    p1 == p2
-  _ == _ = False
 instance Eq (TypeCacheAlpha (Map Name Def)) where
   (==) = tcaFunctorial
 instance Eq (TypeCacheAlpha Module) where

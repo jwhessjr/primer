@@ -60,7 +60,6 @@ import Primer.Def (
  )
 import Primer.Def.Utils (globalInUse)
 import Primer.Name (unName)
-import Primer.Primitives (tChar, tInt)
 import Primer.Questions (
   generateNameExpr,
   generateNameTy,
@@ -121,8 +120,6 @@ data NoInputAction
 data InputAction
   = MakeCon
   | MakeConSat
-  | MakeInt
-  | MakeChar
   | MakeVar
   | MakeVarSat
   | MakeLet
@@ -200,8 +197,6 @@ forExpr tydefs l expr =
         <> [ Input MakeVar
            , Input MakeCon
            ]
-        <> mwhen (Map.member tInt tydefs) [Input MakeInt]
-        <> mwhen (Map.member tChar tydefs) [Input MakeChar]
         <> mwhen
           (l /= Beginner)
           [ Input MakeVarSat
@@ -337,8 +332,6 @@ options typeDefs defs cxt level def mNodeSel = \case
       . concatMap (\td -> (td,) <$> astTypeDefConstructors td)
       . mapMaybe (typeDefAST . snd)
       $ Map.toList typeDefs
-  MakeInt -> pure Options{opts = [], free = FreeInt}
-  MakeChar -> pure Options{opts = [], free = FreeChar}
   MakeVar ->
     varOpts
       <&> noFree . map fst . filter (not . (&& level == Beginner) . hasArgsVar . snd)
@@ -456,8 +449,6 @@ sortByPriority l =
       Input a -> case a of
         MakeCon -> P.useValueCon
         MakeConSat -> P.useSaturatedValueCon
-        MakeInt -> P.makeInt
-        MakeChar -> P.makeChar
         MakeVar -> P.useVar
         MakeVarSat -> P.useFunction
         MakeLet -> P.makeLet

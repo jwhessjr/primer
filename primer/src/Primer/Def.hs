@@ -16,16 +16,13 @@ import Primer.Core (
   Type',
  )
 import Primer.Core.Utils (forgetTypeMetadata)
-import Primer.Primitives (PrimDef, primDefType)
 
 data Def
-  = DefPrim PrimDef
-  | DefAST ASTDef
+  = DefAST ASTDef
   deriving stock (Eq, Show, Read, Data, Generic)
 
 defType :: Def -> Type' ()
 defType = \case
-  DefPrim d -> primDefType d
   DefAST d -> forgetTypeMetadata $ astDefType d
 
 -- | A mapping of global names to 'Def's.
@@ -40,5 +37,4 @@ data ASTDef = ASTDef
 
 defAST :: Def -> Maybe ASTDef
 defAST = \case
-  DefPrim _ -> Nothing
   DefAST t -> Just t

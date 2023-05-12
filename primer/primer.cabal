@@ -19,7 +19,6 @@ library
     Primer.Action.Priorities
     Primer.App
     Primer.App.Base
-    Primer.Builtins
     Primer.Core
     Primer.Core.DSL
     Primer.Core.Transform
@@ -32,7 +31,6 @@ library
     Primer.Name
     Primer.Name.Fresh
     Primer.Pretty
-    Primer.Primitives
     Primer.Questions
     Primer.Refine
     Primer.Subst
@@ -66,7 +64,6 @@ library
     Primer.Eval.Let
     Primer.Eval.Prim
     Primer.Eval.Redex
-    Primer.Primitives.PrimDef
     Primer.Typecheck.Cxt
     Primer.Typecheck.Kindcheck
     Primer.Typecheck.KindError

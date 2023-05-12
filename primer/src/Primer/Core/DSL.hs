@@ -14,7 +14,6 @@ module Primer.Core.DSL (
   letrec,
   case_,
   branch,
-  prim,
   tEmptyHole,
   tcon,
   tforall,
@@ -40,7 +39,6 @@ import Primer.Core (
   Expr' (..),
   ID,
   LVarName,
-  PrimCon (..),
   TmVarRef (..),
   TyVarName,
   Type,
@@ -104,6 +102,3 @@ branch :: MonadFresh ID m => ValConName -> [(LVarName, Maybe TypeCache)] -> m Ex
 branch c vs e = CaseBranch c <$> mapM binding vs <*> e
   where
     binding (name, ty) = Bind <$> meta' ty <*> pure name
-
-prim :: MonadFresh ID m => PrimCon -> m Expr
-prim p = PrimCon <$> meta <*> pure p

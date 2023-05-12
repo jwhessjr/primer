@@ -37,7 +37,6 @@ import Primer.Core (
   GlobalName (baseName, qualifiedModule),
   LocalName (unLocalName),
   ModuleName (unModuleName),
-  PrimCon (..),
   TmVarRef (GlobalVarRef, LocalVarRef),
   Type,
   Type' (..),
@@ -142,9 +141,6 @@ prettyExpr opts = \case
         <> col Yellow "in"
         <> line
         <> indent' 2 (pE e')
-  PrimCon _ p -> case p of
-    PrimChar c -> "Char" <+> pretty @Text (show c)
-    PrimInt n -> "Int" <+> pretty @Text (show n)
   where
     pT = prettyType opts
     pE = prettyExpr opts

@@ -121,7 +121,6 @@ _freeTmVars = traversalVL $ go mempty
         -- variable, so we do not need to add it to the bound set
         LetType m tv ty <$> go bound f e
       Case m e bs -> Case m <$> go bound f e <*> traverse freeVarsBr bs
-      t@PrimCon{} -> pure t
       where
         freeVarsBr (CaseBranch c binds e) = CaseBranch c binds <$> go (S.union bound $ S.fromList $ map bindName binds) f e
 
@@ -152,7 +151,6 @@ _freeTyVars = traversalVL $ go mempty
         Letrec m v <$> go bound f e <*> traverseFreeVarsTy bound f ty <*> go bound f b
       LetType m v ty e -> LetType m v <$> traverseFreeVarsTy bound f ty <*> go (S.insert v bound) f e
       Case m e bs -> Case m <$> go bound f e <*> traverse freeVarsBr bs
-      t@PrimCon{} -> pure t
       where
         freeVarsBr (CaseBranch c binds e) = CaseBranch c binds <$> go bound f e -- case branches only bind term variables
 

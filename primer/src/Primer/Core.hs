@@ -16,7 +16,6 @@ module Primer.Core (
   TypeCacheBoth (..),
   _chkedAt,
   _synthed,
-  PrimCon (..),
   ExprMeta,
   _exprMeta,
   _exprMetaLens,
@@ -60,7 +59,6 @@ import Primer.Core.Meta (
   ValConName,
   Value,
   getID,
-  mkSimpleModuleName,
   qualifyName,
   trivialMeta,
   unsafeMkGlobalName,
@@ -171,7 +169,6 @@ data Expr' a b
       (Expr' a b)
       -- ^ body of the let; binding scopes over this
   | Case a (Expr' a b) [CaseBranch' a b] -- See Note [Case]
-  | PrimCon a PrimCon
   deriving stock (Eq, Show, Read, Data, Generic)
 
 -- Note [Holes and bidirectionality]
@@ -321,8 +318,3 @@ instance HasMetadata (Expr' ExprMeta b) where
 
 instance HasMetadata (Bind' ExprMeta) where
   _metadata = position @1 % typed @(Maybe Value)
-
-data PrimCon
-  = PrimChar Char
-  | PrimInt Integer
-  deriving stock (Eq, Show, Read, Data, Generic)

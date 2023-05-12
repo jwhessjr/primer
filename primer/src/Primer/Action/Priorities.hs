@@ -32,8 +32,6 @@ module Primer.Action.Priorities (
   makeLambda,
   useVar,
   useValueCon,
-  makeInt,
-  makeChar,
   makeCase,
   useSaturatedValueCon,
   useFunction,
@@ -84,12 +82,6 @@ useSaturatedValueCon _ = 13
 
 useFunction :: Level -> Int
 useFunction _ = 14
-
-makeInt :: Level -> Int
-makeInt _ = 15
-
-makeChar :: Level -> Int
-makeChar _ = 16
 
 makeLet :: Level -> Int
 makeLet _ = 21
