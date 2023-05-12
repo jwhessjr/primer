@@ -7,7 +7,6 @@ module Primer.Eval.Let (
 import Foreword
 
 import Primer.Core.Meta ( ID )
-import Primer.JSON (CustomJSON (CustomJSON), FromJSON, PrimerJSON, ToJSON)
 import Primer.Name (Name)
 
 -- | Detailed information about a removal of a let binding.
@@ -28,4 +27,3 @@ data LetRemovalDetail t = LetRemovalDetail
   -- ^ the right hand side of the let
   }
   deriving stock (Eq, Show, Read, Generic)
-  deriving (FromJSON, ToJSON) via PrimerJSON (LetRemovalDetail t)

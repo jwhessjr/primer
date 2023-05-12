@@ -16,7 +16,6 @@ module Primer.Primitives (
 
 import Foreword
 
-import Data.Aeson (FromJSON (..), ToJSON (..))
 import Data.Data (Data)
 import Data.Map qualified as M
 import Primer.Builtins (
@@ -34,7 +33,6 @@ import Primer.Core (
   mkSimpleModuleName,
   qualifyName,
  )
-import Primer.JSON (CustomJSON (..), PrimerJSON)
 import Primer.Name (Name)
 import Primer.Primitives.PrimDef (PrimDef (..))
 import Primer.TypeDef (PrimTypeDef (..))
@@ -46,7 +44,6 @@ data PrimFunError
       [Expr' () ()]
       -- ^ Arguments
   deriving stock (Eq, Show, Data, Generic)
-  deriving (FromJSON, ToJSON) via PrimerJSON PrimFunError
 
 primitiveModuleName :: ModuleName
 primitiveModuleName = mkSimpleModuleName "Primitives"

@@ -6,11 +6,10 @@ module Primer.Action.Actions (
 
 import Foreword
 
-import Data.Aeson (FromJSON (..), ToJSON (..), Value)
+import Data.Aeson (Value)
 import Primer.Action.Movement (Movement (..))
 import Primer.Core (PrimCon)
 import Primer.Core.Meta (ID, TmVarRef)
-import Primer.JSON (CustomJSON (..), PrimerJSON)
 
 -- We split this module to increase parallelism in our build.
 -- This module does not depend on much, but takes a long time
@@ -103,5 +102,3 @@ data Action
   | -- | Rename a case binding
     RenameCaseBinding Text
   deriving stock (Eq, Show, Read, Generic)
-  deriving (FromJSON, ToJSON) via PrimerJSON Action
-  deriving anyclass (NFData)

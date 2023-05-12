@@ -39,7 +39,6 @@ import Optics (
   set,
   view,
  )
-import Primer.JSON
 import Primer.Name (Name, unsafeMkName)
 
 -- | An identifier for an expression. Every node of the AST has an ID.
@@ -52,14 +51,9 @@ import Primer.Name (Name, unsafeMkName)
 newtype ID = ID {unID :: Int}
   deriving stock (Eq, Generic, Data)
   deriving newtype (Show, Read, Num, Ord, Enum, Bounded)
-  deriving newtype (FromJSON, ToJSON)
-  deriving newtype (ToJSONKey, FromJSONKey)
-  deriving anyclass (NFData)
 
 data Meta a = Meta ID a (Maybe Value)
   deriving stock (Generic, Eq, Show, Read, Data, Functor)
-  deriving (FromJSON, ToJSON) via PrimerJSON (Meta a)
-  deriving anyclass (NFData)
 
 -- | This lens is called 'type' because 'a' is most commonly a Type, but it will
 -- work for any 'a'.
@@ -71,8 +65,6 @@ trivialMeta id = Meta id Nothing Nothing
 
 newtype ModuleName = ModuleName {unModuleName :: NonEmpty Name}
   deriving stock (Eq, Ord, Show, Read, Data, Generic)
-  deriving (FromJSON, ToJSON) via NonEmpty Name
-  deriving anyclass (NFData)
 
 -- | Helper function for simple (non-hierarchical) module names.
 mkSimpleModuleName :: Name -> ModuleName
@@ -91,8 +83,6 @@ data GlobalName (k :: GlobalNameKind) = GlobalName
   , baseName :: Name
   }
   deriving stock (Eq, Ord, Generic, Data, Show, Read)
-  deriving (FromJSON, ToJSON) via PrimerJSON (GlobalName k)
-  deriving anyclass (NFData)
 
 -- | Construct a name from a Text. This is called unsafe because there are no
 -- guarantees about whether the name refers to anything that is in scope.
@@ -117,8 +107,6 @@ data LocalNameKind
 newtype LocalName (k :: LocalNameKind) = LocalName {unLocalName :: Name}
   deriving stock (Eq, Ord, Show, Read, Data, Generic)
   deriving (IsString) via Name
-  deriving (FromJSON, ToJSON) via Name
-  deriving anyclass (NFData)
 
 unsafeMkLocalName :: Text -> LocalName k
 unsafeMkLocalName = LocalName . unsafeMkName
@@ -131,8 +119,6 @@ data TmVarRef
   = GlobalVarRef GVarName
   | LocalVarRef LVarName
   deriving stock (Eq, Show, Read, Data, Generic)
-  deriving (FromJSON, ToJSON) via PrimerJSON TmVarRef
-  deriving anyclass (NFData)
 
 -- | A class for types which have an ID.
 -- This makes it easier to change the underlying metadata representation without

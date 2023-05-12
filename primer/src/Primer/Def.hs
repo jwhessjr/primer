@@ -16,20 +16,12 @@ import Primer.Core (
   Type',
  )
 import Primer.Core.Utils (forgetTypeMetadata)
-import Primer.JSON (
-  CustomJSON (CustomJSON),
-  FromJSON,
-  PrimerJSON,
-  ToJSON,
- )
 import Primer.Primitives (PrimDef, primDefType)
 
 data Def
   = DefPrim PrimDef
   | DefAST ASTDef
   deriving stock (Eq, Show, Read, Data, Generic)
-  deriving (FromJSON, ToJSON) via PrimerJSON Def
-  deriving anyclass (NFData)
 
 defType :: Def -> Type' ()
 defType = \case
@@ -45,8 +37,6 @@ data ASTDef = ASTDef
   , astDefType :: Type
   }
   deriving stock (Eq, Show, Read, Data, Generic)
-  deriving (FromJSON, ToJSON) via PrimerJSON ASTDef
-  deriving anyclass (NFData)
 
 defAST :: Def -> Maybe ASTDef
 defAST = \case

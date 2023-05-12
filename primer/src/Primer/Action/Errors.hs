@@ -9,12 +9,10 @@ module Primer.Action.Errors (ActionError (..)) where
 
 import Foreword
 
-import Data.Aeson (FromJSON (..), ToJSON (..))
 import Primer.Action.Actions (Action)
 import Primer.Action.Available qualified as Available
 import Primer.Action.Movement (Movement)
 import Primer.Core (Expr, GVarName, ID, LVarName, ModuleName, Type)
-import Primer.JSON (CustomJSON (..), PrimerJSON)
 import Primer.Typecheck.TypeError (TypeError)
 import Primer.Zipper (SomeNode)
 
@@ -65,4 +63,3 @@ data ActionError
   | NeedChar Available.Option
   | NoNodeSelection
   deriving stock (Eq, Show, Read, Generic)
-  deriving (FromJSON, ToJSON) via PrimerJSON ActionError

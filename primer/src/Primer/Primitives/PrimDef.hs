@@ -7,9 +7,7 @@ module Primer.Primitives.PrimDef (PrimDef (..)) where
 
 import Foreword
 
-import Data.Aeson (FromJSON (..), ToJSON (..))
 import Data.Data (Data)
-import Primer.JSON (CustomJSON (..), PrimerJSON)
 
 -- | A primitive, built-in definition.
 -- For each of these, we should have a test that the evaluator produces expected results.
@@ -35,5 +33,3 @@ data PrimDef
   | IntToNat
   | IntFromNat
   deriving stock (Eq, Show, Read, Enum, Bounded, Data, Generic)
-  deriving (FromJSON, ToJSON) via PrimerJSON PrimDef
-  deriving anyclass (NFData)

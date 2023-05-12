@@ -24,7 +24,6 @@ import Primer.Core.Meta (
   TyVarName,
   Value,
  )
-import Primer.JSON
 
 -- | Core types.
 --  Type variables are currently represented as text, and we have no compile-time
@@ -57,8 +56,6 @@ data Type' a
       (Type' a)
       -- ^ body of the let; binding scopes over this
   deriving stock (Eq, Show, Read, Data, Generic)
-  deriving (FromJSON, ToJSON) via PrimerJSON (Type' a)
-  deriving anyclass (NFData)
 
 -- | A traversal over the metadata of a type
 _typeMeta :: Traversal (Type' a) (Type' b) a b
@@ -73,8 +70,6 @@ _typeMetaLens = position @1
 -- | Core kinds.
 data Kind = KHole | KType | KFun Kind Kind
   deriving stock (Eq, Show, Read, Data, Generic)
-  deriving (FromJSON, ToJSON) via PrimerJSON Kind
-  deriving anyclass (NFData)
 
 instance HasID a => HasID (Type' a) where
   _id = position @1 % _id

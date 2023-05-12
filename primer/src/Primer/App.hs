@@ -136,7 +136,6 @@ import Primer.Def (
 import Primer.Def.Utils (globalInUse)
 import Primer.Eval.Detail (EvalDetail)
 import Primer.EvalFull (Dir, TerminationBound)
-import Primer.JSON
 import Primer.Module (
   Module (moduleDefs, moduleName, moduleTypes),
   deleteDef,
@@ -213,8 +212,6 @@ data Prog = Prog
   -- preserved across edits.
   }
   deriving stock (Eq, Show, Read, Generic)
-  deriving (FromJSON, ToJSON) via PrimerJSON Prog
-  deriving anyclass (NFData)
 
 -- | Push a compound action onto the given 'Log', returning the new
 -- 'Log'.
@@ -271,8 +268,6 @@ allDefs = fmap snd . progAllDefs
 --  Items are stored in reverse order so it's quick to add new ones.
 newtype Log = Log {unlog :: [[ProgAction]]}
   deriving stock (Eq, Show, Read, Generic)
-  deriving (FromJSON, ToJSON) via PrimerJSON Log
-  deriving anyclass (NFData)
   deriving newtype (Semigroup, Monoid)
 
 -- | The default (empty) 'Log'.
@@ -287,8 +282,6 @@ data Selection = Selection
   , selectedNode :: Maybe NodeSelection
   }
   deriving stock (Eq, Show, Read, Generic, Data)
-  deriving (FromJSON, ToJSON) via PrimerJSON Selection
-  deriving anyclass (NFData)
 
 -- | A selected node, in the body or type signature of some definition.
 -- We have the following invariant: @nodeType = SigNode ==> isRight meta@
@@ -297,8 +290,6 @@ data NodeSelection = NodeSelection
   , meta :: Either ExprMeta TypeMeta
   }
   deriving stock (Eq, Show, Read, Generic, Data)
-  deriving (FromJSON, ToJSON) via PrimerJSON NodeSelection
-  deriving anyclass (NFData)
 
 instance HasID NodeSelection where
   _id =
@@ -312,15 +303,12 @@ data MutationRequest
   | Redo
   | Edit [ProgAction]
   deriving stock (Eq, Show, Read, Generic)
-  deriving (FromJSON, ToJSON) via PrimerJSON MutationRequest
-  deriving anyclass (NFData)
 
 data EvalReq = EvalReq
   { evalReqExpr :: Expr
   , evalReqRedex :: ID
   }
   deriving stock (Eq, Show, Read, Generic)
-  deriving (FromJSON, ToJSON) via PrimerJSON EvalReq
 
 data EvalResp = EvalResp
   { evalRespExpr :: Expr
@@ -328,7 +316,6 @@ data EvalResp = EvalResp
   , evalRespDetail :: EvalDetail
   }
   deriving stock (Eq, Show, Read, Generic)
-  deriving (FromJSON, ToJSON) via PrimerJSON EvalResp
 
 data EvalFullReq = EvalFullReq
   { evalFullReqExpr :: Expr
@@ -336,14 +323,12 @@ data EvalFullReq = EvalFullReq
   , evalFullMaxSteps :: TerminationBound
   }
   deriving stock (Eq, Show, Read, Generic)
-  deriving (FromJSON, ToJSON) via PrimerJSON EvalFullReq
 
 -- If we time out, we still return however far we got
 data EvalFullResp
   = EvalFullRespTimedOut Expr
   | EvalFullRespNormal Expr
   deriving stock (Eq, Show, Read, Generic)
-  deriving (FromJSON, ToJSON) via PrimerJSON EvalFullResp
 
 -- * Request handlers
 
@@ -944,8 +929,6 @@ data App = App
   , initialState :: AppState
   }
   deriving stock (Eq, Show, Read, Generic)
-  deriving (FromJSON, ToJSON) via PrimerJSON App
-  deriving anyclass (NFData)
 
 -- Internal app state. Note that this type is not exported, as we want
 -- to guarantee that the counters are kept in sync with the 'Prog',
@@ -957,8 +940,6 @@ data AppState = AppState
   , prog :: Prog
   }
   deriving stock (Eq, Show, Read, Generic)
-  deriving (FromJSON, ToJSON) via PrimerJSON AppState
-  deriving anyclass (NFData)
 
 -- | Construct an 'App' from an 'ID' and a 'Prog'.
 --

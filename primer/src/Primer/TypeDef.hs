@@ -34,20 +34,12 @@ import Primer.Core.Type (
   TypeMeta,
  )
 import Primer.Core.Utils (forgetTypeMetadata, generateTypeIDs)
-import Primer.JSON (
-  CustomJSON (CustomJSON),
-  FromJSON,
-  PrimerJSON,
-  ToJSON,
- )
 import Primer.Name (Name)
 
 data TypeDef b
   = TypeDefPrim PrimTypeDef
   | TypeDefAST (ASTTypeDef b)
   deriving stock (Eq, Show, Read, Data, Generic)
-  deriving (FromJSON, ToJSON) via PrimerJSON (TypeDef b)
-  deriving anyclass (NFData)
 
 -- | A mapping of global names to 'TypeDef's.
 type TypeDefMap = Map TyConName (TypeDef ())
@@ -58,8 +50,6 @@ data PrimTypeDef = PrimTypeDef
   , primTypeDefNameHints :: [Name]
   }
   deriving stock (Eq, Show, Read, Data, Generic)
-  deriving (FromJSON, ToJSON) via PrimerJSON PrimTypeDef
-  deriving anyclass (NFData)
 
 -- | Definition of an algebraic data type
 --
@@ -72,16 +62,12 @@ data ASTTypeDef b = ASTTypeDef
   , astTypeDefNameHints :: [Name]
   }
   deriving stock (Eq, Show, Read, Data, Generic)
-  deriving (FromJSON, ToJSON) via PrimerJSON (ASTTypeDef b)
-  deriving anyclass (NFData)
 
 data ValCon b = ValCon
   { valConName :: ValConName
   , valConArgs :: [Type' b]
   }
   deriving stock (Eq, Show, Read, Data, Generic)
-  deriving (FromJSON, ToJSON) via PrimerJSON (ValCon b)
-  deriving anyclass (NFData)
 
 valConType :: TyConName -> ASTTypeDef () -> ValCon () -> Type' ()
 valConType tc td vc =

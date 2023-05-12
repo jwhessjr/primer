@@ -9,12 +9,6 @@ module Primer.App.Base (
 import Protolude
 
 import Data.Data (Data)
-import Primer.JSON (
-  CustomJSON (CustomJSON),
-  FromJSON,
-  PrimerJSON,
-  ToJSON,
- )
 
 -- | The current programming "level". This setting determines which
 -- actions are displayed to the student, the labels on UI elements,
@@ -29,12 +23,9 @@ data Level
   | -- | All features.
     Expert
   deriving stock (Eq, Read, Show, Enum, Bounded, Generic)
-  deriving (FromJSON, ToJSON) via PrimerJSON Level
 
 data Editable = Editable | NonEditable
   deriving stock (Bounded, Enum, Show)
 
 data NodeType = BodyNode | SigNode
   deriving stock (Eq, Show, Read, Bounded, Enum, Generic, Data)
-  deriving (FromJSON, ToJSON) via PrimerJSON NodeType
-  deriving anyclass (NFData)

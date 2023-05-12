@@ -75,7 +75,6 @@ import Primer.Core.Type (
   _typeMeta,
   _typeMetaLens,
  )
-import Primer.JSON
 
 -- | Typechecking will add metadata to each node describing its type.
 -- Some nodes are purely synthesised, some are purely checked, and some
@@ -91,8 +90,6 @@ data TypeCache
   | TCChkedAt (Type' ())
   | TCEmb TypeCacheBoth
   deriving stock (Eq, Show, Read, Generic, Data)
-  deriving (FromJSON, ToJSON) via PrimerJSON TypeCache
-  deriving anyclass (NFData)
 
 -- We were checking at the first, but term was synthesisable and synth'd the
 -- second We don't inline this into TypeCache because then we would get partial
@@ -100,8 +97,6 @@ data TypeCache
 -- though, to make it clear what each one is!
 data TypeCacheBoth = TCBoth {tcChkedAt :: Type' (), tcSynthed :: Type' ()}
   deriving stock (Eq, Show, Read, Generic, Data)
-  deriving (FromJSON, ToJSON) via PrimerJSON TypeCacheBoth
-  deriving anyclass (NFData)
 
 -- TODO `_chkedAt` and `_synthed` should be `AffineTraversal`s,
 -- but there is currently no `failing` for AffineTraversals, only for AffineFolds (`afailing`).
@@ -178,8 +173,6 @@ data Expr' a b
   | Case a (Expr' a b) [CaseBranch' a b] -- See Note [Case]
   | PrimCon a PrimCon
   deriving stock (Eq, Show, Read, Data, Generic)
-  deriving (FromJSON, ToJSON) via PrimerJSON (Expr' a b)
-  deriving anyclass (NFData)
 
 -- Note [Holes and bidirectionality]
 --
@@ -292,8 +285,6 @@ data CaseBranch' a b
       (Expr' a b)
       -- ^ right hand side
   deriving stock (Eq, Show, Read, Data, Generic)
-  deriving (FromJSON, ToJSON) via PrimerJSON (CaseBranch' a b)
-  deriving anyclass (NFData)
 
 -- | Variable bindings
 -- These are used in case branches to represent the binding of a variable.
@@ -302,8 +293,6 @@ type Bind = Bind' ExprMeta
 
 data Bind' a = Bind a LVarName
   deriving stock (Eq, Show, Read, Data, Generic)
-  deriving (FromJSON, ToJSON) via PrimerJSON (Bind' a)
-  deriving anyclass (NFData)
 
 bindName :: Bind' a -> LVarName
 bindName (Bind _ n) = n
@@ -337,5 +326,3 @@ data PrimCon
   = PrimChar Char
   | PrimInt Integer
   deriving stock (Eq, Show, Read, Data, Generic)
-  deriving (FromJSON, ToJSON) via PrimerJSON PrimCon
-  deriving anyclass (NFData)

@@ -5,7 +5,6 @@ import Foreword
 import Primer.Core (Expr)
 import Primer.Core.Meta (TmVarRef, TyConName, ValConName)
 import Primer.Core.Type (Type')
-import Primer.JSON (CustomJSON (..), FromJSON, PrimerJSON, ToJSON)
 import Primer.Name (Name)
 import Primer.Typecheck.KindError (KindError)
 
@@ -29,5 +28,3 @@ data TypeError
   | CaseBranchWrongNumberPatterns
   | KindError KindError
   deriving stock (Eq, Show, Read, Generic)
-  deriving (FromJSON, ToJSON) via PrimerJSON TypeError
-  deriving anyclass (NFData)

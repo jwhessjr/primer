@@ -2,11 +2,9 @@ module Primer.Action.ProgError (ProgError (..)) where
 
 import Foreword
 
-import Data.Aeson (FromJSON (..), ToJSON (..))
 import Primer.Action.Errors (ActionError)
 import Primer.Core.Meta (GVarName, ModuleName, TyConName, TyVarName, ValConName)
 import Primer.Eval.EvalError (EvalError)
-import Primer.JSON (CustomJSON (..), PrimerJSON)
 import Primer.Name (Name)
 
 data ProgError
@@ -44,4 +42,3 @@ data ProgError
   | -- | Cannot edit an imported module
     ModuleReadonly ModuleName
   deriving stock (Eq, Show, Read, Generic)
-  deriving (FromJSON, ToJSON) via PrimerJSON ProgError

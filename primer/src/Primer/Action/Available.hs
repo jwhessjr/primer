@@ -59,7 +59,6 @@ import Primer.Def (
   DefMap,
  )
 import Primer.Def.Utils (globalInUse)
-import Primer.JSON (CustomJSON (..), FromJSON, PrimerJSON, ToJSON)
 import Primer.Name (unName)
 import Primer.Primitives (tChar, tInt)
 import Primer.Questions (
@@ -96,7 +95,6 @@ data Action
   = NoInput NoInputAction
   | Input InputAction
   deriving stock (Eq, Ord, Show, Read, Generic)
-  deriving (ToJSON, FromJSON) via PrimerJSON Action
 
 -- | An action which can be applied without requiring further input.
 data NoInputAction
@@ -118,7 +116,6 @@ data NoInputAction
   | DuplicateDef
   | DeleteDef
   deriving stock (Eq, Ord, Show, Read, Enum, Bounded, Generic)
-  deriving (ToJSON, FromJSON) via PrimerJSON NoInputAction
 
 -- | An action which requires extra data (often a name) before it can be applied.
 data InputAction
@@ -142,7 +139,6 @@ data InputAction
   | RenameForall
   | RenameDef
   deriving stock (Eq, Ord, Show, Read, Enum, Bounded, Generic)
-  deriving (ToJSON, FromJSON) via PrimerJSON InputAction
 
 forDef ::
   DefMap ->
@@ -293,7 +289,6 @@ data Option = Option
   , context :: Maybe (NonEmpty Text)
   }
   deriving stock (Eq, Show, Read, Generic)
-  deriving (FromJSON, ToJSON) via PrimerJSON Option
 
 -- | The available sorts of free-form input for an 'InputAction'.
 data FreeInput
@@ -306,7 +301,6 @@ data FreeInput
   | -- | A free-form string input is allowed, and represents a primitive character
     FreeChar
   deriving stock (Show, Read, Generic, Bounded, Enum)
-  deriving (ToJSON, FromJSON) via PrimerJSON FreeInput
 
 -- | The available inputs for an 'InputAction'.
 data Options = Options
@@ -314,7 +308,6 @@ data Options = Options
   , free :: FreeInput
   }
   deriving stock (Show, Read, Generic)
-  deriving (ToJSON, FromJSON) via PrimerJSON Options
 
 options ::
   TypeDefMap ->

@@ -3,7 +3,6 @@ module Primer.Eval.EvalError (EvalError (..)) where
 import Foreword
 
 import Primer.Core.Meta (ID)
-import Primer.JSON (CustomJSON (..), FromJSON, PrimerJSON, ToJSON)
 
 -- | Errors that can be raised during reduction.
 --
@@ -23,4 +22,3 @@ data EvalError
   | -- | We did a reduction, but our assumptions were flawed when working out details
     InternalDetailError
   deriving stock (Eq, Show, Read, Generic)
-  deriving (FromJSON, ToJSON) via PrimerJSON EvalError

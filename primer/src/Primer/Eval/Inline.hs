@@ -13,7 +13,6 @@ import Primer.Core (
   LocalName,
  )
 import Primer.Def (ASTDef)
-import Primer.JSON (CustomJSON (CustomJSON), FromJSON, PrimerJSON, ToJSON)
 
 data LocalVarInlineDetail k = LocalVarInlineDetail
   { letID :: ID
@@ -31,7 +30,6 @@ data LocalVarInlineDetail k = LocalVarInlineDetail
   -- Otherwise it is a term variable.
   }
   deriving stock (Eq, Show, Read, Generic)
-  deriving (FromJSON, ToJSON) via PrimerJSON (LocalVarInlineDetail k)
 
 data GlobalVarInlineDetail = GlobalVarInlineDetail
   { def :: ASTDef
@@ -42,4 +40,3 @@ data GlobalVarInlineDetail = GlobalVarInlineDetail
   -- ^ The result of the reduction
   }
   deriving stock (Eq, Show, Read, Generic)
-  deriving (FromJSON, ToJSON) via PrimerJSON GlobalVarInlineDetail

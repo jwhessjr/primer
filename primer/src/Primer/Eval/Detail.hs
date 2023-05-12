@@ -15,7 +15,6 @@ import Primer.Eval.Inline
     ( GlobalVarInlineDetail, LocalVarInlineDetail )
 import Primer.Eval.Let ( LetRemovalDetail )
 import Primer.Eval.Prim ( ApplyPrimFunDetail )
-import Primer.JSON (CustomJSON (CustomJSON), FromJSON, PrimerJSON, ToJSON)
 
 -- | Detailed information about a reduction step
 data EvalDetail
@@ -44,4 +43,3 @@ data EvalDetail
   | -- | Apply a primitive function
     ApplyPrimFun ApplyPrimFunDetail
   deriving stock (Eq, Show, Read, Generic)
-  deriving (FromJSON, ToJSON) via PrimerJSON EvalDetail

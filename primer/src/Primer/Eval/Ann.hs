@@ -8,7 +8,6 @@ import Primer.Core (
   Expr,
   ID,
  )
-import Primer.JSON (CustomJSON (CustomJSON), FromJSON, PrimerJSON, ToJSON)
 
 data RemoveAnnDetail = RemoveAnnDetail
   { before :: Expr
@@ -19,4 +18,3 @@ data RemoveAnnDetail = RemoveAnnDetail
   -- ^ the ID of the type annotation
   }
   deriving stock (Eq, Show, Read, Generic)
-  deriving (FromJSON, ToJSON) via PrimerJSON RemoveAnnDetail

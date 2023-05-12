@@ -9,7 +9,6 @@ import Primer.Core (
   ID,
   LocalName,
  )
-import Primer.JSON (CustomJSON (CustomJSON), FromJSON, PrimerJSON, ToJSON)
 
 -- | Detailed information about a beta reduction (of a λ or Λ).
 -- If λ:
@@ -33,4 +32,3 @@ data BetaReductionDetail k domain codomain = BetaReductionDetail
   , types :: (domain, codomain)
   }
   deriving stock (Eq, Show, Read, Generic)
-  deriving (FromJSON, ToJSON) via PrimerJSON (BetaReductionDetail k domain codomain)

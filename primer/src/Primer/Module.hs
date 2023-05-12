@@ -50,12 +50,6 @@ import Primer.Def (
   Def (..),
   DefMap,
  )
-import Primer.JSON (
-  CustomJSON (CustomJSON),
-  FromJSON,
-  PrimerJSON,
-  ToJSON,
- )
 import Primer.Name (Name)
 import Primer.Primitives (allPrimTypeDefs, primDefName, primitiveModuleName)
 import Primer.TypeDef (TypeDef (..), TypeDefMap, forgetTypeDefMetadata, _typedefFields)
@@ -66,8 +60,6 @@ data Module = Module
   , moduleDefs :: Map Name Def -- The current program: a set of definitions indexed by Name
   }
   deriving stock (Eq, Show, Read, Data, Generic)
-  deriving (FromJSON, ToJSON) via PrimerJSON Module
-  deriving anyclass (NFData)
 
 qualifyTyConName :: Module -> Name -> TyConName
 qualifyTyConName m = qualifyName (moduleName m)

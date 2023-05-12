@@ -27,7 +27,6 @@ library
     Primer.Def
     Primer.Def.Utils
     Primer.EvalFull
-    Primer.JSON
     Primer.Log
     Primer.Module
     Primer.Name

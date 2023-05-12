@@ -9,7 +9,6 @@ import Primer.Core (
   GVarName,
   ID,
  )
-import Primer.JSON (CustomJSON (CustomJSON), FromJSON, PrimerJSON, ToJSON)
 
 data ApplyPrimFunDetail = ApplyPrimFunDetail
   { before :: Expr
@@ -22,4 +21,3 @@ data ApplyPrimFunDetail = ApplyPrimFunDetail
   -- ^ the IDs of the arguments to the application
   }
   deriving stock (Eq, Show, Read, Generic)
-  deriving (FromJSON, ToJSON) via PrimerJSON ApplyPrimFunDetail
