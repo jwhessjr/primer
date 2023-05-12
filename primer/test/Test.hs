@@ -67,8 +67,12 @@ import Primer.Core.DSL
 
 main :: IO ()
 main = defaultMain [ check tasty_undo_redo ]
---main = recheckAt (Seed 9701331813554010028 14839848710226094279) "87:b3A3k2" tasty_undo_redo
---main = recheckAt (Seed 14048740289421623188 5783122199880849279) "34:cA3bKj" tasty_undo_redo
+-- NB: these two give different non-replay outputs:
+-- one says "✓ <interactive> passed 110 tests."
+-- the other says   "⚐ <interactive> gave up after 0 discards, passed 57 tests."
+-- I would expect them to both find a failing test, since they came from Hedgehog's output after finding a failing test
+--main = recheckAt (Seed 4195382447644610221 1776702242676743617) "110:b" tasty_undo_redo
+--main =  recheckAt (Seed 1515607086776039261 8253938518069764919) "57:bAfB" tasty_undo_redo
 
 -- | A helper type for 'tasty_available_actions_actions',
 -- describing where a particular option came from.
