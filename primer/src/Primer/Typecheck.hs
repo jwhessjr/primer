@@ -16,7 +16,6 @@ module Primer.Typecheck (
   synthKind,
   checkKind,
   checkTypeDefs,
-  checkValidContext,
   CheckEverythingRequest (..),
   checkEverything,
   Cxt (..),
@@ -271,27 +270,6 @@ type TypeM e m =
   , MonadFresh NameCounter m
   , MonadNestedError TypeError e m -- can throw type errors
   )
-
--- | Check a context is valid
-checkValidContext ::
-  (MonadFresh ID m, MonadFresh NameCounter m, MonadNestedError TypeError e (ReaderT Cxt m)) =>
-  Cxt ->
-  m ()
-checkValidContext cxt = do
-  let tds = typeDefs cxt
-  runReaderT (checkTypeDefs tds) $ initialCxt NoSmartHoles
-  runReaderT (checkGlobalCxt $ globalCxt cxt) $ (initialCxt NoSmartHoles){typeDefs = tds}
-  checkLocalCxtTys $ localTyVars cxt
-  runReaderT (checkLocalCxtTms $ localTmVars cxt) $ extendLocalCxtTys (M.toList $ localTyVars cxt) (initialCxt NoSmartHoles){typeDefs = tds}
-  where
-    checkGlobalCxt = mapM_ (checkKind' KType <=< fakeMeta)
-    -- a tyvar just declares its kind. There are no possible errors in kinds.
-    checkLocalCxtTys _tyvars = pure ()
-    checkLocalCxtTms = mapM_ (checkKind' KType <=< fakeMeta)
-    -- We need metadata to use checkKind, but we don't care about the output,
-    -- just a yes/no answer. In this case it is fine to put nonsense in the
-    -- metadata as it won't be inspected.
-    fakeMeta = generateTypeIDs
 
 -- | Check all type definitions, as one recursive group, in some monadic environment
 checkTypeDefs ::
