@@ -1,15 +1,10 @@
-{-# LANGUAGE RecordWildCards #-}
-
 module Primer.Core.Meta (
   HasID (..),
   getID,
-  setID,
   HasMetadata (_metadata),
   ID (ID),
   ModuleName (ModuleName, unModuleName),
   mkSimpleModuleName,
-  moduleNamePretty,
-  globalNamePretty,
   GlobalNameKind (..),
   GlobalName (qualifiedModule, baseName),
   qualifyName,
@@ -45,7 +40,7 @@ import Optics (
   view,
  )
 import Primer.JSON
-import Primer.Name (Name, unName, unsafeMkName)
+import Primer.Name (Name, unsafeMkName)
 
 -- | An identifier for an expression. Every node of the AST has an ID.
 --
@@ -82,12 +77,6 @@ newtype ModuleName = ModuleName {unModuleName :: NonEmpty Name}
 -- | Helper function for simple (non-hierarchical) module names.
 mkSimpleModuleName :: Name -> ModuleName
 mkSimpleModuleName n = ModuleName $ n :| []
-
-moduleNamePretty :: ModuleName -> Text
-moduleNamePretty = mconcat . intersperse "." . toList . fmap unName . unModuleName
-
-globalNamePretty :: GlobalName k -> Text
-globalNamePretty GlobalName{..} = moduleNamePretty qualifiedModule <> "." <> unName baseName
 
 -- | Tags for 'GlobalName'
 data GlobalNameKind
@@ -171,11 +160,6 @@ instance HasID a => HasID (Zipper a a) where
 -- | Get the ID of the given expression or type
 getID :: HasID a => a -> ID
 getID = view _id
-
--- | Set the ID of the given expression or type.
--- | Don't use this function outside of tests, since you could cause ID clashes.
-setID :: HasID a => ID -> a -> a
-setID = set _id
 
 -- | A class for types which have metadata.
 -- This exists for the same reasons that 'HasID' does
