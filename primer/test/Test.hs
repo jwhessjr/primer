@@ -66,9 +66,8 @@ import Tests.Typecheck (TypeCacheAlpha (TypeCacheAlpha))
 import Primer.TypeDef (ASTTypeDef(ASTTypeDef))
 
 main :: IO ()
---main = defaultMain [ check tasty_undo_redo ]
+main = defaultMain [ check tasty_undo_redo ]
 --main = recheckAt (Seed 11087148197968773465 7784360380252669127) "369:eDbKaC2o" tasty_undo_redo
-main = recheckAt (Seed 17289153444071322063 6250170459541170041) "105:cKeAb2F" tasty_undo_redo
 
 -- | A helper type for 'tasty_available_actions_actions',
 -- describing where a particular option came from.
