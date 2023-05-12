@@ -1,9 +1,8 @@
 -- | Tests for the typechecker
-module Tests.Typecheck where
+module Tests.Typecheck (TypeCacheAlpha (TypeCacheAlpha)) where
 
 import Foreword
 
-import Control.Monad.Fresh (MonadFresh)
 import Optics ((%), (%~))
 import Primer.App (
   Prog (
@@ -18,7 +17,6 @@ import Primer.App qualified as App
 import Primer.Core (
   Expr' (..),
   ExprMeta,
-  ID,
   Meta (..),
   TypeCache (..),
   TypeCacheBoth (..),
@@ -31,12 +29,7 @@ import Primer.Def (
   Def (..),
  )
 import Primer.Module (Module (..))
-import Primer.Name (Name, NameCounter)
-import Primer.Test.TestM (TestM)
-import Primer.Typecheck (
-  Cxt,
-  TypeError (..),
- )
+import Primer.Name (Name)
 
 -- A helper type for smartholes idempotent tests
 -- Equality is as normal, except in the typecache, where it is up-to-alpha
@@ -91,14 +84,3 @@ instance Eq (TypeCacheAlpha App.App) where
       && appIdCounter a1 == appIdCounter a2
       && appNameCounter a1 == appNameCounter a2
       && TypeCacheAlpha (appProg a1) == TypeCacheAlpha (appProg a2)
-
-newtype TypecheckTestM a = TypecheckTestM {unTypecheckTestM :: ExceptT TypeError (ReaderT Cxt TestM) a}
-  deriving newtype
-    ( Functor
-    , Applicative
-    , Monad
-    , MonadFresh ID
-    , MonadFresh NameCounter
-    , MonadReader Cxt
-    , MonadError TypeError
-    )
