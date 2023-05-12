@@ -10,7 +10,6 @@ import Data.Map qualified as Map
 import Data.Text qualified as T
 import Hedgehog
 import Hedgehog.Gen qualified as Gen
-import Hedgehog.Main (defaultMain)
 import Hedgehog.Range qualified as Range
 import Optics (toListOf)
 import Primer.Action (
@@ -66,20 +65,37 @@ import Tests.Typecheck (TypeCacheAlpha (TypeCacheAlpha))
 import Primer.TypeDef (ASTTypeDef(..), TypeDef (..))
 import Control.Monad.Fresh (fresh, MonadFresh)
 import Primer.Core.DSL
+import Hedgehog.Internal.Runner (checkReport)
+import Hedgehog.Internal.Property (Property(propertyConfig, propertyTest), Skip(SkipToShrink))
+import qualified Hedgehog.Internal.Seed as Seed
+import Hedgehog.Internal.Report (reportStatus, Report (reportSeed, reportTests), Result (..), FailureReport (failureShrinkPath))
 
+-- This runs the test once with a random seed, and
+-- - if it fails then rechecks it with the reported skip/shrink, asserting that it finds an error again
+-- - if it passes, error out
 main :: IO ()
-main = defaultMain [ check tasty_undo_redo ]
--- NB: these two give different non-replay outputs:
--- one says "✓ <interactive> passed 43 tests."
--- the other says   "⚐ <interactive> gave up after 0 discards, passed 63 tests."
--- I would expect them to both find a failing test, since they came from Hedgehog's output after finding a failing test
---main = recheckAt (Seed 6908339241222328337 3287419477091939665) "43:bKa" tasty_undo_redo
---main = recheckAt (Seed 17180548447945897768 10835732386502211389) "63:iBa2Bc" tasty_undo_redo
---
--- on the other hand, the following are found which do replay fine (this did not seem to happen before I ripped out primitives/builtins!)
---main = recheckAt (Seed 16153558878078727539 1302402656052769935) "36:mJbLcA2" tasty_undo_redo
---main = recheckAt (Seed 6243298434994001189 6674793301017129269) "14:cG" tasty_undo_redo
-
+main = do
+  seed <- Seed.random
+  report <- checkReport (propertyConfig tasty_undo_redo) 0 seed (propertyTest tasty_undo_redo) $ const $ pure ()
+  let testcount = reportTests report
+  let seed' = reportSeed report
+  let (status, sp) = case reportStatus report of
+        GaveUp -> ("GaveUp" :: Text, Nothing)
+        OK -> ("Passed", Nothing)
+        Failed x -> ("Failed, with shrink path: " <> show (failureShrinkPath x), Just $ failureShrinkPath x)
+  putStrLn status
+  print testcount
+  print (seed, seed', seed == seed')
+  case sp of
+    Nothing -> die "did not find a failure"
+    Just sp' -> do
+      -- This is essentially "recheckAt", with the skip/shrink info from above
+      let prop = withSkip (SkipToShrink testcount sp') tasty_undo_redo
+      report2 <- checkReport (propertyConfig prop) 0 seed' (propertyTest prop) $ const $ pure ()
+      case reportStatus report2 of
+        GaveUp -> die "rechecking gave up"
+        OK -> die "rechecking passed"
+        Failed _ -> putStrLn @Text "rechecking found the error"
 
 -- | A helper type for 'tasty_available_actions_actions',
 -- describing where a particular option came from.
