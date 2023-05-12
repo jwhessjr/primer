@@ -1,61 +1,190 @@
 cradle:
   cabal:
-    - path: "primer/src"
-      component: "lib:primer"
+    - path: "primer/src/Test.hs"
+      component: "primer:exe:primer-test"
 
-    - path: "primer/gen"
-      component: "primer:lib:primer-hedgehog"
+    - path: "primer/src/Control/Monad/Fresh.hs"
+      component: "primer:exe:primer-test"
 
-    - path: "primer/testlib"
-      component: "primer:lib:primer-testlib"
+    - path: "primer/src/Foreword.hs"
+      component: "primer:exe:primer-test"
 
-    - path: "primer/test"
-      component: "primer:test:primer-test"
+    - path: "primer/src/Primer/Action.hs"
+      component: "primer:exe:primer-test"
 
-    - path: "primer-benchmark/src"
-      component: "lib:primer-benchmark"
+    - path: "primer/src/Primer/Action/Available.hs"
+      component: "primer:exe:primer-test"
 
-    - path: "primer-benchmark/mkfixture/Main.hs"
-      component: "primer-benchmark:exe:primer-benchmark-mkfixture"
+    - path: "primer/src/Primer/Action/Priorities.hs"
+      component: "primer:exe:primer-test"
 
-    - path: "primer-benchmark/bench/Main.hs"
-      component: "primer-benchmark:bench:primer-benchmark"
+    - path: "primer/src/Primer/App.hs"
+      component: "primer:exe:primer-test"
 
-    - path: "primer-benchmark/test"
-      component: "primer-benchmark:test:primer-benchmark-test"
+    - path: "primer/src/Primer/App/Base.hs"
+      component: "primer:exe:primer-test"
 
-    - path: "primer-rel8/src"
-      component: "lib:primer-rel8"
+    - path: "primer/src/Primer/Core.hs"
+      component: "primer:exe:primer-test"
 
-    - path: "primer-rel8/testlib"
-      component: "primer-rel8:lib:primer-rel8-testlib"
+    - path: "primer/src/Primer/Core/DSL.hs"
+      component: "primer:exe:primer-test"
 
-    - path: "primer-rel8/test"
-      component: "primer-rel8:test:primer-rel8-test"
+    - path: "primer/src/Primer/Core/Transform.hs"
+      component: "primer:exe:primer-test"
 
-    - path: "primer-selda/src"
-      component: "lib:primer-selda"
+    - path: "primer/src/Primer/Core/Utils.hs"
+      component: "primer:exe:primer-test"
 
-    - path: "primer-selda/testlib"
-      component: "primer-selda:lib:primer-selda-testlib"
+    - path: "primer/src/Primer/Def.hs"
+      component: "primer:exe:primer-test"
 
-    - path: "primer-selda/test"
-      component: "primer-selda:test:primer-selda-test"
+    - path: "primer/src/Primer/Def/Utils.hs"
+      component: "primer:exe:primer-test"
 
-    - path: "primer-service/src"
-      component: "lib:primer-service"
+    - path: "primer/src/Primer/EvalFull.hs"
+      component: "primer:exe:primer-test"
 
-    - path: "primer-service/exe-server/Main.hs"
-      component: "primer-service:exe:primer-service"
+    - path: "primer/src/Primer/Log.hs"
+      component: "primer:exe:primer-test"
 
-    - path: "primer-service/exe-client/Main.hs"
-      component: "primer-service:exe:primer-client"
+    - path: "primer/src/Primer/Module.hs"
+      component: "primer:exe:primer-test"
 
-    - path: "primer-service/exe-replay/Main.hs"
-      component: "primer-service:exe:primer-replay"
+    - path: "primer/src/Primer/Name.hs"
+      component: "primer:exe:primer-test"
 
-    - path: "primer-service/exe-openapi/Main.hs"
-      component: "primer-service:exe:primer-openapi"
+    - path: "primer/src/Primer/Name/Fresh.hs"
+      component: "primer:exe:primer-test"
 
-    - path: "primer-service/test"
-      component: "primer-service:test:service-test"
+    - path: "primer/src/Primer/Pretty.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Primer/Questions.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Primer/Refine.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Primer/Subst.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Primer/Typecheck.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Primer/TypeDef.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Primer/Unification.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Primer/Zipper.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Primer/ZipperCxt.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Control/Monad/NestedError.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Primer/Action/Actions.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Primer/Action/Errors.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Primer/Action/Movement.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Primer/Action/ProgAction.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Primer/Action/ProgError.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Primer/Core/DSL/Meta.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Primer/Core/DSL/Type.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Primer/Core/Fresh.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Primer/Core/Meta.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Primer/Core/Type.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Primer/Core/Type/Utils.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Primer/Eval/Ann.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Primer/Eval/Beta.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Primer/Eval/Bind.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Primer/Eval/Case.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Primer/Eval/Detail.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Primer/Eval/EvalError.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Primer/Eval/Inline.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Primer/Eval/Let.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Primer/Eval/Prim.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Primer/Eval/Redex.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Primer/Typecheck/Cxt.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Primer/Typecheck/Kindcheck.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Primer/Typecheck/KindError.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Primer/Typecheck/SmartHoles.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Primer/Typecheck/TypeError.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Primer/Typecheck/Utils.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Primer/Zipper/Type.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Tests/Typecheck.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Primer/Gen/App.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Primer/Gen/Core/Raw.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Primer/Gen/Core/Typed.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Primer/Test/TestM.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Primer/Test/Util.hs"
+      component: "primer:exe:primer-test"
