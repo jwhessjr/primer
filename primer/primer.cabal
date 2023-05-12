@@ -20,7 +20,6 @@ library
     Primer.App
     Primer.App.Base
     Primer.Builtins
-    Primer.Builtins.DSL
     Primer.Core
     Primer.Core.DSL
     Primer.Core.Transform
