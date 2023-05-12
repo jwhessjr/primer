@@ -70,21 +70,40 @@ import Hedgehog.Internal.Property (Property(propertyConfig, propertyTest), Skip(
 import qualified Hedgehog.Internal.Seed as Seed
 import Hedgehog.Internal.Report (reportStatus, Report (reportSeed, reportTests), Result (..), FailureReport (failureShrinkPath))
 
--- This runs the test once with a random seed, and
--- - if it fails then rechecks it with the reported skip/shrink, asserting that it finds an error again
--- - if it passes, error out
 main :: IO ()
-main = do
-  seed <- Seed.random
-  shrink <- runProp seed tasty_undo_redo >>= \case
-    Passed -> die "Passed"
-    Defeat -> die "GaveUp"
-    Fail tc sp -> pure $ SkipToShrink tc sp
-  -- This is essentially "recheckAt", with the skip/shrink info from above
-  runProp seed (withSkip shrink tasty_undo_redo) >>= \case
-    Passed -> die "rechecking passed"
-    Defeat -> die "rechecking gave up"
-    Fail _ _ -> putStrLn @Text "rechecking found the error"
+main = runAndRecheck >>= \case
+  RunPass -> die "Initial run passed"
+  RunDefeat -> die "Initial run gave up"
+  RecheckPass -> die "Rechecking run passed"
+  RecheckDefeat -> die "Rechecking run gave up"
+  RecheckRefind -> putStrLn @Text "Rechecking found an error"
+
+
+-- This runs the test once with a random seed, and
+-- - if it fails then rechecks it with the reported skip/shrink, reporting whether it finds an error again
+-- - if it passes or gives up, report that
+runAndRecheck :: IO RRInfo
+runAndRecheck = either identity absurd <$> runExceptT go
+ where
+   go :: ExceptT RRInfo IO Void
+   go = do
+    seed <- Seed.random
+    shrink <- ExceptT $ runProp seed tasty_undo_redo <&> \case
+      Passed -> Left RunPass
+      Defeat -> Left RunDefeat
+      Fail tc sp -> Right $ SkipToShrink tc sp
+    -- This is essentially "recheckAt", with the skip/shrink info from above
+    ExceptT $ fmap Left $ runProp seed (withSkip shrink tasty_undo_redo) <&> \case
+      Passed -> RecheckPass
+      Defeat -> RecheckDefeat
+      Fail _ _ -> RecheckRefind
+
+data RRInfo
+  = RunPass
+  | RunDefeat
+  | RecheckPass
+  | RecheckDefeat
+  | RecheckRefind -- rechecking finds /an/ error, not asserted /the same/ error
 
 data RunInfo
   = Passed
