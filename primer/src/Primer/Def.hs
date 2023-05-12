@@ -3,7 +3,6 @@ module Primer.Def (
   DefMap,
   ASTDef (..),
   defAST,
-  defPrim,
   defType,
 ) where
 
@@ -53,7 +52,3 @@ defAST :: Def -> Maybe ASTDef
 defAST = \case
   DefPrim _ -> Nothing
   DefAST t -> Just t
-defPrim :: Def -> Maybe PrimDef
-defPrim = \case
-  DefPrim t -> Just t
-  DefAST _ -> Nothing
