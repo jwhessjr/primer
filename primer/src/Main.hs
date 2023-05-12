@@ -174,7 +174,7 @@ runRandomAvailableAction l a = do
       (defName,defMut,defLoc) <- maybe discard forAll (pickPos $ appProg a)
       let defMap = fmap snd $ progAllDefs $ appProg a
       let (def, loc,acts) = case defLoc of
-            Left d -> (d, Nothing,Available.forDef defMap l defMut defName)
+            Left d -> (d, Nothing,Available.forDef defMap defMut defName)
             Right (d,SigNode, i) -> (DefAST d, Just (SigNode, i), Available.forSig l defMut (astDefType d) i)
             Right (d,BodyNode, i) -> (DefAST d, Just (BodyNode, i), Available.forBody (snd <$> progAllTypeDefs (appProg a)) l defMut (astDefExpr d) i)
       case acts of

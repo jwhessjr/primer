@@ -18,7 +18,6 @@ executable primer-test
     Foreword
     Primer.Action
     Primer.Action.Available
-    Primer.Action.Priorities
     Primer.App
     Primer.App.Base
     Primer.Core

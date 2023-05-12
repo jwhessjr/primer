@@ -29,7 +29,6 @@ import Optics (
   (^?),
   _Just,
  )
-import Primer.Action.Priorities qualified as P
 import Primer.App.Base (
   Editable (..),
   Level (..),
@@ -139,13 +138,11 @@ data InputAction
 
 forDef ::
   DefMap ->
-  Level ->
   Editable ->
   GVarName ->
   [Action]
-forDef _ _ NonEditable _ = mempty
-forDef defs l Editable defName =
-  sortByPriority l $
+forDef _ NonEditable _ = mempty
+forDef defs Editable defName =
     [Input RenameDef, NoInput DuplicateDef]
       <> mwhen
         -- ensure the definition is not in use, otherwise the action will not succeed
@@ -160,7 +157,7 @@ forBody ::
   ID ->
   [Action]
 forBody _ _ NonEditable _ _ = mempty
-forBody tydefs l Editable expr id = sortByPriority l $ case findNodeWithParent id expr of
+forBody tydefs l Editable expr id = case findNodeWithParent id expr of
   Nothing -> mempty
   Just (ExprNode e, p) ->
     let raiseAction = case p of
@@ -183,7 +180,7 @@ forSig ::
   ID ->
   [Action]
 forSig _ NonEditable _ _ = mempty
-forSig l Editable ty id = sortByPriority l $ case findType id ty of
+forSig l Editable ty id = case findType id ty of
   Nothing -> mempty
   Just t ->
     forType l t
@@ -420,47 +417,3 @@ options typeDefs defs cxt level def mNodeSel = \case
       TFun{} -> True
       TForall{} -> True
       _ -> False
-
-sortByPriority ::
-  Level ->
-  [Action] ->
-  [Action]
-sortByPriority l =
-  sortOn $
-    ($ l) . \case
-      NoInput a -> case a of
-        MakeCase -> P.makeCase
-        MakeApp -> P.applyFunction
-        MakeAPP -> P.applyType
-        MakeAnn -> P.annotateExpr
-        RemoveAnn -> P.removeAnnotation
-        LetToRec -> P.makeLetRecursive
-        Raise -> P.raise
-        EnterHole -> P.enterHole
-        RemoveHole -> P.finishHole
-        DeleteExpr -> P.delete
-        MakeFun -> P.constructFunction
-        AddInput -> P.addInput
-        MakeTApp -> P.constructTypeApp
-        RaiseType -> P.raise
-        DeleteType -> P.delete
-        DuplicateDef -> P.duplicate
-        DeleteDef -> P.delete
-      Input a -> case a of
-        MakeCon -> P.useValueCon
-        MakeConSat -> P.useSaturatedValueCon
-        MakeVar -> P.useVar
-        MakeVarSat -> P.useFunction
-        MakeLet -> P.makeLet
-        MakeLetRec -> P.makeLetrec
-        MakeLam -> P.makeLambda
-        MakeLAM -> P.makeTypeAbstraction
-        RenamePattern -> P.rename
-        RenameLet -> P.rename
-        RenameLam -> P.rename
-        RenameLAM -> P.rename
-        MakeTCon -> P.useTypeCon
-        MakeTVar -> P.useTypeVar
-        MakeForall -> P.constructForall
-        RenameForall -> P.rename
-        RenameDef -> P.rename
