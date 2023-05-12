@@ -6,7 +6,6 @@ module Primer.Core.Utils (
   generateTypeIDs,
   regenerateTypeIDs,
   forgetTypeMetadata,
-  generateIDs,
   regenerateExprIDs,
   noHoles,
   _freeTmVars,
@@ -45,7 +44,6 @@ import Optics (
 
 import Primer.Core (
   CaseBranch' (..),
-  Expr,
   Expr' (..),
   GVarName,
   HasID (_id),
@@ -56,7 +54,6 @@ import Primer.Core (
   TyVarName,
   Type' (..),
   bindName,
-  trivialMeta,
   _exprMeta,
   _exprTypeMeta,
  )
@@ -82,10 +79,6 @@ regenerateExprIDs' :: MonadFresh ID m => (ID -> a -> a') -> (ID -> b -> b') -> E
 regenerateExprIDs' se st =
   traverseOf _exprMeta (\a -> flip se a <$> fresh)
     >=> traverseOf _exprTypeMeta (\a -> flip st a <$> fresh)
-
--- | Like 'generateTypeIDs', but for expressions
-generateIDs :: MonadFresh ID m => Expr' () () -> m Expr
-generateIDs = regenerateExprIDs' (const . trivialMeta) (const . trivialMeta)
 
 -- Both term and type vars, but not constructors or global variables.
 -- This is because constructor names and global variables are never

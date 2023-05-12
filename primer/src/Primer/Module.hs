@@ -8,51 +8,27 @@ module Primer.Module (
   deleteDef,
   renameModule,
   renameModule',
-  builtinModule,
-  primitiveModule,
 ) where
 
 import Foreword
 
-import Control.Monad.Fresh (MonadFresh)
 import Data.Data (Data)
 import Data.Generics.Uniplate.Data (transformBi)
-import Data.List.Extra (enumerate)
 import Data.Map (delete, insert, mapKeys, member)
-import Data.Map qualified as M
-import Optics (traverseOf)
-import Primer.Builtins (
-  boolDef,
-  builtinModuleName,
-  eitherDef,
-  listDef,
-  maybeDef,
-  natDef,
-  pairDef,
-  tBool,
-  tEither,
-  tList,
-  tMaybe,
-  tNat,
-  tPair,
- )
 import Primer.Core (
   GVarName,
   GlobalName (baseName),
-  ID,
   ModuleName,
   TyConName,
   TypeMeta,
   qualifyName,
  )
-import Primer.Core.Utils (generateTypeIDs)
 import Primer.Def (
   Def (..),
   DefMap,
  )
 import Primer.Name (Name)
-import Primer.Primitives (allPrimTypeDefs, primDefName, primitiveModuleName)
-import Primer.TypeDef (TypeDef (..), TypeDefMap, forgetTypeDefMetadata, _typedefFields)
+import Primer.TypeDef (TypeDef (..), TypeDefMap, forgetTypeDefMetadata)
 
 data Module = Module
   { moduleName :: ModuleName
@@ -100,36 +76,3 @@ renameModule fromName toName = traverse rn1
 -- detect name clashes, see 'renameModule'
 renameModule' :: Data a => ModuleName -> ModuleName -> a -> a
 renameModule' fromName toName = transformBi (\n -> if n == fromName then toName else n)
-
--- | This module depends on the builtin module, due to some terms referencing builtin types.
--- It contains all primitive types and terms.
-primitiveModule :: Module
-primitiveModule =
-  Module
-    { moduleName = primitiveModuleName
-    , moduleTypes = TypeDefPrim <$> M.mapKeys baseName allPrimTypeDefs
-    , moduleDefs = M.fromList $ [(primDefName def, DefPrim def) | def <- enumerate]
-    }
-
-builtinModule :: MonadFresh ID m => m Module
-builtinModule = do
-  boolDef' <- traverseOf _typedefFields generateTypeIDs $ TypeDefAST boolDef
-  natDef' <- traverseOf _typedefFields generateTypeIDs $ TypeDefAST natDef
-  listDef' <- traverseOf _typedefFields generateTypeIDs $ TypeDefAST listDef
-  maybeDef' <- traverseOf _typedefFields generateTypeIDs $ TypeDefAST maybeDef
-  pairDef' <- traverseOf _typedefFields generateTypeIDs $ TypeDefAST pairDef
-  eitherDef' <- traverseOf _typedefFields generateTypeIDs $ TypeDefAST eitherDef
-  pure $
-    Module
-      { moduleName = builtinModuleName
-      , moduleTypes =
-          M.fromList
-            [ (baseName tBool, boolDef')
-            , (baseName tNat, natDef')
-            , (baseName tList, listDef')
-            , (baseName tMaybe, maybeDef')
-            , (baseName tPair, pairDef')
-            , (baseName tEither, eitherDef')
-            ]
-      , moduleDefs = mempty
-      }

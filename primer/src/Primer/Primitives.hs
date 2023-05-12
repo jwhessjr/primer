@@ -3,12 +3,10 @@
 
 module Primer.Primitives (
   PrimDef (..),
-  allPrimTypeDefs,
   tInt,
   tChar,
   primitive,
   primConName,
-  primDefName,
   primDefType,
   PrimFunError (..),
   primitiveModuleName,
@@ -17,7 +15,6 @@ module Primer.Primitives (
 import Foreword
 
 import Data.Data (Data)
-import Data.Map qualified as M
 import Primer.Builtins (
   tBool,
   tMaybe,
@@ -35,7 +32,6 @@ import Primer.Core (
  )
 import Primer.Name (Name)
 import Primer.Primitives.PrimDef (PrimDef (..))
-import Primer.TypeDef (PrimTypeDef (..))
 
 data PrimFunError
   = -- | We have attempted to apply a primitive function to invalid args.
@@ -63,56 +59,6 @@ tChar = primitive "Char"
 
 tInt :: TyConName
 tInt = primitive "Int"
-
--- | Primitive type definitions.
--- There should be one entry here for each constructor of `PrimCon`.
-allPrimTypeDefs :: Map TyConName PrimTypeDef
-allPrimTypeDefs =
-  M.fromList
-    [ let name = tChar
-       in ( name
-          , PrimTypeDef
-              { primTypeDefParameters = []
-              , primTypeDefNameHints = ["c"]
-              }
-          )
-    , let name = tInt
-       in ( name
-          , PrimTypeDef
-              { primTypeDefParameters = []
-              , primTypeDefNameHints = ["i", "j", "k", "m", "n"]
-              }
-          )
-    ]
-  where
-    -- This ensures that when we modify the constructors of `PrimCon` (i.e. we add/remove primitive types),
-    -- we are alerted that we need to update this map.
-    _ = \case
-      PrimChar _ -> ()
-      PrimInt _ -> ()
-
-primDefName :: PrimDef -> Name
-primDefName = \case
-  ToUpper -> "toUpper"
-  IsSpace -> "isSpace"
-  HexToNat -> "hexToNat"
-  NatToHex -> "natToHex"
-  EqChar -> "eqChar"
-  IntAdd -> "Int.+"
-  IntMinus -> "Int.-"
-  IntMul -> "Int.×"
-  IntQuotient -> "Int.quotient"
-  IntRemainder -> "Int.remainder"
-  IntQuot -> "Int.quot"
-  IntRem -> "Int.rem"
-  IntLT -> "Int.<"
-  IntLTE -> "Int.≤"
-  IntGT -> "Int.>"
-  IntGTE -> "Int.≥"
-  IntEq -> "Int.="
-  IntNeq -> "Int.≠"
-  IntToNat -> "Int.toNat"
-  IntFromNat -> "Int.fromNat"
 
 primDefType :: PrimDef -> Type' ()
 primDefType = uncurry (flip $ foldr $ TFun ()) . primFunTypes

@@ -54,7 +54,6 @@ module Primer.Typecheck (
   extendLocalCxts,
   extendGlobalCxt,
   extendTypeDefCxt,
-  localTmVars,
   localTyVars,
 ) where
 
@@ -97,7 +96,6 @@ import Primer.Core (
   ID,
   Kind (..),
   LVarName,
-  LocalName (LocalName),
   Meta (..),
   PrimCon,
   TmVarRef (..),
@@ -227,9 +225,6 @@ extendGlobalCxt globals cxt = cxt{globalCxt = Map.fromList globals <> globalCxt 
 
 extendTypeDefCxt :: TypeDefMap -> Cxt -> Cxt
 extendTypeDefCxt typedefs cxt = cxt{typeDefs = typedefs <> typeDefs cxt}
-
-localTmVars :: Cxt -> Map LVarName Type
-localTmVars = M.mapKeys LocalName . M.mapMaybe (\case T t -> Just t; K _ -> Nothing) . localCxt
 
 noSmartHoles :: Cxt -> Cxt
 noSmartHoles cxt = cxt{smartHoles = NoSmartHoles}
