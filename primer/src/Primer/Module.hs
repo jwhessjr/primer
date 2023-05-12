@@ -8,9 +8,7 @@ module Primer.Module (
   deleteDef,
   renameModule,
   renameModule',
-  nextModuleID,
   builtinModule,
-  builtinTypes,
   primitiveModule,
 ) where
 
@@ -47,13 +45,11 @@ import Primer.Core (
   TypeMeta,
   qualifyName,
  )
-import Primer.Core.DSL
 import Primer.Core.Utils (generateTypeIDs)
 import Primer.Def (
   Def (..),
   DefMap,
  )
-import Primer.Def.Utils (nextID)
 import Primer.JSON (
   CustomJSON (CustomJSON),
   FromJSON,
@@ -113,14 +109,6 @@ renameModule fromName toName = traverse rn1
 renameModule' :: Data a => ModuleName -> ModuleName -> a -> a
 renameModule' fromName toName = transformBi (\n -> if n == fromName then toName else n)
 
--- | Given a 'Module', return the next 'ID' that's safe to use when
--- editing its definitions.
---
--- Note: do not rely on the implementation of this function, as it may
--- change in the future.
-nextModuleID :: Module -> ID
-nextModuleID m = foldl' (\id_ d -> max (nextID d) id_) minBound (moduleDefs m)
-
 -- | This module depends on the builtin module, due to some terms referencing builtin types.
 -- It contains all primitive types and terms.
 primitiveModule :: Module
@@ -153,8 +141,3 @@ builtinModule = do
             ]
       , moduleDefs = mempty
       }
-
-builtinTypes :: TypeDefMap
--- NB: we don't care about IDs/TypeMeta here, since we remove them in
--- moduleTypesQualified, thus @create'@ is ok.
-builtinTypes = moduleTypesQualified $ create' builtinModule
