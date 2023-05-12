@@ -4,7 +4,6 @@ import Foreword
 
 import Primer.Action.Errors (ActionError)
 import Primer.Core.Meta (GVarName, ModuleName, TyConName, TyVarName, ValConName)
-import Primer.Eval.EvalError (EvalError)
 import Primer.Name (Name)
 
 data ProgError
@@ -22,7 +21,6 @@ data ProgError
   | TyConParamClash Name
   | ValConParamClash Name
   | ActionError ActionError
-  | EvalError EvalError
   | -- | Currently copy/paste is only exposed in the frontend via select
     --   channels, which should never go wrong. Consequently, this is an
     --   "internal error" which should never happen!

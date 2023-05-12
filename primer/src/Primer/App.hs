@@ -33,10 +33,6 @@ module Primer.App (
   MutationRequest (..),
   Selection (..),
   NodeSelection (..),
-  EvalReq (..),
-  EvalResp (..),
-  EvalFullReq (..),
-  EvalFullResp (..),
   lookupASTDef,
   liftError,
 ) where
@@ -138,8 +134,6 @@ import Primer.Def (
   defAST,
  )
 import Primer.Def.Utils (globalInUse)
-import Primer.Eval.Detail (EvalDetail)
-import Primer.EvalFull (Dir, TerminationBound)
 import Primer.Module (
   Module (moduleDefs, moduleName, moduleTypes),
   _moduleTypes,
@@ -312,32 +306,6 @@ instance HasID NodeSelection where
 data MutationRequest
   = Undo
   | Edit [ProgAction]
-  deriving stock (Eq, Show, Read)
-
-data EvalReq = EvalReq
-  { evalReqExpr :: Expr
-  , evalReqRedex :: ID
-  }
-  deriving stock (Eq, Show, Read)
-
-data EvalResp = EvalResp
-  { evalRespExpr :: Expr
-  , evalRespRedexes :: [ID]
-  , evalRespDetail :: EvalDetail
-  }
-  deriving stock (Eq, Show, Read)
-
-data EvalFullReq = EvalFullReq
-  { evalFullReqExpr :: Expr
-  , evalFullCxtDir :: Dir -- is this expression in a syn/chk context, so we can tell if is an embedding.
-  , evalFullMaxSteps :: TerminationBound
-  }
-  deriving stock (Eq, Show, Read)
-
--- If we time out, we still return however far we got
-data EvalFullResp
-  = EvalFullRespTimedOut Expr
-  | EvalFullRespNormal Expr
   deriving stock (Eq, Show, Read)
 
 -- * Request handlers
