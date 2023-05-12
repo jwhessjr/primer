@@ -67,7 +67,7 @@ import Primer.Core.DSL
 import Hedgehog.Internal.Runner (checkReport)
 import Hedgehog.Internal.Property (Property(propertyConfig, propertyTest), Skip(SkipToShrink), TestCount, ShrinkPath)
 import qualified Hedgehog.Internal.Seed as Seed
-import Hedgehog.Internal.Report (reportStatus, Report (reportSeed, reportTests), Result (..), FailureReport (failureShrinkPath))
+import Hedgehog.Internal.Report (reportStatus, Report (reportSeed, reportTests), Result (..), FailureReport (failureShrinkPath, failureAnnotations), FailedAnnotation (FailedAnnotation))
 import Numeric.Natural (Natural)
 import qualified Data.Map.Strict as M
 import Data.List.Extra (enumerate)
@@ -95,15 +95,19 @@ runAndRecheck = either identity absurd <$> runExceptT go
    go :: ExceptT RRInfo IO Void
    go = do
     seed <- Seed.random
-    shrink <- ExceptT $ runProp seed tasty_undo_redo <&> \case
+    (shrink, failann) <- ExceptT $ runProp seed tasty_undo_redo <&> \case
       Passed -> Left RunPass
       Defeat -> Left RunDefeat
-      Fail tc sp -> Right $ SkipToShrink tc sp
+      Fail tc sp failann -> Right (SkipToShrink tc sp, failann)
     -- This is essentially "recheckAt", with the skip/shrink info from above
-    ExceptT $ fmap Left $ runProp seed (withSkip shrink tasty_undo_redo) <&> \case
-      Passed -> RecheckPass
-      Defeat -> RecheckDefeat
-      Fail _ _ -> RecheckRefind
+    ExceptT $ fmap Left $ runProp seed (withSkip shrink tasty_undo_redo) >>= \case
+      Passed -> do
+        mapM_ (print . \(FailedAnnotation sp val) -> FailedAnnotation sp (take 40 val)) failann
+        pure RecheckPass
+      Defeat -> do
+        mapM_ (print . \(FailedAnnotation sp val) -> FailedAnnotation sp (take 40 val)) failann
+        pure RecheckDefeat
+      Fail _ _ _ -> pure RecheckRefind
 
 data RRInfo
   = RunPass
@@ -119,7 +123,7 @@ showPad ri = let s = show ri in s <> T.replicate (13 - T.length s) " "
 data RunInfo
   = Passed
   | Defeat
-  | Fail TestCount ShrinkPath
+  | Fail TestCount ShrinkPath [FailedAnnotation]
 
 runProp :: Seed -> Property -> IO RunInfo
 runProp seed prop = do
@@ -131,7 +135,7 @@ runProp seed prop = do
   pure $ case reportStatus report of
         GaveUp -> Defeat
         OK -> Passed
-        Failed x -> Fail testcount $ failureShrinkPath x
+        Failed x -> Fail testcount (failureShrinkPath x) (failureAnnotations x)
 
 -- | A helper type for 'tasty_available_actions_actions',
 -- describing where a particular option came from.
@@ -184,13 +188,13 @@ runRandomAvailableAction l a = do
           collect action
           case action of
             Available.NoInput act' -> do
-              def' <- maybe (annotate "primitive def" >> failure) pure $ defAST def
+              def' <- maybe failure pure $ defAST def
               progActs <-
                 either (\e -> annotateShow e >> failure) pure $
                   toProgActionNoInput (map snd $ progAllDefs $ appProg a) def' defName loc act'
               Just <$> actionSucceeds (handleEditRequest progActs) a
             Available.Input act' -> do
-              def' <- maybe (annotate "primitive def" >> failure) pure $ defAST def
+              def' <- maybe failure pure $ defAST def
               Available.Options{Available.opts, Available.free} <-
                 maybe (annotate "id not found" >> failure) pure $
                   Available.options
@@ -209,10 +213,10 @@ runRandomAvailableAction l a = do
                       Available.FreeInt -> [(StudentProvided,) . flip Available.Option Nothing <$> (show <$> Gen.integral (Range.linear @Integer 0 1_000_000_000))]
                       Available.FreeChar -> [(StudentProvided,) . flip Available.Option Nothing . T.singleton <$> Gen.unicode]
               case opts'' of
-                [] -> annotate "no options" >> pure Nothing
+                [] -> pure Nothing
                 options -> do
                   opt <- forAllT $ Gen.choice options
-                  progActs <- either (\e -> annotateShow e >> failure) pure $ toProgActionInput def' defName loc (snd opt) act'
+                  progActs <- either (const failure) pure $ toProgActionInput def' defName loc (snd opt) act'
                   actionSucceedsOrCapture (fst opt) (handleEditRequest progActs) a
   where
     runEditAppMLogs ::
@@ -225,7 +229,7 @@ runRandomAvailableAction l a = do
     actionSucceeds :: HasCallStack => EditAppM (PureLog (WithSeverity ())) ProgError a -> App -> PropertyT WT App
     actionSucceeds m a' =
       runEditAppMLogs m a' >>= \case
-        (Left err, _) -> annotateShow err >> failure
+        (Left _, _) -> failure
         (Right _, a'') -> pure a''
     -- If we submit our own name rather than an offered one, then
     -- we should expect that name capture/clashing may happen
@@ -235,17 +239,14 @@ runRandomAvailableAction l a = do
       case (p, a'') of
         (StudentProvided, (Left (ActionError NameCapture), _)) -> do
           label "name-capture with entered name"
-          annotate "ignoring name capture error as was generated name, not offered one"
           pure Nothing
         (StudentProvided, (Left (ActionError (CaseBindsClash{})), _)) -> do
           label "name-clash with entered name"
-          annotate "ignoring name clash error as was generated name, not offered one"
           pure Nothing
         (StudentProvided, (Left DefAlreadyExists{}, _)) -> do
           label "rename def name clash with entered name"
-          annotate "ignoring def already exists error as was generated name, not offered one"
           pure Nothing
-        (_, (Left err, _)) -> annotateShow err >> failure
+        (_, (Left _, _)) -> failure
         (_, (Right _, a''')) -> pure $ Just a'''
 
 -- helper type for tasty_undo_redo
@@ -288,22 +289,17 @@ tasty_undo_redo = withTests 500 $
       let l = Expert
       -- We only test SmartHoles mode (which is the only supported user-facing
       -- mode - NoSmartHoles is only used for internal sanity testing etc)
-      let annotateShow' :: HasCallStack => App -> PropertyT WT ()
-          annotateShow' = withFrozenCallStack $ annotateShow . (\p -> (progModules p, progLog p)) . appProg
       Right p' <- runExceptT @TypeError $ tcWholeProgWithImports =<< prog
       i <- lift $ isolateWT fresh
       nc <- lift $ isolateWT fresh
       let a = mkApp i nc p'
-      annotateShow' a
-      n <- forAll $ Gen.int $ Range.linear 1 20
+      let n = 4
       a' <- iterateNM n a $ \a' -> runRandomAction l a'
-      annotateShow' a'
       if null $ unlog $ progLog $ appProg a' -- TODO: expose a "log-is-null" helper from App?
         -- It is possible for the random actions to undo everything!
         then success
         else do
-          a'' <- runEditAppMLogs (handleMutationRequest Undo) a'
-          annotateShow' a''
+          void $ runEditAppMLogs (handleMutationRequest Undo) a'
   where
     -- TODO: dry
     runEditAppMLogs ::
@@ -313,15 +309,18 @@ tasty_undo_redo = withTests 500 $
       PropertyT WT App
     runEditAppMLogs m a = case runPureLog $ runEditAppM m a of
       (r, logs) -> testNoSevereLogs logs >> case r of
-        (Left err, _) -> annotateShow err >> failure
+        (Left _, _) -> failure
         (Right _, a') -> pure a'
     runRandomAction l a = do
+      let act = Avail
+      {-
       act <- forAll $ Gen.frequency $ second pure <$> [
         (2,AddTm)
         ,(1,AddTy)
         ,(if null $ unlog $ progLog $ appProg a then 0 else 1,Un) -- TODO: expose a "log-is-null" helper from App?
         ,(5,Avail)
                                     ]
+-}
       case act of
         AddTm -> do
           let n' = local (extendCxtByModules $ progModules $ appProg a) freshNameForCxt
