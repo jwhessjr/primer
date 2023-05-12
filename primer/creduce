@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+
+creduce --not-c ./creduce-test *

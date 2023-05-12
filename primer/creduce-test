@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+
+set -e
+
+echo "running an interestingness test"
+
+# it builds
+cabal build -O0
+
+# it tickles the hedgehog bug
+cabal run -O0
