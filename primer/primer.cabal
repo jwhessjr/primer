@@ -70,7 +70,6 @@ executable primer-test
     Primer.Typecheck.TypeError
     Primer.Typecheck.Utils
     Primer.Zipper.Type
-    Tests.Typecheck
     Primer.Gen.App
     Primer.Gen.Core.Raw
     Primer.Gen.Core.Typed

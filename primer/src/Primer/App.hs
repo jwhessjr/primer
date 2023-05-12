@@ -7,7 +7,6 @@
 module Primer.App (
   module Primer.App.Base,
   Log (..),
-  defaultLog,
   App,
   mkApp,
   appProg,
@@ -216,12 +215,6 @@ data Prog = Prog
   -- since its creation, in order of first edit to last. A successful
   -- undo operation pops the last edit from this log, and pushes it
   -- onto the 'redoLog'.
-  , redoLog :: Log
-  -- ^ A log of successive undo operations, in order of most recent to
-  -- least (i.e., a LIFO-order stack). A successful redo operation
-  -- pops the most recent undo from this log. Note that this log is
-  -- reset whenever an action is performed; i.e., redos are not
-  -- preserved across edits.
   }
   deriving stock (Eq, Show, Read)
 
@@ -237,24 +230,10 @@ _progSelection = sets $ \f p -> p {progSelection = f $ progSelection p}
 _progSmartHoles :: Setter' Prog SmartHoles
 _progSmartHoles = sets $ \f p -> p {progSmartHoles = f $ progSmartHoles p}
 
-_redoLog :: Setter' Prog Log
-_redoLog = sets $ \f p -> p {redoLog = f $ redoLog p}
-
 -- | Push a compound action onto the given 'Log', returning the new
 -- 'Log'.
 push :: [ProgAction] -> Log -> Log
 push as l = Log $ as : unlog l
-
--- | Pop the head of the given 'Log'.
---
--- If the log is not empty, returns 'Just (as, l)' where 'as' is the
--- head of the log and 'l' is the rest of the log.
---
--- If the log is empty, returns 'Nothing'.
-pop :: Log -> Maybe ([ProgAction], Log)
-pop l = case unlog l of
-  [] -> Nothing
-  (as : l') -> Just (as, Log l')
 
 progAllModules :: Prog -> [Module]
 progAllModules p = progModules p <> progImports p
@@ -297,10 +276,6 @@ newtype Log = Log {unlog :: [[ProgAction]]}
   deriving stock (Eq, Show, Read)
   deriving newtype (Semigroup, Monoid)
 
--- | The default (empty) 'Log'.
-defaultLog :: Log
-defaultLog = Log mempty
-
 -- | Describes what interface element the user has selected.
 -- A definition in the left hand nav bar, and possibly a node in that definition.
 data Selection = Selection
@@ -336,7 +311,6 @@ instance HasID NodeSelection where
 -- | The type of requests which can mutate the application state.
 data MutationRequest
   = Undo
-  | Redo
   | Edit [ProgAction]
   deriving stock (Eq, Show, Read)
 
@@ -392,7 +366,6 @@ handleMutationRequest :: MonadEditApp l ProgError m => MutationRequest -> m Prog
 handleMutationRequest = \case
   Edit as -> handleEditRequest as
   Undo -> handleUndoRequest
-  Redo -> handleRedoRequest
 
 -- | Handle an edit request
 --
@@ -401,7 +374,7 @@ handleEditRequest :: forall m l. MonadEditApp l ProgError m => [ProgAction] -> m
 handleEditRequest actions = do
   (prog, _) <- gets appProg >>= \p -> foldlM go (p, Nothing) actions
   let l = progLog prog
-  let prog' = prog{progLog = push actions l, redoLog = defaultLog}
+  let prog' = prog{progLog = push actions l}
   modify (\s -> s & _currentState % _prog .~ prog')
   pure prog'
   where
@@ -882,33 +855,10 @@ handleUndoRequest = do
   start <- gets appInit
   case unlog (progLog prog) of
     [] -> pure prog
-    (a : as) -> do
+    (_ : as) -> do
       runEditAppM (replay (reverse as)) start >>= \case
         (Right _, app') -> do
-          put $ app' & _currentState % _prog % _redoLog .~ push a (redoLog prog)
-          gets appProg
-        (Left err, _) -> throwError err
-
--- | Redo the last undo by replaying it from the current program
--- state.
---
--- If the replay is successful, then we return the new program and
--- pop the last undo off the redo log.
---
--- If the replay is unsuccessful, then we throw a 'ProgError' and
--- leave it to the caller to decide how to handle it.
---
--- If the redo log is empty, return the program unchanged.
-handleRedoRequest :: (MonadEditApp l ProgError m) => m Prog
-handleRedoRequest = do
-  prog <- gets appProg
-  app <- get
-  case pop (redoLog prog) of
-    Nothing -> pure prog
-    Just (a, redoLog') -> do
-      runEditAppM (handleEditRequest a) app >>= \case
-        (Right _, app') -> do
-          put $ app' & _currentState % _prog % _redoLog .~ redoLog'
+          put app'
           gets appProg
         (Left err, _) -> throwError err
 

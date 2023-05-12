@@ -33,7 +33,7 @@ import Primer.App (
   progAllTypeDefs,
   progCxt,
   progModules,
-  runEditAppM, handleMutationRequest, MutationRequest (Undo, Redo), Log (..), tcWholeProgWithImports, mkApp,
+  runEditAppM, handleMutationRequest, MutationRequest (Undo), Log (..), tcWholeProgWithImports, mkApp,
  )
 import Primer.Core (
   GVarName,
@@ -61,7 +61,6 @@ import Primer.Test.Util (testNoSevereLogs)
 import Primer.Typecheck (
   SmartHoles (SmartHoles), TypeError,
  )
-import Tests.Typecheck (TypeCacheAlpha (TypeCacheAlpha))
 import Primer.TypeDef (ASTTypeDef(..), TypeDef (..))
 import Control.Monad.Fresh (fresh, MonadFresh)
 import Primer.Core.DSL
@@ -251,7 +250,7 @@ runRandomAvailableAction l a = do
 
 -- helper type for tasty_undo_redo
 data Act = AddTm | AddTy
-  | Un | Re | Avail
+  | Un | Avail
   deriving stock Show
 
 prog :: MonadFresh ID m => m Prog
@@ -280,7 +279,6 @@ prog = do
         , progSelection = Nothing
         , progSmartHoles = SmartHoles
         , progLog = Log { unlog = [] }
-        , redoLog = Log { unlog = [] }
         }
 
 tasty_undo_redo :: Property
@@ -291,7 +289,7 @@ tasty_undo_redo = withTests 500 $
       -- We only test SmartHoles mode (which is the only supported user-facing
       -- mode - NoSmartHoles is only used for internal sanity testing etc)
       let annotateShow' :: HasCallStack => App -> PropertyT WT ()
-          annotateShow' = withFrozenCallStack $ annotateShow . (\p -> (progModules p, progLog p, redoLog p)) . appProg
+          annotateShow' = withFrozenCallStack $ annotateShow . (\p -> (progModules p, progLog p)) . appProg
       Right p' <- runExceptT @TypeError $ tcWholeProgWithImports =<< prog
       i <- lift $ isolateWT fresh
       nc <- lift $ isolateWT fresh
@@ -306,9 +304,6 @@ tasty_undo_redo = withTests 500 $
         else do
           a'' <- runEditAppMLogs (handleMutationRequest Undo) a'
           annotateShow' a''
-          a''' <- runEditAppMLogs (handleMutationRequest Redo) a''
-          annotateShow' a'''
-          TypeCacheAlpha a' === TypeCacheAlpha a'''
   where
     -- TODO: dry
     runEditAppMLogs ::
@@ -325,7 +320,6 @@ tasty_undo_redo = withTests 500 $
         (2,AddTm)
         ,(1,AddTy)
         ,(if null $ unlog $ progLog $ appProg a then 0 else 1,Un) -- TODO: expose a "log-is-null" helper from App?
-        ,(if null $ unlog $ redoLog $ appProg a then 0 else 1,Re) -- TODO: expose a "log-is-null" helper from App?
         ,(5,Avail)
                                     ]
       case act of
@@ -340,7 +334,6 @@ tasty_undo_redo = withTests 500 $
           n <- qualifyName m <$> forAllT n'
           runEditAppMLogs (handleMutationRequest $ Edit [AddTypeDef n $ ASTTypeDef [] [] []]) a
         Un -> runEditAppMLogs (handleMutationRequest Undo) a
-        Re -> runEditAppMLogs (handleMutationRequest Redo) a
         Avail -> fromMaybe a <$> runRandomAvailableAction l a
 
 iterateNM :: Monad m => Int -> a -> (a -> m a) -> m a
