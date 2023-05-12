@@ -97,43 +97,43 @@ data Action
 -- | An action which can be applied without requiring further input.
 data NoInputAction
   = MakeCase
-  | MakeApp
-  | MakeAPP
-  | MakeAnn
-  | RemoveAnn
+  | MakeApp -- 6
+  | MakeAPP -- 1
+  | MakeAnn -- 1
+  | RemoveAnn -- 3
   | LetToRec
-  | Raise
+  | Raise -- 35
   | EnterHole
   | RemoveHole
-  | DeleteExpr
-  | MakeFun
-  | AddInput
-  | MakeTApp
+  | DeleteExpr -- 3
+  | MakeFun -- 63
+  | AddInput -- 2
+  | MakeTApp -- 5
   | RaiseType
-  | DeleteType
+  | DeleteType -- 40
   | DuplicateDef
   | DeleteDef
   deriving stock (Eq, Ord, Show, Read, Enum, Bounded)
 
 -- | An action which requires extra data (often a name) before it can be applied.
 data InputAction
-  = MakeCon
+  = MakeCon -- 1
   | MakeConSat
-  | MakeVar
+  | MakeVar -- 1
   | MakeVarSat
   | MakeLet
   | MakeLetRec
-  | MakeLam
-  | MakeLAM
+  | MakeLam -- 5
+  | MakeLAM -- 2
   | RenamePattern
   | RenameLet
   | RenameLam
   | RenameLAM
   | MakeTCon
   | MakeTVar
-  | MakeForall
+  | MakeForall -- 6
   | RenameForall
-  | RenameDef
+  | RenameDef -- 35
   deriving stock (Eq, Ord, Show, Read, Enum, Bounded)
 
 forDef ::
@@ -143,11 +143,7 @@ forDef ::
   [Action]
 forDef _ NonEditable _ = mempty
 forDef defs Editable defName =
-    [Input RenameDef, NoInput DuplicateDef]
-      <> mwhen
-        -- ensure the definition is not in use, otherwise the action will not succeed
-        (not $ globalInUse defName $ Map.delete defName defs)
-        [NoInput DeleteDef]
+    [Input RenameDef]
 
 forBody ::
   TypeDefMap ->
@@ -171,7 +167,7 @@ forBody tydefs l Editable expr id = case findNodeWithParent id expr of
           _ -> [NoInput Raise]
      in forType l t <> raiseAction
   Just (CaseBindNode _, _) ->
-    [Input RenamePattern]
+    []
 
 forSig ::
   Level ->
@@ -184,7 +180,6 @@ forSig l Editable ty id = case findType id ty of
   Nothing -> mempty
   Just t ->
     forType l t
-      <> mwhen (id /= getID ty) [NoInput RaiseType]
 
 forExpr :: TypeDefMap -> Level -> Expr -> [Action]
 forExpr tydefs l expr =
@@ -194,38 +189,25 @@ forExpr tydefs l expr =
         <> [ Input MakeVar
            , Input MakeCon
            ]
-        <> mwhen
-          (l /= Beginner)
-          [ Input MakeVarSat
-          , Input MakeConSat
-          , Input MakeLet
-          , Input MakeLetRec
-          , NoInput EnterHole
-          ]
     Hole{} ->
       delete
         <> annotate
-        <> [NoInput RemoveHole]
     Ann{} ->
       delete
         <> mwhen (l == Expert) [NoInput RemoveAnn]
     Lam{} ->
       delete
         <> annotate
-        <> [Input RenameLam]
     LAM{} ->
       delete
         <> annotate
-        <> mwhen (l == Expert) [Input RenameLAM]
     Let _ v e _ ->
       delete
         <> annotate
-        <> [Input RenameLet]
-        <> munless (unLocalName v `Set.member` freeVars e) [NoInput LetToRec]
+        <> munless (unLocalName v `Set.member` freeVars e) []
     Letrec{} ->
       delete
         <> annotate
-        <> [Input RenameLet]
     _ ->
       delete
         <> annotate
@@ -248,8 +230,8 @@ forExpr tydefs l expr =
     -- filter some actions by Syn/Chk
     synOnly =
       expr ^.. _exprMetaLens % _type % _Just % _synthed % to (getTypeDefInfo' tydefs) >>= \case
-        Left TDIHoleType{} -> [NoInput MakeCase]
-        Right (TypeDefInfo _ _ TypeDefAST{}) -> [NoInput MakeCase]
+        Left TDIHoleType{} -> []
+        Right (TypeDefInfo _ _ TypeDefAST{}) -> []
         _ -> []
     annotate = mwhen (l == Expert) [NoInput MakeAnn]
     delete = [NoInput DeleteExpr]
@@ -257,10 +239,9 @@ forExpr tydefs l expr =
 forType :: Level -> Type -> [Action]
 forType l type_ =
   universalActions <> case type_ of
-    TEmptyHole{} ->
-      [Input MakeTCon] <> mwhen (l == Expert) [Input MakeTVar]
+    TEmptyHole{} -> []
     TForall{} ->
-      delete <> mwhen (l == Expert) [Input RenameForall]
+      delete
     TFun{} ->
       delete <> [NoInput AddInput]
     _ ->
