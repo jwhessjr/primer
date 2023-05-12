@@ -8,7 +8,6 @@ module Primer.Core.Utils (
   forgetTypeMetadata,
   generateIDs,
   regenerateExprIDs,
-  forgetMetadata,
   noHoles,
   _freeTmVars,
   _freeTyVars,
@@ -16,10 +15,8 @@ module Primer.Core.Utils (
   freeVars,
   _freeVarsTy,
   freeVarsTy,
-  boundVarsTy,
   freeGlobalVars,
   alphaEqTy,
-  concreteTy,
 ) where
 
 import Foreword
@@ -66,8 +63,6 @@ import Primer.Core (
 import Primer.Core.Fresh (freshLocalName, freshLocalName')
 import Primer.Core.Type.Utils (
   alphaEqTy,
-  boundVarsTy,
-  concreteTy,
   forgetTypeMetadata,
   freeVarsTy,
   generateTypeIDs,
@@ -91,10 +86,6 @@ regenerateExprIDs' se st =
 -- | Like 'generateTypeIDs', but for expressions
 generateIDs :: MonadFresh ID m => Expr' () () -> m Expr
 generateIDs = regenerateExprIDs' (const . trivialMeta) (const . trivialMeta)
-
--- | Like 'forgetTypeMetadata', but for expressions
-forgetMetadata :: Expr' a b -> Expr' () ()
-forgetMetadata = set _exprTypeMeta () . set _exprMeta ()
 
 -- Both term and type vars, but not constructors or global variables.
 -- This is because constructor names and global variables are never

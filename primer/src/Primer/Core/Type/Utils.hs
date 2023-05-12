@@ -7,9 +7,7 @@ module Primer.Core.Type.Utils (
   _freeVarsTy,
   traverseFreeVarsTy,
   freeVarsTy,
-  boundVarsTy,
   alphaEqTy,
-  concreteTy,
 ) where
 
 import Foreword
@@ -24,7 +22,6 @@ import Optics (
   Traversal,
   Traversal',
   getting,
-  hasn't,
   set,
   traversalVL,
   traverseOf,
@@ -44,7 +41,6 @@ import Primer.Core.Type (
   Type' (..),
   _typeMeta,
  )
-import Primer.Zipper.Type (getBoundHereDnTy)
 
 -- | Regenerate all IDs, not changing any other metadata
 regenerateTypeIDs :: (HasID a, MonadFresh ID m) => Type' a -> m (Type' a)
@@ -96,9 +92,6 @@ traverseFreeVarsTy = go
       TForall m a k s -> TForall m a k <$> go (S.insert a bound) f s
       TLet m a t b -> TLet m a <$> go bound f t <*> go (S.insert a bound) f b
 
-boundVarsTy :: (Data a, Eq a) => Type' a -> Set TyVarName
-boundVarsTy = foldMap' getBoundHereDnTy . universe
-
 -- Check two types for alpha equality
 --
 -- it makes usage easier if this is pure
@@ -127,9 +120,6 @@ alphaEqTy = go (0, mempty, mempty)
       -- binders we have gone under, and is thus the next value free
       -- in the map.
     new (c, p, q) n m = (c + 1 :: Int, M.insert n c p, M.insert m c q)
-
-concreteTy :: Data b => Type' b -> Bool
-concreteTy ty = hasn't (getting _freeVarsTy) ty && noHoles ty
 
 -- | Traverse the 'ID's in a 'Type''.
 typeIDs :: HasID a => Traversal' (Type' a) ID
