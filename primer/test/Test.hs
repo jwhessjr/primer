@@ -68,6 +68,7 @@ import Primer.TypeDef (ASTTypeDef(ASTTypeDef))
 main :: IO ()
 main = defaultMain [ check tasty_undo_redo ]
 --main = recheckAt (Seed 11087148197968773465 7784360380252669127) "369:eDbKaC2o" tasty_undo_redo
+--main = recheckAt (Seed 7821100195500719741 16942824065656170451) "21:eD2h2F3eFmBCb" tasty_undo_redo
 
 -- | A helper type for 'tasty_available_actions_actions',
 -- describing where a particular option came from.
