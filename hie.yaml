@@ -15,9 +15,6 @@ cradle:
     - path: "primer/src/Primer/Action/Available.hs"
       component: "primer:exe:primer-test"
 
-    - path: "primer/src/Primer/Action/Priorities.hs"
-      component: "primer:exe:primer-test"
-
     - path: "primer/src/Primer/App.hs"
       component: "primer:exe:primer-test"
 
@@ -40,9 +37,6 @@ cradle:
       component: "primer:exe:primer-test"
 
     - path: "primer/src/Primer/Def/Utils.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/EvalFull.hs"
       component: "primer:exe:primer-test"
 
     - path: "primer/src/Primer/Log.hs"
@@ -120,36 +114,6 @@ cradle:
     - path: "primer/src/Primer/Core/Type/Utils.hs"
       component: "primer:exe:primer-test"
 
-    - path: "primer/src/Primer/Eval/Ann.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Eval/Beta.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Eval/Bind.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Eval/Case.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Eval/Detail.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Eval/EvalError.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Eval/Inline.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Eval/Let.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Eval/Prim.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Eval/Redex.hs"
-      component: "primer:exe:primer-test"
-
     - path: "primer/src/Primer/Typecheck/Cxt.hs"
       component: "primer:exe:primer-test"
 
@@ -169,9 +133,6 @@ cradle:
       component: "primer:exe:primer-test"
 
     - path: "primer/src/Primer/Zipper/Type.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Tests/Typecheck.hs"
       component: "primer:exe:primer-test"
 
     - path: "primer/src/Primer/Gen/App.hs"
