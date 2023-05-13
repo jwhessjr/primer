@@ -18,7 +18,6 @@ import Core (
   Expr,
   Expr' (..),
   ID,
-  Meta (..),
   TyConName,
   Type,
   Type' (..),
@@ -43,8 +42,8 @@ create = flip runState 0 . unS
 create' :: S a -> a
 create' = fst . create
 
-meta :: MonadFresh ID m => m Meta
-meta = Meta <$> fresh
+meta :: MonadFresh ID m => m ID
+meta = fresh
 
 tEmptyHole :: MonadFresh ID m => m Type
 tEmptyHole = TEmptyHole <$> meta

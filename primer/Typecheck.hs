@@ -39,7 +39,6 @@ import Core (
   GVarName,
   ID,
   Kind (..),
-  Meta (..),
   Type' (..),
   TypeMeta,
   qualifyName,
@@ -138,7 +137,7 @@ type KindM e m =
 type TypeT = Type' TypeMeta
 
 -- Synthesise a kind for the given type
-synthKind :: KindM e m => Type' Meta -> m (Kind, TypeT)
+synthKind :: KindM e m => Type' ID -> m (Kind, TypeT)
 synthKind = \case
   TEmptyHole m -> pure (KType, TEmptyHole m)
   TCon m c -> do
@@ -151,7 +150,7 @@ synthKind = \case
     b' <- checkKind KType b
     pure (KType, TFun m a' b')
 
-checkKind :: KindM e m => Kind -> Type' Meta -> m TypeT
+checkKind :: KindM e m => Kind -> Type' ID -> m TypeT
 checkKind _ t = do
   (_, t') <- synthKind t
   pure t'
@@ -404,5 +403,5 @@ exprTtoExpr = identity
 typeTtoType :: TypeT -> Type' TypeMeta
 typeTtoType = identity
 
-checkKind' :: TypeM e m => Kind -> Type' Meta -> m TypeT
+checkKind' :: TypeM e m => Kind -> Type' ID -> m TypeT
 checkKind' k t = modifyError' KindError (checkKind k t)
