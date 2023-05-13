@@ -59,7 +59,6 @@ import KindError (
   KindError (
     InconsistentKinds,
     KindDoesNotMatchArrow,
-    TLetUnsupported,
     UnknownTypeConstructor
   ),
  )

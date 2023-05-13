@@ -2,7 +2,6 @@ module Meta (
   HasID (..),
   getID,
   ID (ID),
-  ModuleName (ModuleName, unModuleName),
 ) where
 
 import Foreword
@@ -28,9 +27,6 @@ import Optics (
 newtype ID = ID Int
   deriving stock (Eq, Data)
   deriving newtype (Show, Read, Num, Ord, Enum, Bounded)
-
-newtype ModuleName = ModuleName {unModuleName :: NonEmpty Text}
-  deriving stock (Eq, Ord, Show, Read, Data, Generic)
 
 -- | A class for types which have an ID.
 -- This makes it easier to change the underlying metadata representation without

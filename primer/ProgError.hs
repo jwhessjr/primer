@@ -3,7 +3,6 @@ module ProgError (ProgError (..)) where
 import Foreword
 
 import Errors (ActionError)
-import Meta (ModuleName)
 
 data ProgError
   = NoDefSelected
@@ -17,5 +16,4 @@ data ProgError
     --   If/when we expose it more broadly, we should refactor this to contain
     --   a descriptive ADT, rather than a string.
     CopyPasteError Text
-  | ModuleNotFound ModuleName
   deriving stock (Eq, Show, Read)
