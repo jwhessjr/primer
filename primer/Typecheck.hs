@@ -48,7 +48,7 @@ import CoreUtils (
   forgetTypeMetadata,
   noHoles,
  )
-import DSL (S, create', meta)
+import DSL (S, create')
 import Data.Foldable (foldMap')
 import Data.Map.Strict qualified as Map
 import Def (
@@ -342,7 +342,7 @@ check t = \case
             then pure e'
             else case sh of
               NoSmartHoles -> throwError' (InconsistentTypes t t')
-              SmartHoles -> Hole <$> meta <*> pure e'
+              SmartHoles -> Hole <$> fresh <*> pure e'
     case (e, sh) of
       -- If the hole can be dropped leaving a type-correct term, do so
       -- We don't want the recursive call to create a fresh hole though -

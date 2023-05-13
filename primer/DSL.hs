@@ -6,7 +6,6 @@ module DSL (
   tEmptyHole,
   tcon,
   tfun,
-  meta,
   create,
   create',
   S,
@@ -42,20 +41,17 @@ create = flip runState 0 . unS
 create' :: S a -> a
 create' = fst . create
 
-meta :: MonadFresh ID m => m ID
-meta = fresh
-
 tEmptyHole :: MonadFresh ID m => m Type
-tEmptyHole = TEmptyHole <$> meta
+tEmptyHole = TEmptyHole <$> fresh
 
 tcon :: MonadFresh ID m => TyConName -> m Type
-tcon t = TCon <$> meta <*> pure t
+tcon t = TCon <$> fresh <*> pure t
 
 tfun :: MonadFresh ID m => m Type -> m Type -> m Type
-tfun a b = TFun <$> meta <*> a <*> b
+tfun a b = TFun <$> fresh <*> a <*> b
 
 emptyHole :: MonadFresh ID m => m Expr
-emptyHole = EmptyHole <$> meta
+emptyHole = EmptyHole <$> fresh
 
 ann :: MonadFresh ID m => m Expr -> m Type -> m Expr
-ann e t = Ann <$> meta <*> e <*> t
+ann e t = Ann <$> fresh <*> e <*> t
