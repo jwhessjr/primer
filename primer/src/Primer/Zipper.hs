@@ -92,7 +92,7 @@ import Primer.Core (
   Bind' (..),
   CaseBranch' (CaseBranch),
   Expr,
-  Expr' (Case, LAM, Lam, Let, LetType, Letrec),
+  Expr' (Case, Lam),
   ExprMeta,
   HasID (..),
   ID,
@@ -363,13 +363,6 @@ letBindingName = \case
 getBoundHere' :: (Eq a, Eq b) => Expr' a b -> Maybe (Expr' a b) -> [Either Name (LetBinding' a b)]
 getBoundHere' e prev = case e of
   Lam _ v _ -> anon v
-  LAM _ tv _ -> anon tv
-  Let _ v rhs b ->
-    if maybe True (== b) prev
-      then letBind $ LetBind v rhs
-      else mempty
-  Letrec _ v rhs t _ -> letBind $ LetrecBind v rhs t
-  LetType _ v t _ -> letBind $ LetTyBind $ LetTypeBind v t
   Case _ _ bs ->
     let binderss = map (\(CaseBranch _ ns rhs) -> (rhs, map (unLocalName . bindName) ns)) bs
      in case prev of
@@ -378,7 +371,6 @@ getBoundHere' e prev = case e of
   _ -> mempty
   where
     anon x = [Left $ unLocalName x]
-    letBind l = [Right l]
 
 -- | Find a node in the AST by its ID, and also return its parent
 findNodeWithParent ::

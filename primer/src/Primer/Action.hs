@@ -161,13 +161,9 @@ refocus Refocus{pre, post} = do
   where
     candidateIDsExpr e =
       getID e : case e of
-        Hole _ e' -> candidateIDsExpr e'
         Ann _ e' _ -> candidateIDsExpr e'
         _ -> []
-    candidateIDsType t =
-      getID t : case t of
-        THole _ t' -> candidateIDsType t'
-        _ -> []
+    candidateIDsType = (:[]) . getID
 
 -- | Apply a sequence of actions to the body of a definition, producing a new Expr or an error if
 -- any of the actions failed to apply.

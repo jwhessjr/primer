@@ -418,37 +418,6 @@ checkEverything sh CheckEverything{trusted, toCheck} =
 -- cached types, and @TCSynthed T == typeOf e'@
 synth :: TypeM e m => Expr -> m (Type, ExprT)
 synth = \case
-  Var i x -> do
-    t <- either throwError' pure . lookupVar x =<< ask
-    pure $ annSynth1 t i Var x
-  App i e1 e2 -> do
-    -- Synthesise e1
-    (t1, e1') <- synth e1
-    -- Check that e1 has an arrow type
-    case matchArrowType t1 of
-      Just (t2, t) -> do
-        -- Check e2 against the domain type of e1
-        e2' <- check t2 e2
-        pure $ annSynth2 t i App e1' e2'
-      Nothing ->
-        asks smartHoles >>= \case
-          NoSmartHoles -> throwError' $ TypeDoesNotMatchArrow t1
-          SmartHoles -> do
-            e1Wrap <- Hole <$> meta <*> pure e1
-            synth $ App i e1Wrap e2
-  APP i e t -> do
-    (et, e') <- synth e
-    matchForallType et >>= \case
-      Just (v, vk, b) -> do
-        t' <- checkKind' vk t
-        bSub <- substTy v (forgetTypeMetadata t') b
-        pure (bSub, APP (annotate (TCSynthed bSub) i) e' t')
-      Nothing ->
-        asks smartHoles >>= \case
-          NoSmartHoles -> throwError' $ TypeDoesNotMatchForall et
-          SmartHoles -> do
-            eWrap <- Hole <$> meta <*> pure e
-            synth $ APP i eWrap t
   Ann i e t -> do
     -- Check that the type is well-formed by synthesising its kind
     t' <- checkKind' KType t
@@ -460,41 +429,6 @@ synth = \case
   EmptyHole i -> pure $ annSynth0 (TEmptyHole ()) i EmptyHole
   -- We assume that constructor names are unique
   -- See Note [Synthesisable constructors] in Core.hs
-  Con i c -> do
-    asks (flip lookupConstructor c . typeDefs) >>= \case
-      Just (vc, tc, td) -> let t = valConType tc td vc in pure $ annSynth1 t i Con c
-      Nothing -> throwError' $ UnknownConstructor c
-  -- When synthesising a hole, we first check that the expression inside it
-  -- synthesises a type successfully (see Note [Holes and bidirectionality]).
-  -- TODO: we would like to remove this hole (leaving e) if possible, but I
-  -- don't see how to do this nicely as we don't know what constraints the
-  -- synthesised type needs. Consider {? 1 ?} True: we can't remove the hole,
-  -- but we don't know that when we come to synthesise its type. Potentially we
-  -- could remove it here and let the App rule re-add it if necessary, but then
-  -- consider {? ? : Nat -> Nat ?} True: then we could remove the hole, and App
-  -- would see the function has an arrow type and check Nat ∋ True which fails,
-  -- leaving (? : Nat -> Nat) {? True ?}. This causes holes to jump around
-  -- which is bad UX.
-  -- See https://github.com/hackworthltd/primer/issues/7
-  Hole i e -> do
-    (_, e') <- synth e
-    pure $ annSynth1 (TEmptyHole ()) i Hole e'
-  Let i x a b -> do
-    -- Synthesise a type for the bound expression
-    (aT, a') <- synth a
-    -- Extend the context with the binding, and synthesise the body
-    (bT, b') <- local (extendLocalCxt (x, aT)) $ synth b
-    pure $ annSynth3 bT i Let x a' b'
-  Letrec i x a tA b -> do
-    -- Check that tA is well-formed
-    tA' <- checkKind' KType tA
-    let t = forgetTypeMetadata tA'
-        ctx' = extendLocalCxt (x, t)
-    -- Check the bound expression against its annotation
-    a' <- local ctx' $ check t a
-    -- Extend the context with the binding, and synthesise the body
-    (bT, b') <- local ctx' $ synth b
-    pure $ annSynth4 bT i Letrec x a' tA' b'
   e ->
     asks smartHoles >>= \case
       NoSmartHoles -> throwError' $ CannotSynthesiseType e
@@ -527,39 +461,7 @@ check t = \case
             -- 'synth' will take care of adding an annotation - no need to do it
             -- explicitly here
             (_, lam') <- synth lam
-            Hole <$> meta' (TCEmb TCBoth{tcChkedAt = t, tcSynthed = TEmptyHole ()}) <*> pure lam'
-  lAM@(LAM i n e) -> do
-    matchForallType t >>= \case
-      Just (m, k, b) -> do
-        b' <- substTy m (TVar () n) b
-        e' <- local (extendLocalCxtTy (n, k)) $ check b' e
-        pure $ LAM (annotate (TCChkedAt t) i) n e'
-      Nothing ->
-        asks smartHoles >>= \case
-          NoSmartHoles -> throwError' $ TypeDoesNotMatchForall t
-          SmartHoles -> do
-            -- 'synth' will take care of adding an annotation - no need to do it
-            -- explicitly here
-            (_, lAM') <- synth lAM
-            Hole <$> meta' (TCEmb TCBoth{tcChkedAt = t, tcSynthed = TEmptyHole ()}) <*> pure lAM'
-  Let i x a b -> do
-    -- Synthesise a type for the bound expression
-    (aT, a') <- synth a
-    -- Extend the context with the binding, and check the body against the type
-    b' <- local (extendLocalCxt (x, aT)) $ check t b
-    -- NB here: if b were synthesisable, we bubble that information up to the
-    -- let, saying @typeOf b'@ rather than @TCChkedAt t@
-    -- TODO: why do we do this?
-    pure $ Let (annotate (typeOf b') i) x a' b'
-  Letrec i x a tA b -> do
-    -- Check that tA is well-formed
-    tA' <- checkKind' KType tA
-    let ctx' = extendLocalCxt (x, forgetTypeMetadata tA')
-    -- Check the bound expression against its annotation
-    a' <- local ctx' $ check (forgetTypeMetadata tA') a
-    -- Extend the context with the binding, and synthesise the body
-    b' <- local ctx' $ check t b
-    pure $ Letrec (annotate (TCChkedAt t) i) x a' tA' b'
+            undefined
   Case i e brs -> do
     (eT, e') <- synth e
     let caseMeta = annotate (TCChkedAt t) i
@@ -576,16 +478,14 @@ check t = \case
         asks smartHoles >>= \case
           NoSmartHoles -> throwError' $ CannotCaseNonADT eT
           SmartHoles -> do
-            -- NB: we wrap the scrutinee in a hole and DELETE the branches
-            scrutWrap <- Hole <$> meta' (TCSynthed (TEmptyHole ())) <*> pure e'
+            scrutWrap <- undefined
             pure $ Case caseMeta scrutWrap []
       Left (TDIUnknown ty) -> throwError' $ InternalError $ "We somehow synthesised the unknown type " <> show ty <> " for the scrutinee of a case"
       Left TDINotSaturated ->
         asks smartHoles >>= \case
           NoSmartHoles -> throwError' $ CannotCaseNonSaturatedADT eT
           SmartHoles -> do
-            -- NB: we wrap the scrutinee in a hole and DELETE the branches
-            scrutWrap <- Hole <$> meta' (TCSynthed (TEmptyHole ())) <*> pure e'
+            scrutWrap <- undefined
             pure $ Case caseMeta scrutWrap []
       Right (tc, _, expected) -> do
         let branchNames = map (\(CaseBranch n _ _) -> n) brs
@@ -601,44 +501,12 @@ check t = \case
         pure $ Case caseMeta e' brs''
   e -> do
     sh <- asks smartHoles
-    let default_ = do
-          (t', e') <- synth e
-          if consistentTypes t t'
-            then pure (set _typecache (TCEmb TCBoth{tcChkedAt = t, tcSynthed = t'}) e')
-            else case sh of
-              NoSmartHoles -> throwError' (InconsistentTypes t t')
-              SmartHoles -> Hole <$> meta' (TCEmb TCBoth{tcChkedAt = t, tcSynthed = TEmptyHole ()}) <*> pure e'
-    case (e, sh) of
-      -- If the hole can be dropped leaving a type-correct term, do so
-      -- We don't want the recursive call to create a fresh hole though -
-      -- this can lead to the output being the same as the input, but with
-      -- ID of the top hole changed, leading to losing cursor positions etc.
-      -- But we do want to remove nested holes.
-      (Hole _ e'@Hole{}, SmartHoles) ->
-        check t e' -- we strip off one layer, and hit this case again.
-      (Hole _ (Ann _ e' TEmptyHole{}), SmartHoles) ->
-        -- We do want to remove (e.g.) {? λx.x : ? ?} to get λx.x,
-        -- if that typechecks. (But only a simple hole annotation, as we do
-        -- not wish to delete any interesting annotations.)
-        flip catchError (const default_) $
-          check t e' >>= \case
-            Hole{} -> default_ -- Don't let the recursive call mint a hole.
-            e'' -> pure e''
-      (Hole _ (Ann _ _ ty), SmartHoles)
-        | not (noHoles ty) ->
-            -- Don't want to, e.g., remove {? λx.x : ? ?} to get λx.x : ?
-            -- Since holey annotations behave like non-empty holes, we will
-            -- not elide non-empty holes if they have a holey annotation.
-            -- (This is needed for idempotency, since we return non-empty
-            -- holes with holey-annotated contents in the case a construction
-            -- cannot typecheck, e.g. Bool ∋ λx.t returns {? λx.t : ? ?}
-            default_
-      (Hole _ e', SmartHoles) ->
-        flip catchError (const default_) $
-          check t e' >>= \case
-            Hole{} -> default_ -- Don't let the recursive call mint a hole.
-            e'' -> pure e''
-      _ -> default_
+    (t', e') <- synth e
+    if consistentTypes t t'
+      then pure (set _typecache (TCEmb TCBoth{tcChkedAt = t, tcSynthed = t'}) e')
+      else case sh of
+        NoSmartHoles -> throwError' (InconsistentTypes t t')
+        SmartHoles -> undefined
 
 -- | Similar to check, but for the RHS of case branches
 -- We assume that the branch is for this constructor
@@ -689,7 +557,6 @@ checkBranch t (vc, args) (CaseBranch nb patterns rhs) =
 -- holes on both sides.
 matchArrowType :: Type -> Maybe (Type, Type)
 matchArrowType (TEmptyHole _) = pure (TEmptyHole (), TEmptyHole ())
-matchArrowType (THole _ _) = pure (TEmptyHole (), TEmptyHole ())
 matchArrowType (TFun _ a b) = pure (a, b)
 matchArrowType _ = Nothing
 
@@ -698,8 +565,6 @@ matchArrowType _ = Nothing
 matchForallType :: MonadFresh NameCounter m => Type -> m (Maybe (TyVarName, Kind, Type))
 -- These names will never enter the program, so we don't need to avoid shadowing
 matchForallType (TEmptyHole _) = (\n -> Just (n, KHole, TEmptyHole ())) <$> freshLocalName mempty
-matchForallType (THole _ _) = (\n -> Just (n, KHole, TEmptyHole ())) <$> freshLocalName mempty
-matchForallType (TForall _ a k t) = pure $ Just (a, k, t)
 matchForallType _ = pure Nothing
 
 -- | Two types are consistent if they are equal (up to IDs and alpha) when we
@@ -712,20 +577,10 @@ consistentTypes x y = uncurry eqType $ holepunch x y
     -- obviously different constructors.)
     holepunch (TEmptyHole _) _ = (TEmptyHole (), TEmptyHole ())
     holepunch _ (TEmptyHole _) = (TEmptyHole (), TEmptyHole ())
-    holepunch (THole _ _) _ = (TEmptyHole (), TEmptyHole ())
-    holepunch _ (THole _ _) = (TEmptyHole (), TEmptyHole ())
     holepunch (TFun _ s t) (TFun _ s' t') =
       let (hs, hs') = holepunch s s'
           (ht, ht') = holepunch t t'
        in (TFun () hs ht, TFun () hs' ht')
-    holepunch (TApp _ s t) (TApp _ s' t') =
-      let (hs, hs') = holepunch s s'
-          (ht, ht') = holepunch t t'
-       in (TApp () hs ht, TApp () hs' ht')
-    holepunch (TForall _ n k s) (TForall _ m l t) =
-      let (hs, ht) = holepunch s t
-       in -- Perhaps we need to compare the kinds up to holes also?
-          (TForall () n k hs, TForall () m l ht)
     holepunch s t = (s, t)
 
 -- | Compare two types for alpha equality, ignoring their IDs

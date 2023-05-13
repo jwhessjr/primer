@@ -69,7 +69,7 @@ import Primer.App.Base (
   NodeType (..),
  )
 import Primer.Core (
-  Expr' (EmptyHole, Var),
+  Expr' (EmptyHole),
   ExprMeta,
   GVarName,
   GlobalName (baseName, qualifiedModule),
@@ -626,7 +626,7 @@ copyPasteSig p (fromDefName, fromTyId) toDefName setup = do
     let cTgt = either target target c
         f (m, n) =
           if Set.member (unLocalName n) sharedScope
-            then pure $ TVar m n
+            then undefined
             else fresh <&> \i -> TEmptyHole (Meta i Nothing Nothing)
     cScoped <- traverseOf _freeVarsTy f cTgt
     freshCopy <- regenerateTypeIDs cScoped
@@ -760,7 +760,7 @@ copyPasteBody p (fromDefName, fromId) toDefName setup = do
         let srcSubtree = either target target srcT
             f (m, n) =
               if Set.member (unLocalName n) sharedScope
-                then pure $ TVar m n
+                then undefined
                 else fresh <&> \i -> TEmptyHole (Meta i Nothing Nothing)
         scopedCopy <- traverseOf _freeVarsTy f srcSubtree
         freshCopy <- regenerateTypeIDs scopedCopy
@@ -778,11 +778,11 @@ copyPasteBody p (fromDefName, fromId) toDefName setup = do
         -- Delete unbound vars. TODO: we may want to let-bind them?
         let tm (m, n) =
               if Set.member (unLocalName n) sharedScope
-                then pure $ Var m $ LocalVarRef n
+                then undefined
                 else fresh <&> \i -> EmptyHole (Meta i Nothing Nothing)
             ty (m, n) =
               if Set.member (unLocalName n) sharedScope
-                then pure $ TVar m n
+                then undefined
                 else fresh <&> \i -> TEmptyHole (Meta i Nothing Nothing)
         scopedCopy <- traverseOf _freeTyVars ty =<< traverseOf _freeTmVars tm (target srcE)
         freshCopy <- regenerateExprIDs scopedCopy

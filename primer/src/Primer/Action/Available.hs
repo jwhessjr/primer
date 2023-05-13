@@ -76,7 +76,6 @@ forBody Editable expr id = case findNodeWithParent id expr of
   Nothing -> mempty
   Just (ExprNode _, p) -> case p of
           Nothing -> [] -- at root already, cannot raise
-          Just (ExprNode (Hole _ _)) -> [] -- in a NE hole, don't offer raise (as hole will probably just be recreated)
           _ -> [NoInput Raise]
   Just (TypeNode t, p) ->
     let raiseAction = case p of

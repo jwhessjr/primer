@@ -26,7 +26,7 @@ import Optics (Lens', view, (%))
 import Primer.Core (Expr', GlobalName (baseName, qualifiedModule), ModuleName, TypeCache, _exprMetaLens)
 import Primer.Core.Meta (Meta, TyConName, ValConName, _type)
 import Primer.Core.Transform (decomposeTAppCon)
-import Primer.Core.Type (Kind, Type' (TEmptyHole, THole))
+import Primer.Core.Type (Kind, Type' (TEmptyHole))
 import Primer.Core.Type.Utils (forgetTypeMetadata)
 import Primer.Name (Name, NameCounter)
 import Primer.Subst (substTySimul)
@@ -59,7 +59,6 @@ data TypeDefInfo a = TypeDefInfo [Type' a] TyConName (TypeDef ()) -- instantiate
 
 getTypeDefInfo' :: TypeDefMap -> Type' a -> Either TypeDefError (TypeDefInfo a)
 getTypeDefInfo' _ (TEmptyHole _) = Left TDIHoleType
-getTypeDefInfo' _ (THole _ _) = Left TDIHoleType
 getTypeDefInfo' tydefs ty =
   case decomposeTAppCon ty of
     Nothing -> Left TDINotADT

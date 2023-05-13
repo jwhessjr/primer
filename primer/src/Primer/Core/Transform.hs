@@ -36,31 +36,6 @@ renameVar x y expr = case expr of
     | sameVarRef v x -> whenNotFreeIn y expr
     | sameVarRef v y -> Nothing
     | otherwise -> substAllChildren
-  LAM _ v _
-    -- NB: local term and type variables are in the same namespace
-    | sameVarRef v x -> whenNotFreeIn y expr
-    | sameVarRef v y -> Nothing
-    | otherwise -> substAllChildren
-  Let m v e1 e2
-    -- the binding only scopes over e2
-    | sameVarRef v x -> Let m v <$> renameVar x y e1 <*> whenNotFreeIn y e2
-    | sameVarRef v y -> Nothing
-    | otherwise -> substAllChildren
-  LetType _ v _ _
-    -- the binding only scopes over _e, but due to assuming well-scoped-ness,
-    -- we don't need to rename inside ty. However, we need to check y is
-    -- not free in both the type and term, as type and term variables live
-    -- in the same namespace, so can capture each other.
-    | sameVarRef v x -> whenNotFreeIn y expr
-    | sameVarRef v y -> Nothing
-    | otherwise -> substAllChildren
-  Letrec _ v _ _ _
-    -- the binding scopes over both expressions, and we need not rename inside types
-    -- however, we need to check y is not free in the type (since type and term
-    -- variables live in the same namespace).
-    | sameVarRef v x -> whenNotFreeIn y expr
-    | sameVarRef v y -> Nothing
-    | otherwise -> substAllChildren
   Case m scrut branches -> Case m <$> renameVar x y scrut <*> mapM renameBranch branches
     where
       renameBranch b@(CaseBranch con termargs rhs)
@@ -68,16 +43,8 @@ renameVar x y expr = case expr of
         | any (`sameVarRef` x) $ bindingNames b = guard (notFreeIn y rhs) >> pure b
         | otherwise = CaseBranch con termargs <$> renameVar x y rhs
       bindingNames (CaseBranch _ bs _) = map bindName bs
-  Var m v
-    | v == x -> pure $ Var m y
-    | v == y -> Nothing
-    | otherwise -> pure expr
-  Hole{} -> substAllChildren
   EmptyHole{} -> substAllChildren
   Ann{} -> substAllChildren
-  App{} -> substAllChildren
-  APP{} -> substAllChildren
-  Con{} -> substAllChildren
   -- We assume the term is well-scoped, so do not have any references to the
   -- term vars x,y inside any type child (e.g. annotation), so no need to
   -- consider renaming inside them. However, but we do need to worry about
@@ -107,12 +74,11 @@ sameVar v v' = unLocalName v == unLocalName v'
 unfoldTApp :: Type' a -> (Type' a, [Type' a])
 unfoldTApp = second reverse . go
   where
-    go (TApp _ f x) = let (g, args) = go f in (g, x : args)
     go e = (e, [])
 
 -- | Fold an type-level application head and a list of arguments into a single expression.
 foldTApp :: (Monad m, Foldable t) => m a -> Type' a -> t (Type' a) -> m (Type' a)
-foldTApp m = foldlM $ \a b -> (\m' -> TApp m' a b) <$> m
+foldTApp m = undefined
 
 -- | @mkTAppCon C [X,Y,Z] = C X Y Z@
 mkTAppCon :: TyConName -> [Type' ()] -> Type' ()
