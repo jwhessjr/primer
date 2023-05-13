@@ -1,9 +1,7 @@
 module CoreUtils (
   exprIDs,
   typeIDs,
-  regenerateTypeIDs,
   forgetTypeMetadata,
-  regenerateExprIDs,
   noHoles,
   freeGlobalVars,
   alphaEqTy,
@@ -23,21 +21,12 @@ import Core (
  )
 import Data.Data (Data)
 import Data.Generics.Uniplate.Data (universe)
-import Fresh (MonadFresh, fresh)
 import Optics (
   Traversal',
   adjoin,
   set,
-  traverseOf,
   (%),
  )
-
--- | Regenerate all IDs, not changing any other metadata
-regenerateTypeIDs :: (HasID a, MonadFresh ID m) => Type' a -> m (Type' a)
-regenerateTypeIDs = regenerateTypeIDs' (set _id)
-
-regenerateTypeIDs' :: MonadFresh ID m => (ID -> a -> b) -> Type' a -> m (Type' b)
-regenerateTypeIDs' s = traverseOf _typeMeta (\a -> flip s a <$> fresh)
 
 -- | Replace all 'ID's in a Type with unit.
 -- Technically this replaces all annotations, regardless of what they are.
@@ -70,15 +59,6 @@ alphaEqTy = go
 -- | Traverse the 'ID's in a 'Type''.
 typeIDs :: HasID a => Traversal' (Type' a) ID
 typeIDs = _typeMeta % _id
-
--- | Regenerate all IDs, not changing any other metadata
-regenerateExprIDs :: (HasID a, HasID b, MonadFresh ID m) => Expr' a b -> m (Expr' a b)
-regenerateExprIDs = regenerateExprIDs' (set _id) (set _id)
-
-regenerateExprIDs' :: MonadFresh ID m => (ID -> a -> a') -> (ID -> b -> b') -> Expr' a b -> m (Expr' a' b')
-regenerateExprIDs' se st =
-  traverseOf _exprMeta (\a -> flip se a <$> fresh)
-    >=> traverseOf _exprTypeMeta (\a -> flip st a <$> fresh)
 
 freeGlobalVars :: Expr' a b -> Set GVarName
 freeGlobalVars _ = mempty

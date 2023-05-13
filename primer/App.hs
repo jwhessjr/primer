@@ -16,8 +16,6 @@ module App (
 import Foreword hiding (mod)
 
 import Action (
-  Action,
-  ActionError (..),
   ProgAction (..),
   applyActionsToBody,
   applyActionsToTypeSig,
@@ -26,29 +24,20 @@ import Available (
   NodeType (..),
  )
 import Core (
-  Expr' (EmptyHole),
   GVarName,
   GlobalName (baseName, qualifiedModule),
   HasID (_id),
   ID (..),
   ModuleName,
-  Type' (..),
-  getID,
   qualifyName,
   _exprMetaLens,
   _typeMetaLens,
  )
-import CoreUtils (regenerateExprIDs, regenerateTypeIDs)
 import Data.Data (Data)
-import Data.Generics.Uniplate.Zipper (
-  fromZipper,
- )
 import Data.Map.Strict qualified as Map
 import Def (
   ASTDef (..),
   Def (..),
-  DefMap,
-  defAST,
  )
 import DefUtils (globalInUse)
 import Fresh (MonadFresh (..))
@@ -60,40 +49,18 @@ import Module (
   qualifyDefName,
  )
 import Name (Name, NameCounter, unsafeMkName)
-import NestedError (MonadNestedError)
 import Optics (
-  Getter,
   Setter',
   lens,
   sets,
-  to,
   view,
-  (%),
   (.~),
   (?~),
-  (^.),
  )
 import ProgError (ProgError (..))
-import Typecheck (
-  CheckEverythingRequest (CheckEverything, toCheck),
-  Cxt,
-  TypeError,
-  checkEverything,
- )
 import Zipper (
-  ExprZ,
-  Loc' (InExpr, InType),
-  TypeZ,
-  TypeZip,
-  focusOn,
-  focusOnTy,
-  focusOnlyType,
   locToEither,
-  replace,
   target,
-  unfocusExpr,
-  unfocusType,
-  _target,
  )
 
 -- | The full program state.
@@ -130,12 +97,6 @@ data Selection = Selection
   }
   deriving stock (Eq, Show, Read)
 
-_selectedDef :: Getter Selection GVarName
-_selectedDef = to selectedDef
-
-_selectedNode :: Getter Selection (Maybe NodeSelection)
-_selectedNode = to selectedNode
-
 -- | A selected node, in the body or type signature of some definition.
 -- We have the following invariant: @nodeType = SigNode ==> isRight meta@
 data NodeSelection = NodeSelection
@@ -148,24 +109,6 @@ instance HasID NodeSelection where
   _id = lens meta $ \ns i -> ns {meta = i}
 
 -- * Request handlers
-
--- This only looks in the editable modules, not in any imports
-focusNode :: MonadError ProgError m => Prog -> GVarName -> ID -> m (Either (Either ExprZ TypeZ) TypeZip)
-focusNode prog = focusNodeDefs $ moduleDefsQualified $ progModule prog
-
-focusNodeImports :: MonadError ProgError m => Prog -> GVarName -> ID -> m (Either (Either ExprZ TypeZ) TypeZip)
-focusNodeImports prog = focusNodeDefs $ progAllDefs prog
-
-focusNodeDefs :: MonadError ProgError m => DefMap -> GVarName -> ID -> m (Either (Either ExprZ TypeZ) TypeZip)
-focusNodeDefs defs defname nodeid =
-  case lookupASTDef defname defs of
-    Nothing -> throwError $ DefNotFound defname
-    Just def ->
-      let mzE = locToEither <$> focusOn nodeid (astDefExpr def)
-          mzT = focusOnTy nodeid $ astDefType def
-       in case fmap Left mzE <|> fmap Right mzT of
-            Nothing -> throwError $ ActionError (IDNotFound nodeid)
-            Just x -> pure x
 
 handleEditRequest :: forall m l. MonadEditApp l ProgError m => [ProgAction] -> m Prog
 handleEditRequest actions = do
@@ -238,12 +181,6 @@ applyProgAction prog mdefName = \case
                         , meta = meta
                         }
               )
-  CopyPasteSig fromIds setup -> case mdefName of
-    Nothing -> throwError NoDefSelected
-    Just i -> copyPasteSig prog fromIds i setup
-  CopyPasteBody fromIds setup -> case mdefName of
-    Nothing -> throwError NoDefSelected
-    Just i -> copyPasteBody prog fromIds i setup
 
 lookupModule :: MonadError ProgError m => ModuleName -> Prog -> m Module
 lookupModule n p = if n == moduleName (progModule p)
@@ -406,113 +343,3 @@ instance Monad m => MonadFresh NameCounter (EditAppM m e) where
     nc <- gets appNameCounter
     modify (\s -> s & _nameCounter .~ succ nc)
     pure nc
-
-copyPasteSig :: MonadEdit m ProgError => Prog -> (GVarName, ID) -> GVarName -> [Action] -> m Prog
-copyPasteSig p (fromDefName, fromTyId) toDefName setup = do
-  c' <- focusNodeImports p fromDefName fromTyId
-  c <- case c' of
-    Left (Left _) -> throwError $ CopyPasteError "tried to copy-paste an expression into a signature"
-    Left (Right zt) -> pure $ Left zt
-    Right zt -> pure $ Right zt
-  finalProg <- editModuleOf (Just toDefName) p $ \mod toDefBaseName oldDef -> do
-    -- We intentionally throw away any changes in doneSetup other than via 'tgt'
-    -- as these could be in other definitions referencing this one, due to
-    -- types changing. However, we are going to do a full tc pass anyway,
-    -- which will pick up any problems. It is better to do it in one batch,
-    -- in case the intermediate state after 'setup' causes more problems
-    -- than the final state does.
-    doneSetup <- applyActionsToTypeSig mod (toDefBaseName, oldDef) setup
-    tgt <- case doneSetup of
-      Left err -> throwError $ ActionError err
-      Right (_, tgt) -> pure $ focusOnlyType tgt
-    let cTgt = either target target c
-    let cScoped = cTgt
-    freshCopy <- regenerateTypeIDs cScoped
-    pasted <- case target tgt of
-      TEmptyHole _ -> pure $ replace freshCopy tgt
-      _ -> throwError $ CopyPasteError "copy/paste setup didn't select an empty hole"
-    let newDef = oldDef{astDefType = fromZipper pasted}
-    let newSel = NodeSelection SigNode (pasted ^. _target % _typeMetaLens)
-    pure (insertDef mod toDefBaseName (DefAST newDef), Just (Selection toDefName $ Just newSel))
-  liftError ActionError $ tcWholeProg finalProg
-
--- | Checks every term and type definition in the editable modules.
--- Does not check imported modules.
-tcWholeProg ::
-  forall m e.
-  ( MonadFresh ID m
-  , MonadFresh NameCounter m
-  , MonadNestedError TypeError e (ReaderT Cxt m)
-  ) =>
-  Prog ->
-  m Prog
-tcWholeProg p = do
-  mod' <- checkEverything CheckEverything { toCheck = progModule p}
-  let p' = p{progModule = mod'}
-  -- We need to update the metadata cached in the selection
-  let oldSel = progSelection p
-  newSel <- case oldSel of
-    Nothing -> pure Nothing
-    Just s -> do
-      let defName_ = s ^. _selectedDef
-      updatedNode <- case s ^. _selectedNode of
-        Nothing -> pure Nothing
-        Just sel@NodeSelection{nodeType} -> do
-          n <- runExceptT $ focusNode p' defName_ $ getID sel
-          case (nodeType, n) of
-            (BodyNode, Right (Left x)) -> pure $ Just $ NodeSelection BodyNode $ either (view _exprMetaLens . target) (view _typeMetaLens . target) x
-            (SigNode, Right (Right x)) -> pure $ Just $ NodeSelection SigNode $ x ^. _target % _typeMetaLens
-            _ -> pure Nothing -- something's gone wrong: expected a SigNode, but found it in the body, or vv, or just not found it
-      pure $
-        Just $
-          Selection
-            { selectedDef = defName_
-            , selectedNode = updatedNode
-            }
-  pure $ p'{progSelection = newSel}
-
-copyPasteBody :: MonadEdit m ProgError => Prog -> (GVarName, ID) -> GVarName -> [Action] -> m Prog
-copyPasteBody p (fromDefName, fromId) toDefName setup = do
-  src' <- focusNodeImports p fromDefName fromId
-  -- reassociate so get Expr+(Type+Type), rather than (Expr+Type)+Type
-  let src = case src' of
-        Left (Left e) -> Left e
-        Left (Right t) -> Right (Left t)
-        Right t -> Right (Right t)
-  finalProg <- editModuleOf (Just toDefName) p $ \mod toDefBaseName oldDef -> do
-    -- The Loc zipper captures all the changes, they are only reflected in the
-    -- returned Def, which we thus ignore
-    doneSetup <- applyActionsToBody (progModule p) oldDef setup
-    tgt <- case doneSetup of
-      Left err -> throwError $ ActionError err
-      Right (_, tgt) -> pure tgt
-    case (src, tgt) of
-      (Left _, InType _) -> throwError $ CopyPasteError "tried to paste an expression into a type"
-      (Right _, InExpr _) -> throwError $ CopyPasteError "tried to paste a type into an expression"
-      (Right srcT, InType tgtT) -> do
-        let srcSubtree = either target target srcT
-        let scopedCopy = srcSubtree
-        freshCopy <- regenerateTypeIDs scopedCopy
-        pasted <- case target tgtT of
-          TEmptyHole _ -> pure $ replace freshCopy tgtT
-          _ -> throwError $ CopyPasteError "copy/paste setup didn't select an empty hole"
-        let newDef = oldDef{astDefExpr = unfocusExpr $ unfocusType pasted}
-        let newSel = NodeSelection BodyNode (pasted ^. _target % _typeMetaLens)
-        pure (insertDef mod toDefBaseName (DefAST newDef), Just (Selection toDefName $ Just newSel))
-      (Left srcE, InExpr tgtE) -> do
-        let scopedCopy = target srcE
-        freshCopy <- regenerateExprIDs scopedCopy
-        pasted <- case target tgtE of
-          EmptyHole _ -> pure $ replace freshCopy tgtE
-          _ -> throwError $ CopyPasteError "copy/paste setup didn't select an empty hole"
-        let newDef = oldDef{astDefExpr = unfocusExpr pasted}
-        let newSel = NodeSelection BodyNode (pasted ^. _target % _exprMetaLens)
-        pure (insertDef mod toDefBaseName (DefAST newDef), Just (Selection toDefName $ Just newSel))
-  liftError ActionError $ tcWholeProg finalProg
-
-lookupASTDef :: GVarName -> DefMap -> Maybe ASTDef
-lookupASTDef name = defAST <=< Map.lookup name
-
--- | Run a computation in some context whose errors can be promoted to `ProgError`.
-liftError :: MonadError ProgError m => (e -> ProgError) -> ExceptT e m b -> m b
-liftError f = runExceptT >=> either (throwError . f) pure

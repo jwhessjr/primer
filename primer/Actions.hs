@@ -22,11 +22,6 @@ type QualifiedText = (NonEmpty Text, Text)
 --  untrusted input from the frontend.
 data Action
   = SetCursor ID
-  | -- | Move one step in some direction
-    Move Movement
-  | -- | Delete the expression under the cursor
-    Delete
-  | -- | Construct a function type around the type under the cursor.
-    -- The type under the cursor is placed in the domain (left) position.
-    ConstructArrowL
+  | Delete
+  | ConstructArrowL
   deriving stock (Eq, Show, Read)

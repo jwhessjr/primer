@@ -12,7 +12,6 @@ module Zipper (
   focusType,
   focusLoc,
   unfocusType,
-  focusOnlyType,
   focus,
   unfocus,
   target,
@@ -207,10 +206,6 @@ focusType z = do
 -- | Switch from a 'Type' zipper back to an 'Expr' zipper.
 unfocusType :: TypeZ' a b -> ExprZ' a b
 unfocusType (TypeZ zt f) = f (fromZipper zt)
-
--- | Forget the surrounding expression context
-focusOnlyType :: TypeZ' a b -> TypeZip' b
-focusOnlyType (TypeZ zt _) = zt
 
 instance Data b => IsZipper (TypeZ' a b) (Type' b) where
   asZipper = tzpos1

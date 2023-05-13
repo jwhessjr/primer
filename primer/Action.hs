@@ -18,7 +18,6 @@ import Core (
   Expr,
   Expr' (..),
   GVarName,
-  HasID,
   ID,
   Type,
   getID,
@@ -50,7 +49,6 @@ import Typecheck (
 import Typecheck qualified as TC
 import Zipper (
   ExprZ,
-  IsZipper,
   Loc,
   Loc' (..),
   TypeZ,
@@ -64,7 +62,6 @@ import Zipper (
   unfocus,
   unfocusExpr,
   unfocusLoc,
-  up,
  )
 
 -- | A shorthand for the constraints needed when applying actions
@@ -205,9 +202,6 @@ synthZ z = do
 applyAction' :: ActionM m => Action -> Loc -> m Loc
 applyAction' a = case a of
   SetCursor i -> setCursor i . unfocusLoc
-  Move _ -> \case
-    InExpr z -> InExpr <$> moveUp z
-    InType z -> InType <$> moveUp z
   Delete -> \case
     InExpr ze -> InExpr . flip replace ze <$> emptyHole
     InType zt -> InType . flip replace zt <$> tEmptyHole
@@ -222,12 +216,6 @@ setCursor i e = case focusOn i (unfocusExpr e) of
   Just e' -> pure e'
   Nothing -> throwError $ IDNotFound i
 
-moveUp :: forall m za a. (ActionM m, IsZipper za a, HasID za) => za -> m za
-moveUp z = do
-  case up z of
-    Just z' -> pure z'
-    Nothing -> throwError $ MovementFailed (getID z, Parent)
-
 constructArrowL :: ActionM m => TypeZ -> m TypeZ
 constructArrowL zt = flip replace zt <$> tfun (pure (target zt)) tEmptyHole
 
@@ -238,9 +226,6 @@ toProgActionNoInput ::
   Available.NoInputAction ->
   Either ActionError [ProgAction]
 toProgActionNoInput defName mNodeSel = \case
-  Available.Raise -> do
-    id <- mid
-    pure [MoveToDef defName, CopyPasteBody (defName, id) [SetCursor id, Move Parent, Delete]]
   Available.MakeFun ->
     -- We arbitrarily choose that the "construct a function type" action places the focused expression
     -- on the domain (left) side of the arrow.
@@ -251,7 +236,6 @@ toProgActionNoInput defName mNodeSel = \case
     pure [DeleteDef defName]
   where
     toProgAction actions = toProg' actions defName <$> maybeToEither NoNodeSelection mNodeSel
-    mid = maybeToEither NoNodeSelection $ snd <$> mNodeSel
 
 -- | Convert a high-level 'Available.InputAction', and associated 'Available.Option',
 -- to a concrete sequence of 'ProgAction's.

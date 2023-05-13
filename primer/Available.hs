@@ -44,8 +44,7 @@ data Action
 
 -- | An action which can be applied without requiring further input.
 data NoInputAction
-  = Raise -- 35
-  | MakeFun -- 63
+  = MakeFun -- 63
   | DeleteType -- 40
   | DeleteDef
   deriving stock (Eq, Ord, Show, Read, Enum, Bounded)
@@ -75,11 +74,11 @@ forBody expr id = case findNodeWithParent id expr of
   Just (ExprNode _, p) -> case p of
     Nothing -> [] -- at root already, cannot raise
     Just (ExprNode (Hole _ _)) -> [] -- in a NE hole, don't offer raise (as hole will probably just be recreated)
-    _ -> [NoInput Raise]
+    _ -> []
   Just (TypeNode t, p) ->
     let raiseAction = case p of
           Just (ExprNode _) -> [] -- at the root of an annotation, so cannot raise
-          _ -> [NoInput Raise]
+          _ -> []
      in forType t <> raiseAction
 
 forSig ::
