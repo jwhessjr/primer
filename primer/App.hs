@@ -15,7 +15,6 @@ module App (
   Prog (..),
   progAllModules,
   progAllDefs,
-  tcWholeProg,
   ProgAction (..),
   ProgError (..),
   handleMutationRequest,

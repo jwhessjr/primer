@@ -23,7 +23,6 @@ import App (
   progAllDefs,
   progModules,
   runEditAppM,
-  tcWholeProg,
  )
 import Available qualified as Available
 import Control.Monad.Morph (hoist)
@@ -79,7 +78,6 @@ import TypeDef (ASTTypeDef (..), TypeDef (..))
 import Typecheck (
   Cxt,
   SmartHoles (..),
-  TypeError,
   buildTypingContextFromModules',
  )
 
@@ -277,7 +275,7 @@ tasty_undo_redo = withTests 500 $
     propertyWT [] $ do
       -- We only test SmartHoles mode (which is the only supported user-facing
       -- mode - NoSmartHoles is only used for internal sanity testing etc)
-      Right p' <- runExceptT @TypeError $ tcWholeProg =<< prog
+      p' <- prog
       i <- lift $ isolateWT fresh
       nc <- lift $ isolateWT fresh
       let a = mkApp i nc p'
