@@ -49,7 +49,6 @@ executable primer-test
     Primer.Typecheck.TypeError
     Primer.Typecheck.Utils
     Primer.Zipper.Type
-    Primer.Gen.Core.Typed
     Primer.Test.TestM
 
   default-language:   GHC2021

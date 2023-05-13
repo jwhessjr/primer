@@ -42,24 +42,26 @@ import Primer.Def (
   Def (DefAST),
   defAST,
  )
-import Primer.Gen.Core.Typed (WT, forAllT, propertyWT, isolateWT)
 import Primer.Module (
   Module (..),
  )
-import Primer.Name (Name (unName), unsafeMkName)
+import Primer.Name (Name (unName), unsafeMkName, NameCounter)
 import Primer.Typecheck (
-  SmartHoles (SmartHoles), TypeError,
+  SmartHoles (..), TypeError, Cxt, buildTypingContextFromModules',
  )
 import Primer.TypeDef (ASTTypeDef(..), TypeDef (..))
 import Control.Monad.Fresh (fresh, MonadFresh)
 import Primer.Core.DSL
 import Hedgehog.Internal.Runner (checkReport)
-import Hedgehog.Internal.Property (Property(propertyConfig, propertyTest), Skip(SkipToShrink), TestCount, ShrinkPath)
+import Hedgehog.Internal.Property (Property(propertyConfig, propertyTest), Skip(SkipToShrink), TestCount, ShrinkPath, forAllT)
 import qualified Hedgehog.Internal.Seed as Seed
 import Hedgehog.Internal.Report (reportStatus, Report (reportSeed, reportTests), Result (..), FailureReport (failureShrinkPath, failureAnnotations), FailedAnnotation (FailedAnnotation))
 import Numeric.Natural (Natural)
 import qualified Data.Map.Strict as M
 import Data.List.Extra (enumerate)
+import Primer.Test.TestM (TestM, isolateTestM, evalTestM)
+import Control.Monad.Reader (mapReaderT)
+import Control.Monad.Morph (hoist)
 
 main :: IO ()
 main = do
@@ -278,3 +280,42 @@ genName = unsafeMkName <$> Gen.frequency [(9, fixed), (1, random)]
   where
     fixed = Gen.element ["x", "y", "z", "foo", "bar"]
     random = Gen.text (Range.linear 1 10) Gen.alpha
+
+
+newtype WT a = WT {unWT :: ReaderT Cxt TestM a}
+  deriving newtype
+    ( Functor
+    , Applicative
+    , Monad
+    , MonadReader Cxt
+    , MonadFresh NameCounter
+    , MonadFresh ID
+    )
+
+-- | Run an action and ignore any effect on the fresh name/id state
+isolateWT :: WT a -> WT a
+isolateWT x = WT $ mapReaderT isolateTestM $ unWT x
+
+instance MonadFresh NameCounter (GenT WT) where
+  fresh = lift fresh
+
+instance MonadFresh ID (GenT WT) where
+  fresh = lift fresh
+
+instance MonadFresh NameCounter (PropertyT WT) where
+  fresh = lift fresh
+
+instance MonadFresh ID (PropertyT WT) where
+  fresh = lift fresh
+
+hoist' :: Applicative f => Cxt -> WT a -> f a
+hoist' cxt = pure . evalTestM 0 . flip runReaderT cxt . unWT
+
+-- | Convert a @PropertyT WT ()@ into a @Property@, which Hedgehog can test.
+-- It is recommended to do more than default number of tests when using this module.
+-- That is to say, generating well-typed syntax is hard, and you probably want
+-- to increase the number of tests run to get decent coverage.
+-- The modules form the 'Cxt' in the environment of the 'WT' monad
+-- (thus the definitions of terms is ignored)
+propertyWT :: [S Module] -> PropertyT WT () -> Property
+propertyWT mods = property . hoist (hoist' $ buildTypingContextFromModules' mods NoSmartHoles)
