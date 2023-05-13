@@ -7,6 +7,7 @@ import Data.Map qualified as Map
 import Data.Text qualified as T
 import Hedgehog
 import Hedgehog.Gen qualified as Gen
+import Hedgehog.Range qualified as Range
 import Optics (toListOf)
 import Primer.Action (
   ActionError (NameCapture),
@@ -41,12 +42,11 @@ import Primer.Def (
   Def (DefAST),
   defAST,
  )
-import Primer.Gen.Core.Raw (genName)
 import Primer.Gen.Core.Typed (WT, forAllT, propertyWT, isolateWT)
 import Primer.Module (
   Module (..),
  )
-import Primer.Name (Name (unName))
+import Primer.Name (Name (unName), unsafeMkName)
 import Primer.Typecheck (
   SmartHoles (SmartHoles), TypeError,
  )
@@ -271,3 +271,10 @@ iterateNM :: Monad m => Int -> a -> (a -> m a) -> m a
 iterateNM n a f
   | n <= 0 = pure a
   | otherwise = f a >>= \fa -> iterateNM (n - 1) fa f
+
+
+genName :: MonadGen m => m Name
+genName = unsafeMkName <$> Gen.frequency [(9, fixed), (1, random)]
+  where
+    fixed = Gen.element ["x", "y", "z", "foo", "bar"]
+    random = Gen.text (Range.linear 1 10) Gen.alpha
