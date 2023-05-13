@@ -12,7 +12,7 @@ import Hedgehog
 import Hedgehog.Gen qualified as Gen
 import Optics (toListOf)
 import Primer.Action (
-  ActionError (CaseBindsClash, NameCapture),
+  ActionError (NameCapture),
   toProgActionInput,
   toProgActionNoInput,
  )
@@ -211,9 +211,6 @@ runRandomAvailableAction a = do
       case (p, a'') of
         (StudentProvided, (Left (ActionError NameCapture), _)) -> do
           label "name-capture with entered name"
-          pure Nothing
-        (StudentProvided, (Left (ActionError (CaseBindsClash{})), _)) -> do
-          label "name-clash with entered name"
           pure Nothing
         (StudentProvided, (Left DefAlreadyExists{}, _)) -> do
           label "rename def name clash with entered name"
