@@ -93,10 +93,10 @@ runAndRecheck = either identity absurd <$> runExceptT go
     -- This is essentially "recheckAt", with the skip/shrink info from above
     ExceptT $ fmap Left $ runProp seed (withSkip shrink tasty_undo_redo) >>= \case
       Passed -> do
-        mapM_ (print . \(FailedAnnotation sp val) -> FailedAnnotation sp (take 40 val)) failann
+        --mapM_ (print . \(FailedAnnotation sp val) -> FailedAnnotation sp (take 40 val)) failann
         pure RecheckPass
       Defeat -> do
-        mapM_ (print . \(FailedAnnotation sp val) -> FailedAnnotation sp (take 40 val)) failann
+        --mapM_ (print . \(FailedAnnotation sp val) -> FailedAnnotation sp (take 40 val)) failann
         pure RecheckDefeat
       Fail _ _ _ -> pure RecheckRefind
 
