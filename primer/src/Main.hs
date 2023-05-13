@@ -31,7 +31,6 @@ import Primer.App (
   handleEditRequest,
   progAllDefs,
   progAllTypeDefs,
-  progCxt,
   progModules,
   runEditAppM, handleMutationRequest, MutationRequest (Undo), Log (..), tcWholeProgWithImports, mkApp,
  )
@@ -177,10 +176,10 @@ runRandomAvailableAction :: Level -> App -> PropertyT WT (Maybe App)
 runRandomAvailableAction l a = do
       (defName,defMut,defLoc) <- maybe discard forAll (pickPos $ appProg a)
       let defMap = fmap snd $ progAllDefs $ appProg a
-      let (def, loc,acts) = case defLoc of
-            Left d -> (d, Nothing,Available.forDef defMap defMut defName)
-            Right (d,SigNode, i) -> (DefAST d, Just (SigNode, i), Available.forSig l defMut (astDefType d) i)
-            Right (d,BodyNode, i) -> (DefAST d, Just (BodyNode, i), Available.forBody (snd <$> progAllTypeDefs (appProg a)) l defMut (astDefExpr d) i)
+      let (loc,acts) = case defLoc of
+            Left _ -> (Nothing,Available.forDef defMap defMut defName)
+            Right (d,SigNode, i) -> (Just (SigNode, i), Available.forSig l defMut (astDefType d) i)
+            Right (d,BodyNode, i) -> (Just (BodyNode, i), Available.forBody (snd <$> progAllTypeDefs (appProg a)) l defMut (astDefExpr d) i)
       case acts of
         [] -> label "no offered actions" >> pure Nothing
         acts' -> do
@@ -188,22 +187,14 @@ runRandomAvailableAction l a = do
           collect action
           case action of
             Available.NoInput act' -> do
-              def' <- maybe failure pure $ defAST def
               progActs <-
                 either (\e -> annotateShow e >> failure) pure $
-                  toProgActionNoInput (map snd $ progAllDefs $ appProg a) def' defName loc act'
+                  toProgActionNoInput defName loc act'
               Just <$> actionSucceeds (handleEditRequest progActs) a
             Available.Input act' -> do
-              def' <- maybe failure pure $ defAST def
               Available.Options{Available.opts, Available.free} <-
                 maybe (annotate "id not found" >> failure) pure $
                   Available.options
-                    (map snd $ progAllTypeDefs $ appProg a)
-                    (map snd $ progAllDefs $ appProg a)
-                    (progCxt $ appProg a)
-                    l
-                    def'
-                    loc
                     act'
               let opts' = [Gen.element $ (Offered,) <$> opts | not (null opts)]
               let opts'' =
@@ -216,7 +207,7 @@ runRandomAvailableAction l a = do
                 [] -> pure Nothing
                 options -> do
                   opt <- forAllT $ Gen.choice options
-                  progActs <- either (const failure) pure $ toProgActionInput def' defName loc (snd opt) act'
+                  progActs <- either (const failure) pure $ toProgActionInput defName (snd opt) act'
                   actionSucceedsOrCapture (fst opt) (handleEditRequest progActs) a
   where
     runEditAppMLogs ::

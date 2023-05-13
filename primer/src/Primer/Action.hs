@@ -808,13 +808,11 @@ renameForall b zt = case target zt of
 
 -- | Convert a high-level 'Available.NoInputAction' to a concrete sequence of 'ProgAction's.
 toProgActionNoInput ::
-  DefMap ->
-  ASTDef ->
   GVarName ->
   Maybe (NodeType, ID) ->
   Available.NoInputAction ->
   Either ActionError [ProgAction]
-toProgActionNoInput defs def defName mNodeSel = \case
+toProgActionNoInput defName mNodeSel = \case
   Available.Raise -> do
     id <- mid
     pure [MoveToDef defName, CopyPasteBody (defName, id) [SetCursor id, Move Parent, Delete]]
@@ -833,13 +831,11 @@ toProgActionNoInput defs def defName mNodeSel = \case
 -- | Convert a high-level 'Available.InputAction', and associated 'Available.Option',
 -- to a concrete sequence of 'ProgAction's.
 toProgActionInput ::
-  ASTDef ->
   GVarName ->
-  Maybe (NodeType, ID) ->
   Available.Option ->
   Available.InputAction ->
   Either ActionError [ProgAction]
-toProgActionInput def defName mNodeSel opt0 = \case
+toProgActionInput defName opt0 = \case
  Available.RenameDef -> do
     opt <- optNoCxt
     pure [RenameDef defName opt]

@@ -29,7 +29,6 @@ import Optics (
 import Primer.App.Base (
   Editable (..),
   Level (..),
-  NodeType (..),
  )
 import Primer.Core (
   Expr,
@@ -45,7 +44,6 @@ import Primer.Core (
  )
 import Primer.Core.Utils (freeVars)
 import Primer.Def (
-  ASTDef (..),
   DefMap,
  )
 import Primer.Def.Utils (globalInUse)
@@ -54,7 +52,6 @@ import Primer.TypeDef (
   TypeDefMap,
  )
 import Primer.Typecheck (
-  Cxt,
   TypeDefError (TDIHoleType),
   TypeDefInfo (TypeDefInfo),
   getTypeDefInfo',
@@ -226,17 +223,11 @@ data Options = Options
   deriving stock (Show, Read)
 
 options ::
-  TypeDefMap ->
-  DefMap ->
-  Cxt ->
-  Level ->
-  ASTDef ->
-  Maybe (NodeType, ID) ->
   InputAction ->
   -- | Returns 'Nothing' if an ID was required but not passed, passed but not found in the tree,
   -- or found but didn't correspond to the expected sort of entity (type/expr/pattern).
   Maybe Options
-options typeDefs defs cxt level def mNodeSel = \case
+options = \case
   RenameDef ->
     pure $ freeVar []
   where
