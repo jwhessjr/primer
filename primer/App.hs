@@ -48,7 +48,7 @@ import Module (
   moduleDefsQualified,
   qualifyDefName,
  )
-import Name (Name, NameCounter, unsafeMkName)
+import Name (Name, unsafeMkName)
 import Optics (
   Setter',
   lens,
@@ -226,7 +226,7 @@ type MonadEditApp l e m = (MonadEdit m e, MonadState App m)
 -- operations which do not themselves update the 'App' contained in a
 -- 'State' monad. (Typically interaction with the @State@ monad would
 -- be handled by a caller.
-type MonadEdit m e = (MonadFresh ID m, MonadFresh NameCounter m, MonadError e m)
+type MonadEdit m e = (MonadFresh ID m, MonadError e m)
 
 -- | A shorthand for the constraints we need when performing read-only
 -- operations on the application.
@@ -261,16 +261,12 @@ newtype QueryAppM a = QueryAppM (ReaderT App (Except ProgError) a)
 -- constructor. See 'mkApp' and 'mkAppSafe'.
 data App = App
   { idCounter :: ID
-  , nameCounter :: NameCounter
   , prog :: Prog
   }
   deriving stock (Eq, Show, Read)
 
 _idCounter :: Setter' App ID
 _idCounter = sets $ \f as -> as{idCounter = f $ idCounter as}
-
-_nameCounter :: Setter' App NameCounter
-_nameCounter = sets $ \f as -> as{nameCounter = f $ nameCounter as}
 
 _prog :: Setter' App Prog
 _prog = sets $ \f as -> as{prog = f $ prog as}
@@ -313,17 +309,13 @@ _prog = sets $ \f as -> as{prog = f $ prog as}
 -- future. See:
 --
 -- https://github.com/hackworthltd/primer/issues/510
-mkApp :: ID -> NameCounter -> Prog -> App
-mkApp i n p = App i n p
+mkApp :: ID -> Prog -> App
+mkApp = App
 
 -- | Given an 'App', return the next 'ID' that should be used to
 -- create a new node.
 appIdCounter :: App -> ID
 appIdCounter = idCounter
-
--- | Given an 'App', return its 'NameCounter'.
-appNameCounter :: App -> NameCounter
-appNameCounter = nameCounter
 
 -- | Given an 'App', return its 'Prog'.
 appProg :: App -> Prog
@@ -335,11 +327,3 @@ instance Monad m => MonadFresh ID (EditAppM m e) where
     id_ <- gets appIdCounter
     modify (\s -> s & _idCounter .~ id_ + 1)
     pure id_
-
--- | Support for generating names. Basically just a counter so we don't
--- generate the same automatic name twice.
-instance Monad m => MonadFresh NameCounter (EditAppM m e) where
-  fresh = do
-    nc <- gets appNameCounter
-    modify (\s -> s & _nameCounter .~ succ nc)
-    pure nc

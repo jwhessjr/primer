@@ -36,7 +36,7 @@ import Def (
 import Errors (ActionError (..))
 import Fresh (MonadFresh)
 import Module (Module, insertDef)
-import Name (Name, NameCounter)
+import Name (Name)
 import ProgAction (ProgAction (..))
 import Typecheck (
   CheckEverythingRequest (CheckEverything, toCheck),
@@ -68,7 +68,6 @@ import Zipper (
 type ActionM m =
   ( Monad m
   , MonadFresh ID m -- can generate fresh IDs
-  , MonadFresh NameCounter m -- can generate fresh names
   , MonadError ActionError m -- can raise errors
   , MonadReader TC.Cxt m -- has access to a typing context
   )
@@ -80,7 +79,7 @@ type ActionM m =
 -- return a whole set of modules as well as the one definition we wanted to
 -- change.
 applyActionsToTypeSig ::
-  (MonadFresh ID m, MonadFresh NameCounter m) =>
+  (MonadFresh ID m) =>
   Module ->
   -- | This must be one of the definitions in the @Module@, with its correct name
   (Name, ASTDef) ->
@@ -152,7 +151,7 @@ refocus Refocus{pre, post} = do
 -- any of the actions failed to apply.
 -- After applying the actions, we check the new Expr against the type sig of the definition.
 applyActionsToBody ::
-  (MonadFresh ID m, MonadFresh NameCounter m) =>
+  MonadFresh ID m =>
   Module ->
   ASTDef ->
   [Action] ->

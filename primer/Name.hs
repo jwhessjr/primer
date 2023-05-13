@@ -1,6 +1,5 @@
 module Name (
   Name (),
-  NameCounter,
   unName,
   unsafeMkName,
 ) where
@@ -8,7 +7,6 @@ module Name (
 import Foreword
 
 import Data.Data (Data)
-import Numeric.Natural (Natural)
 
 -- | This module contains the type of names in the Core AST.
 
@@ -22,7 +20,3 @@ newtype Name = Name {unName :: Text}
 -- guarantees about whether the name refers to anything that is in scope.
 unsafeMkName :: Text -> Name
 unsafeMkName = Name
-
-newtype NameCounter = NC Natural
-  deriving stock (Eq, Show, Read, Data)
-  deriving newtype (Enum)

@@ -73,7 +73,7 @@ import Module (
   moduleTypesQualified,
   _moduleDefs,
  )
-import Name (Name, NameCounter)
+import Name (Name)
 import NestedError (MonadNestedError (..), modifyError')
 import Optics (
   A_Traversal,
@@ -122,7 +122,6 @@ type KindM e m =
   , MonadReader Cxt m -- has access to a typing context, and SmartHoles option
   , MonadFresh ID m -- can generate fresh IDs
   -- can generate fresh names (needed for "smart holes" and polymorphism)
-  , MonadFresh NameCounter m
   , MonadNestedError KindError e m -- can throw kind errors
   )
 
@@ -183,7 +182,6 @@ type TypeM e m =
   , MonadReader Cxt m -- has access to a typing context, and SmartHoles option
   , MonadFresh ID m -- can generate fresh IDs
   -- can generate fresh names (needed for "smart holes" and polymorphism)
-  , MonadFresh NameCounter m
   , MonadNestedError TypeError e m -- can throw type errors
   )
 
@@ -216,7 +214,7 @@ data CheckEverythingRequest = CheckEverything { toCheck :: Module}
 -- environment with the updated type)
 checkEverything ::
   forall e m.
-  (MonadFresh ID m, MonadFresh NameCounter m, MonadNestedError TypeError e (ReaderT Cxt m)) =>
+  (MonadFresh ID m, MonadNestedError TypeError e (ReaderT Cxt m)) =>
   CheckEverythingRequest ->
   m Module
 checkEverything CheckEverything{toCheck} =

@@ -242,7 +242,7 @@ tasty_undo_redo = withTests 500 $
   withDiscards 2000 $
     property $ do
       let (p',i) = create prog
-      let a = mkApp i (toEnum $ fromEnum i) p'
+      let a = mkApp i p'
       let n = 4
       void $ iterateNM n a $ \a' -> runRandomAction a'
   where
