@@ -8,13 +8,7 @@ module Meta (
   GlobalName (GlobalName, qualifiedModule, baseName),
   qualifyName,
   TyConName,
-  ValConName,
   GVarName,
-  LocalNameKind (..),
-  LocalName (LocalName, unLocalName),
-  TmVarRef (..),
-  LVarName,
-  TyVarName,
   Value,
   Meta (Meta),
   _type,
@@ -62,7 +56,6 @@ newtype ModuleName = ModuleName {unModuleName :: NonEmpty Name}
 -- | Tags for 'GlobalName'
 data GlobalNameKind
   = ATyCon
-  | AValCon
   | ADefName
 
 -- | Global names are fully qualified with a module name.
@@ -77,28 +70,11 @@ qualifyName :: ModuleName -> Name -> GlobalName k
 qualifyName = GlobalName
 
 type TyConName = GlobalName 'ATyCon
-type ValConName = GlobalName 'AValCon
 type GVarName = GlobalName 'ADefName
-
--- | Tags for 'LocalName'
-data LocalNameKind
-  = ATmVar
-  | ATyVar
-
--- | A newtype wrapper around a 'Name', tracking that the name refers
--- to a local variable. The tag says which sort of variable (term or
--- type) this is.
-newtype LocalName (k :: LocalNameKind) = LocalName {unLocalName :: Name}
-  deriving stock (Eq, Ord, Show, Read, Data, Generic)
-  deriving (IsString) via Name
-
-type LVarName = LocalName 'ATmVar
-type TyVarName = LocalName 'ATyVar
 
 -- | A reference to a variable.
 data TmVarRef
   = GlobalVarRef GVarName
-  | LocalVarRef LVarName
   deriving stock (Eq, Show, Read, Data, Generic)
 
 -- | A class for types which have an ID.
