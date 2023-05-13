@@ -16,9 +16,9 @@ import Control.Monad.Fresh (MonadFresh)
 import Data.List (findIndex)
 import Primer.Action.Actions (Action (..), Movement (..))
 import Primer.Action.Available qualified as Available
+import Primer.Action.Available (NodeType (..))
 import Primer.Action.Errors (ActionError (..))
 import Primer.Action.ProgAction (ProgAction (..))
-import Primer.App.Base (NodeType (..))
 import Primer.Core (
   Expr,
   Expr' (..),

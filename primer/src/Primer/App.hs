@@ -1,7 +1,7 @@
 -- This module defines the high level application functions.
 
 module Primer.App (
-  module Primer.App.Base,
+  module Primer.Action.Available,
   Log (..),
   App,
   mkApp,
@@ -62,7 +62,7 @@ import Primer.Action (
   applyActionsToTypeSig,
  )
 import Primer.Action.ProgError (ProgError (..))
-import Primer.App.Base (
+import Primer.Action.Available (
   Editable (..),
   Level (..),
   NodeType (..),

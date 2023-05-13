@@ -19,7 +19,6 @@ executable primer-test
     Primer.Action
     Primer.Action.Available
     Primer.App
-    Primer.App.Base
     Primer.Core
     Primer.Core.DSL
     Primer.Core.Transform
