@@ -131,7 +131,6 @@ import Primer.TypeDef (
   TypeDefMap,
   typeDefKind
  )
-import Primer.Typecheck.SmartHoles (SmartHoles (..))
 import Primer.Typecheck.TypeError (TypeError (..))
 import Primer.Typecheck.KindError (
   KindError (
@@ -145,6 +144,9 @@ import Primer.Typecheck.KindError (
  )
 
 type Type = Type' ()
+
+data SmartHoles = SmartHoles | NoSmartHoles
+  deriving stock (Eq, Show, Read)
 
 data KindOrType = K Kind | T Type
   deriving stock (Show, Eq)

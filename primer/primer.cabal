@@ -39,7 +39,6 @@ executable primer-test
     Primer.Core.Meta
     Primer.Core.Type
     Primer.Typecheck.KindError
-    Primer.Typecheck.SmartHoles
     Primer.Typecheck.TypeError
     Primer.Test.TestM
 
