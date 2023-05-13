@@ -6,7 +6,7 @@ module DSL (
   tEmptyHole,
   tcon,
   tfun,
-  create',
+  create,
   S,
 ) where
 
@@ -35,10 +35,6 @@ instance MonadFresh ID S where
 -- @a@ and the next available fresh 'ID'.
 create :: S a -> (a, ID)
 create = flip runState 0 . unS
-
--- | As 'create', but drop the 'ID'.
-create' :: S a -> a
-create' = fst . create
 
 tEmptyHole :: MonadFresh ID m => m Type
 tEmptyHole = TEmptyHole <$> fresh

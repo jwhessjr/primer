@@ -39,7 +39,6 @@ executable primer-test
     Type
     KindError
     TypeError
-    TestM
 
   default-language:   GHC2021
   default-extensions:

@@ -21,8 +21,6 @@ import App (
   runEditAppM,
  )
 import Available qualified as Available
-import Control.Monad.Morph (hoist)
-import Control.Monad.Reader (mapReaderT)
 import Core (
   GVarName,
   ID,
@@ -43,7 +41,7 @@ import Def (
   Def (DefAST),
   defAST,
  )
-import Fresh (MonadFresh, fresh)
+import Fresh (MonadFresh)
 import Hedgehog
 import Hedgehog.Gen qualified as Gen
 import Hedgehog.Internal.Property (
@@ -51,7 +49,6 @@ import Hedgehog.Internal.Property (
   ShrinkPath,
   Skip (SkipToShrink),
   TestCount,
-  forAllT,
  )
 import Hedgehog.Internal.Report (
   FailedAnnotation, -- (FailedAnnotation)
@@ -66,15 +63,12 @@ import Hedgehog.Range qualified as Range
 import Module (
   Module (..),
  )
-import Name (Name (unName), NameCounter, unsafeMkName)
+import Name (Name (unName), unsafeMkName)
 import Numeric.Natural (Natural)
 import Optics (toListOf)
-import TestM (TestM, evalTestM, isolateTestM)
 import TypeDef (ASTTypeDef (..), TypeDef (..))
 import Typecheck (
-  Cxt,
   SmartHoles (..),
-  buildTypingContextFromModules',
  )
 
 main :: IO ()
@@ -177,7 +171,7 @@ pickPos p = ((\(defName, def) -> (defName,) <$> pickLoc def) =<<) <$> pickDef
 -- - picked a node with no actions available
 -- - picked an action with no options available
 -- - entered a free-choice option and had name-clashing issues
-runRandomAvailableAction :: App -> PropertyT WT (Maybe App)
+runRandomAvailableAction :: Monad m => App -> PropertyT m (Maybe App)
 runRandomAvailableAction a = do
   (defName, defLoc) <- maybe discard forAll (pickPos $ appProg a)
   let defMap = progAllDefs $ appProg a
@@ -188,7 +182,7 @@ runRandomAvailableAction a = do
   case acts of
     [] -> label "no offered actions" >> pure Nothing
     acts' -> do
-      action <- forAllT $ Gen.element acts'
+      action <- forAll $ Gen.element acts'
       collect action
       case action of
         Available.NoInput act' -> do
@@ -197,21 +191,20 @@ runRandomAvailableAction a = do
               toProgActionNoInput defName loc act'
           Just <$> actionSucceeds (handleEditRequest progActs) a
         Available.Input act' -> do
-          n <- forAllT $ unName <$> genName
+          n <- forAll $ unName <$> genName
           progActs <- either (const failure) pure $ toProgActionInput defName (Available.Option n) act'
           actionSucceedsOrCapture StudentProvided (handleEditRequest progActs) a
   where
-    actionSucceeds :: HasCallStack => EditAppM Identity ProgError a -> App -> PropertyT WT App
+    actionSucceeds :: (HasCallStack, Monad m) => EditAppM Identity ProgError a -> App -> PropertyT m App
     actionSucceeds m a' =
-      runEditAppMLogs m a' >>= \case
+      runEditAppMLogs m a' & \case
         (Left _, _) -> failure
         (Right _, a'') -> pure a''
     -- If we submit our own name rather than an offered one, then
     -- we should expect that name capture/clashing may happen
-    actionSucceedsOrCapture :: HasCallStack => Provenance -> EditAppM Identity ProgError a -> App -> PropertyT WT (Maybe App)
+    actionSucceedsOrCapture :: (HasCallStack, Monad m) => Provenance -> EditAppM Identity ProgError a -> App -> PropertyT m (Maybe App)
     actionSucceedsOrCapture p m a' = do
-      a'' <- runEditAppMLogs m a'
-      case (p, a'') of
+      case (p, runEditAppMLogs m a') of
         (StudentProvided, (Left (ActionError NameCapture), _)) -> do
           label "name-capture with entered name"
           pure Nothing
@@ -221,8 +214,10 @@ runRandomAvailableAction a = do
         (_, (Left _, _)) -> failure
         (_, (Right _, a''')) -> pure $ Just a'''
 
-runEditAppMLogs :: EditAppM Identity ProgError a -> App -> PropertyT WT (Either ProgError a, App)
-runEditAppMLogs m a' = pure $ runIdentity $ runEditAppM m a'
+--runEditAppMLogs :: Monad m => EditAppM Identity ProgError a -> App -> PropertyT m (Either ProgError a, App)
+--runEditAppMLogs m a' = pure $ runIdentity $ runEditAppM m a'
+runEditAppMLogs :: EditAppM Identity ProgError a -> App -> (Either ProgError a, App)
+runEditAppMLogs m a' = runIdentity $ runEditAppM m a'
 
 -- helper type for tasty_undo_redo
 data Act
@@ -260,13 +255,11 @@ prog = do
 tasty_undo_redo :: Property
 tasty_undo_redo = withTests 500 $
   withDiscards 2000 $
-    propertyWT [] $ do
+    property $ do
       -- We only test SmartHoles mode (which is the only supported user-facing
       -- mode - NoSmartHoles is only used for internal sanity testing etc)
-      p' <- prog
-      i <- lift $ isolateWT fresh
-      nc <- lift $ isolateWT fresh
-      let a = mkApp i nc p'
+      let (p',i) = create prog
+      let a = mkApp i (toEnum $ fromEnum i) p'
       let n = 4
       void $ iterateNM n a $ \a' -> runRandomAction a'
   where
@@ -282,41 +275,3 @@ genName = unsafeMkName <$> Gen.frequency [(9, fixed), (1, random)]
   where
     fixed = Gen.element ["x", "y", "z", "foo", "bar"]
     random = Gen.text (Range.linear 1 10) Gen.alpha
-
-newtype WT a = WT {unWT :: ReaderT Cxt TestM a}
-  deriving newtype
-    ( Functor
-    , Applicative
-    , Monad
-    , MonadReader Cxt
-    , MonadFresh NameCounter
-    , MonadFresh ID
-    )
-
--- | Run an action and ignore any effect on the fresh name/id state
-isolateWT :: WT a -> WT a
-isolateWT x = WT $ mapReaderT isolateTestM $ unWT x
-
-instance MonadFresh NameCounter (GenT WT) where
-  fresh = lift fresh
-
-instance MonadFresh ID (GenT WT) where
-  fresh = lift fresh
-
-instance MonadFresh NameCounter (PropertyT WT) where
-  fresh = lift fresh
-
-instance MonadFresh ID (PropertyT WT) where
-  fresh = lift fresh
-
-hoist' :: Applicative f => Cxt -> WT a -> f a
-hoist' cxt = pure . evalTestM 0 . flip runReaderT cxt . unWT
-
--- | Convert a @PropertyT WT ()@ into a @Property@, which Hedgehog can test.
--- It is recommended to do more than default number of tests when using this module.
--- That is to say, generating well-typed syntax is hard, and you probably want
--- to increase the number of tests run to get decent coverage.
--- The modules form the 'Cxt' in the environment of the 'WT' monad
--- (thus the definitions of terms is ignored)
-propertyWT :: [S Module] -> PropertyT WT () -> Property
-propertyWT mods = property . hoist (hoist' $ buildTypingContextFromModules' mods NoSmartHoles)
