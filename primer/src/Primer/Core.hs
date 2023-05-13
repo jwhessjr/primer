@@ -112,7 +112,6 @@ data Expr' a b
   = Hole a (Expr' a b) -- See Note [Holes and bidirectionality]
   | EmptyHole a
   | Ann a (Expr' a b) (Type' b)
-  | App a (Expr' a b) (Expr' a b)
   | Lam a LVarName (Expr' a b)
   | Var a TmVarRef
   | Case a (Expr' a b) [CaseBranch' a b] -- See Note [Case]

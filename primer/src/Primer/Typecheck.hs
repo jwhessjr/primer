@@ -411,21 +411,6 @@ synth = \case
   Var i x -> do
     t <- either throwError' pure . lookupVar x =<< ask
     pure $ annSynth1 t i Var x
-  App i e1 e2 -> do
-    -- Synthesise e1
-    (t1, e1') <- synth e1
-    -- Check that e1 has an arrow type
-    case matchArrowType t1 of
-      Just (t2, t) -> do
-        -- Check e2 against the domain type of e1
-        e2' <- check t2 e2
-        pure $ annSynth2 t i App e1' e2'
-      Nothing ->
-        asks smartHoles >>= \case
-          NoSmartHoles -> throwError' $ TypeDoesNotMatchArrow t1
-          SmartHoles -> do
-            e1Wrap <- Hole <$> meta <*> pure e1
-            synth $ App i e1Wrap e2
   Ann i e t -> do
     -- Check that the type is well-formed by synthesising its kind
     t' <- checkKind' KType t

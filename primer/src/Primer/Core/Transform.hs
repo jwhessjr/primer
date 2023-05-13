@@ -44,7 +44,6 @@ renameVar x y expr = case expr of
   Hole{} -> substAllChildren
   EmptyHole{} -> substAllChildren
   Ann{} -> substAllChildren
-  App{} -> substAllChildren
   -- We assume the term is well-scoped, so do not have any references to the
   -- term vars x,y inside any type child (e.g. annotation), so no need to
   -- consider renaming inside them. However, but we do need to worry about
