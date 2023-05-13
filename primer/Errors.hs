@@ -19,7 +19,6 @@ data Error
   | CustomFailure Action Text
   | InternalFailure Text
   | IDNotFound Int
-  | NameCapture
   | NoNodeSelection
   | NoDefSelected
   | DefNotFound Text

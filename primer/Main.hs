@@ -58,7 +58,7 @@ import Module (
 import Numeric.Natural (Natural)
 import Optics (toListOf)
 import TypeDef (ASTTypeDef (..), TypeDef (..))
-import Errors (Error(NameCapture, DefAlreadyExists))
+import Errors (Error(DefAlreadyExists))
 
 main :: IO ()
 main = do
@@ -193,9 +193,6 @@ runRandomAvailableAction a = do
     actionSucceedsOrCapture :: (HasCallStack, Monad m) => Provenance -> EditAppM Identity Error a -> App -> PropertyT m (Maybe App)
     actionSucceedsOrCapture p m a' = do
       case (p, runEditAppMLogs m a') of
-        (StudentProvided, (Left NameCapture, _)) -> do
-          label "name-capture with entered name"
-          pure Nothing
         (StudentProvided, (Left DefAlreadyExists{}, _)) -> do
           label "rename def name clash with entered name"
           pure Nothing
