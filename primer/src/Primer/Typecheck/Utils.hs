@@ -30,12 +30,11 @@ import Primer.TypeDef (
   ASTTypeDef,
   TypeDef (TypeDefAST),
   TypeDefMap,
-  ValCon,
  )
 import Primer.Typecheck.Cxt (Cxt, globalCxt, typeDefs)
 
 -- We assume that constructor names are unique, returning the first one we find
-lookupConstructor :: TypeDefMap -> ValConName -> Maybe (ValCon (), TyConName, ASTTypeDef ())
+lookupConstructor :: TypeDefMap -> ValConName -> Maybe a
 lookupConstructor _tyDefs _c = Nothing
 
 data TypeDefError

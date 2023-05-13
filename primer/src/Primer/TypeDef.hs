@@ -1,13 +1,10 @@
 module Primer.TypeDef (
   TypeDef (..),
   _TypeDefAST,
-  ValCon (..),
-  _valConArgs,
   TypeDefMap,
   typeDefAST,
   typeDefKind,
   ASTTypeDef (..),
-  valConType,
   _typedefFields,
   forgetTypeDefMetadata,
 ) where
@@ -15,16 +12,14 @@ module Primer.TypeDef (
 import Foreword
 
 import Data.Data (Data)
-import Optics (Traversal, traversalVL, Lens, lens)
+import Optics (Traversal, traversalVL)
 import Primer.Core.Meta (
   TyConName,
-  ValConName,
  )
 import Primer.Core.Type (
   Kind (KType),
-  Type' (TFun, TCon),
+  Type',
  )
-import Primer.Core.Utils (forgetTypeMetadata)
 
 data TypeDef b
   = TypeDefAST (ASTTypeDef b)
@@ -44,21 +39,6 @@ type TypeDefMap = Map TyConName (TypeDef ())
 -- The type of the constructor is C :: forall a:TYPE. forall b:(TYPE->TYPE). b a -> Nat -> T a b
 data ASTTypeDef b = ASTTypeDef
   deriving stock (Eq, Show, Read, Data)
-
-data ValCon b = ValCon
-  { valConName :: ValConName
-  , valConArgs :: [Type' b]
-  }
-  deriving stock (Eq, Show, Read, Data)
-
-_valConArgs :: Lens (ValCon b) (ValCon b') [Type' b] [Type' b']
-_valConArgs = lens valConArgs $ \c as -> c {valConArgs = as}
-
-valConType :: TyConName -> ASTTypeDef () -> ValCon () -> Type' ()
-valConType tc _td vc =
-  let ret = TCon () tc
-      args = foldr (TFun ()) ret (forgetTypeMetadata <$> valConArgs vc)
-   in args
 
 typeDefAST :: TypeDef b -> Maybe (ASTTypeDef b)
 typeDefAST = \case
