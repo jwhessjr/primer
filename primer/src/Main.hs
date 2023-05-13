@@ -63,8 +63,7 @@ import Data.List.Extra (enumerate)
 import Hedgehog.Main (defaultMain)
 
 main :: IO ()
-main = defaultMain [check tasty_undo_redo]
-{-
+--main = defaultMain [check tasty_undo_redo]
 main = do
   let n = 100
   rs <- replicateM (fromIntegral n) runAndRecheck
@@ -73,7 +72,6 @@ main = do
   if (cs M.! RecheckPass) + (cs M.! RecheckDefeat) > n `div` 2
     then putStrLn @Text "This tickled non-replay bug > 50%"
     else die "This did not tickle non-replay bug much"
--}
 
 -- Bounded & Enum: we explicitly give counts of 0 for those which did not appear
 count :: (Bounded a, Enum a, Ord a) => [a] -> Map a Natural

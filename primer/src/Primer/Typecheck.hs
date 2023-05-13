@@ -461,7 +461,7 @@ check t = \case
             -- 'synth' will take care of adding an annotation - no need to do it
             -- explicitly here
             (_, lam') <- synth lam
-            undefined
+            EmptyHole <$> meta' (TCEmb TCBoth{tcChkedAt = t, tcSynthed = TEmptyHole ()})
   Case i e brs -> do
     (eT, e') <- synth e
     let caseMeta = annotate (TCChkedAt t) i
@@ -506,7 +506,7 @@ check t = \case
       then pure (set _typecache (TCEmb TCBoth{tcChkedAt = t, tcSynthed = t'}) e')
       else case sh of
         NoSmartHoles -> throwError' (InconsistentTypes t t')
-        SmartHoles -> undefined
+        SmartHoles -> EmptyHole <$> meta' (TCEmb TCBoth{tcChkedAt = t, tcSynthed = TEmptyHole ()})
 
 -- | Similar to check, but for the RHS of case branches
 -- We assume that the branch is for this constructor

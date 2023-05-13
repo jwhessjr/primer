@@ -5,6 +5,7 @@ module Foreword (
   module Foldable,
   modifyError,
   mwhen,
+  undefined,
 ) where
 
 -- In general, we should defer to "Protolude"'s exports and avoid name
@@ -16,6 +17,7 @@ module Foreword (
 -- qualified. Examples are "Control.Monad.STM", 'GHC.Generics.from',
 -- and 'GHC.Generics.to'.
 import Protolude hiding (
+  undefined,
   Handler,
   Meta,
   OnDecodeError,
@@ -70,6 +72,7 @@ import Protolude hiding (
 -- We should remove all uses of `unsafeHead`. See:
 -- https://github.com/hackworthltd/primer/issues/147
 
+import Prelude (undefined) -- better callstack...
 import Protolude.Unsafe as Unsafe (unsafeHead)
 
 import Data.Foldable as Foldable (foldMap')
