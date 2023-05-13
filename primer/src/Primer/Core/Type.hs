@@ -21,7 +21,6 @@ import Primer.Core.Meta (
   HasMetadata (_metadata),
   Meta,
   TyConName,
-  TyVarName,
   Value,
  )
 
@@ -41,7 +40,6 @@ data Type' a
   | THole a (Type' a)
   | TCon a TyConName
   | TFun a (Type' a) (Type' a)
-  | TVar a TyVarName
   | TApp a (Type' a) (Type' a)
   deriving stock (Eq, Show, Read, Data, Generic)
 

@@ -25,9 +25,6 @@ substTySimul sub
       THole m t -> THole m <$> go t
       t@TCon{} -> pure t
       TFun _ s t -> TFun () <$> go s <*> go t
-      t@(TVar _ m)
-        | Just a <- M.lookup m sub -> pure a
-        | otherwise -> pure t
       TApp _ s t -> TApp () <$> go s <*> go t
 
 -- | Simple and inefficient capture-avoiding substitution.

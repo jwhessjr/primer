@@ -21,7 +21,7 @@ import Primer.Core.DSL.Meta (meta')
 import Primer.Core.Meta (ID, Meta (Meta), TyVarName, unLocalName)
 import Primer.Core.Type (
   Kind (KFun, KHole, KType),
-  Type' (TApp, TCon, TEmptyHole, TFun, THole, TVar),
+  Type' (TApp, TCon, TEmptyHole, TFun, THole),
  )
 import Primer.Name (NameCounter)
 import Primer.TypeDef (typeDefKind)
@@ -96,10 +96,6 @@ synthKind = \case
     a' <- checkKind KType a
     b' <- checkKind KType b
     pure (KType, TFun (annotate KType m) a' b')
-  TVar m v -> do
-    asks (lookupLocalTy v) >>= \case
-      Right k -> pure (k, TVar (annotate k m) v)
-      Left err -> throwError' err
   TApp ma (THole mh s) t -> do
     -- If we didn't have this special case, we might remove this hole (in a
     -- recursive call), only to reintroduce it again with a different ID
