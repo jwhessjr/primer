@@ -1,7 +1,6 @@
 -- | Compute all the possible actions which can be performed on a definition.
 -- This module is expected to be imported qualified, due to various potential name clashes.
 module Available (
-  Editable (..),
   NodeType (..),
   Action (..),
   InputAction (..),
@@ -34,9 +33,6 @@ import Zipper (
   findType,
  )
 
-data Editable = Editable
-  deriving stock (Bounded, Enum, Show)
-
 data NodeType = BodyNode | SigNode
   deriving stock (Eq, Show, Read, Bounded, Enum, Data)
 
@@ -61,10 +57,9 @@ data InputAction
 
 forDef ::
   DefMap ->
-  Editable ->
   GVarName ->
   [Action]
-forDef defs Editable defName =
+forDef defs defName =
   [Input RenameDef]
     <> mwhen
       -- ensure the definition is not in use, otherwise the action will not succeed
@@ -72,11 +67,10 @@ forDef defs Editable defName =
       [NoInput DeleteDef]
 
 forBody ::
-  Editable ->
   Expr ->
   ID ->
   [Action]
-forBody Editable expr id = case findNodeWithParent id expr of
+forBody expr id = case findNodeWithParent id expr of
   Nothing -> mempty
   Just (ExprNode _, p) -> case p of
     Nothing -> [] -- at root already, cannot raise
@@ -89,11 +83,10 @@ forBody Editable expr id = case findNodeWithParent id expr of
      in forType t <> raiseAction
 
 forSig ::
-  Editable ->
   Type ->
   ID ->
   [Action]
-forSig Editable ty id = case findType id ty of
+forSig ty id = case findType id ty of
   Nothing -> mempty
   Just t -> forType t
 

@@ -36,7 +36,6 @@ import Action (
   applyActionsToTypeSig,
  )
 import Available (
-  Editable (..),
   NodeType (..),
  )
 import Core (
@@ -137,8 +136,8 @@ push as l = Log $ as : unlog l
 progAllModules :: Prog -> [Module]
 progAllModules p = progModules p
 
-progAllDefs :: Prog -> Map GVarName (Editable, Def)
-progAllDefs p = foldMap' (fmap (Editable,) . moduleDefsQualified) (progModules p)
+progAllDefs :: Prog -> Map GVarName Def
+progAllDefs p = foldMap' (moduleDefsQualified) (progModules p)
 
 -- Note [Modules]
 -- The invariant is that the @progImports@ modules are never edited, but
@@ -150,10 +149,6 @@ progAllDefs p = foldMap' (fmap (Editable,) . moduleDefsQualified) (progModules p
 -- All modules in a @Prog@ shall be well-typed, in the appropriate scope:
 -- all the imports are in one mutual dependency group
 -- the @progModule@ has all the imports in scope
-
--- | Get all definitions from all modules (including imports)
-allDefs :: Prog -> DefMap
-allDefs = fmap snd . progAllDefs
 
 -- | The action log
 --  This is the canonical store of the program - we can recreate any current or
@@ -204,7 +199,7 @@ focusNode prog = focusNodeDefs $ foldMap' moduleDefsQualified $ progModules prog
 
 -- This looks in the editable modules and also in any imports
 focusNodeImports :: MonadError ProgError m => Prog -> GVarName -> ID -> m (Either (Either ExprZ TypeZ) TypeZip)
-focusNodeImports prog = focusNodeDefs $ allDefs prog
+focusNodeImports prog = focusNodeDefs $ progAllDefs prog
 
 focusNodeDefs :: MonadError ProgError m => DefMap -> GVarName -> ID -> m (Either (Either ExprZ TypeZ) TypeZip)
 focusNodeDefs defs defname nodeid =

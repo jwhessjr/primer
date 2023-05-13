@@ -10,7 +10,6 @@ import Action (
 import App (
   App,
   EditAppM,
-  Editable (..),
   Log (..),
   MutationRequest (Undo),
   NodeType (..),
@@ -38,7 +37,7 @@ import CoreUtils (
   typeIDs,
  )
 import DSL
-import Data.List.Extra (enumerate, partition)
+import Data.List.Extra (enumerate)
 import Data.Map qualified as Map
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
@@ -162,16 +161,12 @@ data Provenance
 
 -- gives def name and perhaps a node inside it (if Nothing, then has selected the definition itself)
 -- If the outer Maybe is Nothing, then there were no definitions at all!
-pickPos :: Prog -> Maybe (Gen (GVarName, Editable, Either Def (ASTDef, NodeType, ID)))
-pickPos p = ((\(defName, (editable, def)) -> (defName,editable,) <$> pickLoc def) =<<) <$> pickDef
+pickPos :: Prog -> Maybe (Gen (GVarName, Either Def (ASTDef, NodeType, ID)))
+pickPos p = ((\(defName, def) -> (defName,) <$> pickLoc def) =<<) <$> pickDef
   where
-    isMutable = \case
-      Editable -> True
-    pickDef = case partition (isMutable . fst . snd) $ Map.toList $ progAllDefs p of
-      ([], []) -> Nothing
-      (mut, []) -> Just $ Gen.element mut
-      ([], immut) -> Just $ Gen.element immut
-      (mut, immut) -> Just $ Gen.frequency [(9, Gen.element mut), (1, Gen.element immut)]
+    pickDef = case Map.toList $ progAllDefs p of
+      [] -> Nothing
+      mut -> Just $ Gen.element mut
     pickLoc d =
       Gen.frequency $
         catMaybes
@@ -187,12 +182,12 @@ pickPos p = ((\(defName, (editable, def)) -> (defName,editable,) <$> pickLoc def
 -- - entered a free-choice option and had name-clashing issues
 runRandomAvailableAction :: App -> PropertyT WT (Maybe App)
 runRandomAvailableAction a = do
-  (defName, defMut, defLoc) <- maybe discard forAll (pickPos $ appProg a)
-  let defMap = fmap snd $ progAllDefs $ appProg a
+  (defName, defLoc) <- maybe discard forAll (pickPos $ appProg a)
+  let defMap = progAllDefs $ appProg a
   let (loc, acts) = case defLoc of
-        Left _ -> (Nothing, Available.forDef defMap defMut defName)
-        Right (d, SigNode, i) -> (Just (SigNode, i), Available.forSig defMut (astDefType d) i)
-        Right (d, BodyNode, i) -> (Just (BodyNode, i), Available.forBody defMut (astDefExpr d) i)
+        Left _ -> (Nothing, Available.forDef defMap defName)
+        Right (d, SigNode, i) -> (Just (SigNode, i), Available.forSig (astDefType d) i)
+        Right (d, BodyNode, i) -> (Just (BodyNode, i), Available.forBody (astDefExpr d) i)
   case acts of
     [] -> label "no offered actions" >> pure Nothing
     acts' -> do
