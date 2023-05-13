@@ -37,7 +37,6 @@ import Data.Generics.Uniplate.Zipper (
   fromZipper,
  )
 import Data.Map.Strict qualified as Map
-import Data.Set qualified as Set
 import Optics (
   ReversibleOptic (re),
   Setter',
@@ -69,16 +68,14 @@ import Primer.App.Base (
   NodeType (..),
  )
 import Primer.Core (
-  Expr' (EmptyHole, Var),
+  Expr' (EmptyHole),
   ExprMeta,
   GVarName,
   GlobalName (baseName, qualifiedModule),
   HasID (_id),
   ID (..),
-  LocalName (unLocalName),
-  Meta (..),
   ModuleName,
-  TmVarRef (GlobalVarRef, LocalVarRef),
+  TmVarRef (GlobalVarRef),
   Type' (..),
   TypeMeta,
   getID,
@@ -87,7 +84,7 @@ import Primer.Core (
   _typeMetaLens,
  )
 import Primer.Core.Transform (renameVar)
-import Primer.Core.Utils (regenerateExprIDs, regenerateTypeIDs, _freeTmVars)
+import Primer.Core.Utils (regenerateExprIDs, regenerateTypeIDs)
 import Primer.Def (
   ASTDef (..),
   _astDefExpr,
@@ -118,12 +115,9 @@ import Primer.Zipper (
   Loc' (InBind, InExpr, InType),
   TypeZ,
   TypeZip,
-  current,
   focusOn,
   focusOnTy,
   focusOnlyType,
-  foldAbove,
-  getBoundHereUp,
   locToEither,
   replace,
   target,
@@ -626,29 +620,6 @@ copyPasteSig p (fromDefName, fromTyId) toDefName setup = do
     pure (insertDef mod toDefBaseName (DefAST newDef), Just (Selection toDefName $ Just newSel))
   liftError ActionError $ tcWholeProg finalProg
 
--- TODO: there is a lot of duplicated code for copy/paste, often due to types/terms being different...
-getSharedScope :: ExprZ -> ExprZ -> Set.Set Name
-getSharedScope = getSharedScope' bindersLocAbove
-  where
-    bindersLocAbove :: ExprZ -> Set.Set (ID, Name)
-    bindersLocAbove = foldAbove (\x -> Set.map (getID $ current x,) $ getBoundHereUp x)
-
-getSharedScope' :: (a -> Set.Set (ID, Name)) -> a -> a -> Set.Set Name
-getSharedScope' bindersLocAbove l r =
-  let lBinds = bindersLocAbove l
-      rBinds = bindersLocAbove r
-      common = names $ Set.intersection lBinds rBinds
-      onlyLeft = names $ lBinds Set.\\ rBinds
-      onlyRight = names $ rBinds Set.\\ lBinds
-   in -- NB: 'names' is not injective, thus there can be elements in
-      -- both 'common' and 'onlyLeft'/'onlyRight'
-      -- We must filter these out since any reference to such a name
-      -- would either escape its scope (left) or be captured (right)
-      (common Set.\\ onlyLeft) Set.\\ onlyRight
-  where
-    names :: Set.Set (ID, Name) -> Set.Set Name
-    names = Set.map snd
-
 -- | Checks every term and type definition in the editable modules.
 -- Does not check imported modules.
 tcWholeProg ::
@@ -731,16 +702,7 @@ copyPasteBody p (fromDefName, fromId) toDefName setup = do
         let newSel = NodeSelection BodyNode (pasted ^. _target % _typeMetaLens % re _Right)
         pure (insertDef mod toDefBaseName (DefAST newDef), Just (Selection toDefName $ Just newSel))
       (Left srcE, InExpr tgtE) -> do
-        let sharedScope =
-              if fromDefName == toDefName
-                then getSharedScope srcE tgtE
-                else mempty
-        -- Delete unbound vars. TODO: we may want to let-bind them?
-        let tm (m, n) =
-              if Set.member (unLocalName n) sharedScope
-                then pure $ Var m $ LocalVarRef n
-                else fresh <&> \i -> EmptyHole (Meta i Nothing Nothing)
-        scopedCopy <- traverseOf _freeTmVars tm (target srcE)
+        let scopedCopy = target srcE
         freshCopy <- regenerateExprIDs scopedCopy
         -- TODO: need to care about types and directions here (and write tests for this caring!)
         {-

@@ -37,10 +37,6 @@ renameVar x y expr = case expr of
         | any (`sameVarRef` x) $ bindingNames b = guard (notFreeIn y rhs) >> pure b
         | otherwise = CaseBranch con termargs <$> renameVar x y rhs
       bindingNames (CaseBranch _ bs _) = map bindName bs
-  Var m v
-    | v == x -> pure $ Var m y
-    | v == y -> Nothing
-    | otherwise -> pure expr
   Hole{} -> substAllChildren
   EmptyHole{} -> substAllChildren
   Ann{} -> substAllChildren

@@ -20,8 +20,6 @@ module Primer.Core.Utils (
 import Foreword
 
 import Control.Monad.Fresh (MonadFresh, fresh)
-import Data.Data (Data)
-import Data.Generics.Uniplate.Data (universe)
 import Data.Set qualified as S
 import Optics (
   Fold,
@@ -44,7 +42,6 @@ import Primer.Core (
   HasID (_id),
   ID,
   LVarName,
-  TmVarRef (GlobalVarRef, LocalVarRef),
   TyVarName,
   Type' (..),
   bindName,
@@ -88,11 +85,6 @@ _freeTmVars = traversalVL $ go mempty
       t@EmptyHole{} -> pure t
       Ann m e ty -> Ann m <$> go bound f e <*> pure ty
       Lam m v e -> Lam m v <$> go (S.insert v bound) f e
-      t@(Var m v)
-        | LocalVarRef n <- v
-        , not $ S.member n bound ->
-            curry f m n
-        | otherwise -> pure t
       Case m e bs -> Case m <$> go bound f e <*> traverse freeVarsBr bs
       where
         freeVarsBr (CaseBranch c binds e) = CaseBranch c binds <$> go (S.union bound $ S.fromList $ map bindName binds) f e
@@ -109,13 +101,12 @@ _freeTyVars = traversalVL $ go mempty
         -- A well scoped term will not refer to v as a type
         -- variable, so we do not need to add it to the bound set
         Lam m v <$> go bound f e
-      t@Var{} -> pure t -- These are always term variables, so not a target
       Case m e bs -> Case m <$> go bound f e <*> traverse freeVarsBr bs
       where
         freeVarsBr (CaseBranch c binds e) = CaseBranch c binds <$> go bound f e -- case branches only bind term variables
 
-freeGlobalVars :: (Data a, Data b) => Expr' a b -> Set GVarName
-freeGlobalVars e = S.fromList [v | Var _ (GlobalVarRef v) <- universe e]
+freeGlobalVars :: Expr' a b -> Set GVarName
+freeGlobalVars _ = mempty
 
 -- | Traverse the 'ID's in an 'Expr''.
 exprIDs :: (HasID a, HasID b) => Traversal' (Expr' a b) ID

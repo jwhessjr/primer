@@ -113,7 +113,6 @@ data Expr' a b
   | EmptyHole a
   | Ann a (Expr' a b) (Type' b)
   | Lam a LVarName (Expr' a b)
-  | Var a TmVarRef
   | Case a (Expr' a b) [CaseBranch' a b] -- See Note [Case]
   deriving stock (Eq, Show, Read, Data, Generic)
 

@@ -408,9 +408,6 @@ checkEverything sh CheckEverything{trusted, toCheck} =
 -- cached types, and @TCSynthed T == typeOf e'@
 synth :: TypeM e m => Expr -> m (Type, ExprT)
 synth = \case
-  Var i x -> do
-    t <- either throwError' pure . lookupVar x =<< ask
-    pure $ annSynth1 t i Var x
   Ann i e t -> do
     -- Check that the type is well-formed by synthesising its kind
     t' <- checkKind' KType t
