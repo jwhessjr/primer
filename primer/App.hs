@@ -2,7 +2,6 @@
 
 module App (
   module Available,
-  Log (..),
   App,
   mkApp,
   appProg,
@@ -115,21 +114,11 @@ data Prog = Prog
   -- ^ The editable "home" modules
   , progSelection :: Maybe Selection
   , progSmartHoles :: SmartHoles
-  , progLog :: Log
-  -- ^ The sequence of all successful edits performed on the program
-  -- since its creation, in order of first edit to last. A successful
-  -- undo operation pops the last edit from this log, and pushes it
-  -- onto the 'redoLog'.
   }
   deriving stock (Eq, Show, Read)
 
 _progSelection :: Setter' Prog (Maybe Selection)
 _progSelection = sets $ \f p -> p{progSelection = f $ progSelection p}
-
--- | Push a compound action onto the given 'Log', returning the new
--- 'Log'.
-push :: [ProgAction] -> Log -> Log
-push as l = Log $ as : unlog l
 
 progAllModules :: Prog -> [Module]
 progAllModules p = progModules p
@@ -147,15 +136,6 @@ progAllDefs p = foldMap' (moduleDefsQualified) (progModules p)
 -- All modules in a @Prog@ shall be well-typed, in the appropriate scope:
 -- all the imports are in one mutual dependency group
 -- the @progModule@ has all the imports in scope
-
--- | The action log
---  This is the canonical store of the program - we can recreate any current or
---  past program state by replaying this log.
---  Each item is a sequence of Core actions which should be applied atomically.
---  Items are stored in reverse order so it's quick to add new ones.
-newtype Log = Log {unlog :: [[ProgAction]]}
-  deriving stock (Eq, Show, Read)
-  deriving newtype (Semigroup, Monoid)
 
 -- | Describes what interface element the user has selected.
 -- A definition in the left hand nav bar, and possibly a node in that definition.
@@ -216,10 +196,8 @@ focusNodeDefs defs defname nodeid =
 handleEditRequest :: forall m l. MonadEditApp l ProgError m => [ProgAction] -> m Prog
 handleEditRequest actions = do
   (prog, _) <- gets appProg >>= \p -> foldlM go (p, Nothing) actions
-  let l = progLog prog
-  let prog' = prog{progLog = push actions l}
-  modify (\s -> s & _prog .~ prog')
-  pure prog'
+  modify (\s -> s & _prog .~ prog)
+  pure prog
   where
     go :: (Prog, Maybe GVarName) -> ProgAction -> m (Prog, Maybe GVarName)
     go (prog, mdef) a =

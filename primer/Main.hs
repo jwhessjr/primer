@@ -10,7 +10,6 @@ import Action (
 import App (
   App,
   EditAppM,
-  Log (..),
   NodeType (..),
   Prog (..),
   ProgError (ActionError, DefAlreadyExists),
@@ -256,7 +255,6 @@ prog = do
       { progModules = [m]
       , progSelection = Nothing
       , progSmartHoles = SmartHoles
-      , progLog = Log{unlog = []}
       }
 
 tasty_undo_redo :: Property
