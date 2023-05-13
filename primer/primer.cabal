@@ -36,10 +36,8 @@ executable primer-test
     Primer.Action.Movement
     Primer.Action.ProgAction
     Primer.Action.ProgError
-    Primer.Core.Fresh
     Primer.Core.Meta
     Primer.Core.Type
-    Primer.Core.Type.Utils
     Primer.Typecheck.Cxt
     Primer.Typecheck.Kindcheck
     Primer.Typecheck.KindError
