@@ -204,11 +204,6 @@ runRandomAvailableAction a = do
           progActs <- either (const failure) pure $ toProgActionInput defName (Available.Option n) act'
           actionSucceedsOrCapture StudentProvided (handleEditRequest progActs) a
   where
-    runEditAppMLogs ::
-      EditAppM Identity ProgError a ->
-      App ->
-      PropertyT WT (Either ProgError a, App)
-    runEditAppMLogs m a' = pure $ runIdentity $ runEditAppM m a'
     actionSucceeds :: HasCallStack => EditAppM Identity ProgError a -> App -> PropertyT WT App
     actionSucceeds m a' =
       runEditAppMLogs m a' >>= \case
@@ -228,6 +223,9 @@ runRandomAvailableAction a = do
           pure Nothing
         (_, (Left _, _)) -> failure
         (_, (Right _, a''')) -> pure $ Just a'''
+
+runEditAppMLogs :: EditAppM Identity ProgError a -> App -> PropertyT WT (Either ProgError a, App)
+runEditAppMLogs m a' = pure $ runIdentity $ runEditAppM m a'
 
 -- helper type for tasty_undo_redo
 data Act
@@ -281,15 +279,6 @@ tasty_undo_redo = withTests 500 $
         else do
           void $ runEditAppMLogs (handleMutationRequest Undo) a'
   where
-    -- TODO: dry
-    runEditAppMLogs ::
-      HasCallStack =>
-      EditAppM Identity ProgError a ->
-      App ->
-      PropertyT WT App
-    runEditAppMLogs m a = case runIdentity $ runEditAppM m a of
-      (Left _, _) -> failure
-      (Right _, a') -> pure a'
     runRandomAction a = fromMaybe a <$> runRandomAvailableAction a
 
 iterateNM :: Monad m => Int -> a -> (a -> m a) -> m a
