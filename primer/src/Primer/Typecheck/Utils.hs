@@ -32,7 +32,7 @@ import Primer.Name (Name, NameCounter)
 import Primer.Subst (substTySimul)
 import Primer.TypeDef (
   ASTTypeDef (astTypeDefConstructors, astTypeDefParameters),
-  TypeDef (TypeDefAST, TypeDefPrim),
+  TypeDef (TypeDefAST),
   TypeDefMap,
   ValCon (valConArgs, valConName),
   typeDefAST,
@@ -107,7 +107,6 @@ instantiateValCons' ::
 instantiateValCons' tyDefs t =
   getTypeDefInfo' tyDefs t
     >>= \(TypeDefInfo params tc def) -> case def of
-      TypeDefPrim _ -> Left TDINotADT
       TypeDefAST tda -> do
         let defparams = map fst $ astTypeDefParameters tda
             f :: ValCon () -> (ValConName, forall m. MonadFresh NameCounter m => [m (Type' ())])

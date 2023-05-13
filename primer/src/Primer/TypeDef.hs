@@ -9,7 +9,6 @@ module Primer.TypeDef (
   typeDefParameters,
   ASTTypeDef (..),
   _astTypeDefConstructors,
-  PrimTypeDef (..),
   valConType,
   _typedefFields,
   forgetTypeDefMetadata,
@@ -33,24 +32,15 @@ import Primer.Core.Utils (forgetTypeMetadata)
 import Primer.Name (Name)
 
 data TypeDef b
-  = TypeDefPrim PrimTypeDef
-  | TypeDefAST (ASTTypeDef b)
+  = TypeDefAST (ASTTypeDef b)
   deriving stock (Eq, Show, Read, Data)
 
 _TypeDefAST :: Traversal (TypeDef b) (TypeDef b') (ASTTypeDef b) (ASTTypeDef b')
 _TypeDefAST = traversalVL $ \f -> \case
-  TypeDefPrim x -> pure $ TypeDefPrim x
   TypeDefAST x -> TypeDefAST <$> f x
 
 -- | A mapping of global names to 'TypeDef's.
 type TypeDefMap = Map TyConName (TypeDef ())
-
--- | Definition of a primitive data type
-data PrimTypeDef = PrimTypeDef
-  { primTypeDefParameters :: [Kind]
-  , primTypeDefNameHints :: [Name]
-  }
-  deriving stock (Eq, Show, Read, Data)
 
 -- | Definition of an algebraic data type
 --
@@ -85,11 +75,9 @@ valConType tc td vc =
 
 typeDefParameters :: TypeDef b -> [Kind]
 typeDefParameters = \case
-  TypeDefPrim t -> primTypeDefParameters t
   TypeDefAST t -> snd <$> astTypeDefParameters t
 typeDefAST :: TypeDef b -> Maybe (ASTTypeDef b)
 typeDefAST = \case
-  TypeDefPrim _ -> Nothing
   TypeDefAST t -> Just t
 typeDefKind :: TypeDef b -> Kind
 typeDefKind = foldr KFun KType . typeDefParameters
