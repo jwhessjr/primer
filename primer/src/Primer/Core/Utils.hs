@@ -88,7 +88,6 @@ _freeTmVars = traversalVL $ go mempty
       t@EmptyHole{} -> pure t
       Ann m e ty -> Ann m <$> go bound f e <*> pure ty
       App m e s -> App m <$> go bound f e <*> go bound f s
-      t@Con{} -> pure t
       Lam m v e -> Lam m v <$> go (S.insert v bound) f e
       t@(Var m v)
         | LocalVarRef n <- v
@@ -108,7 +107,6 @@ _freeTyVars = traversalVL $ go mempty
       t@EmptyHole{} -> pure t
       Ann m e ty -> Ann m <$> go bound f e <*> traverseFreeVarsTy bound f ty
       App m e s -> App m <$> go bound f e <*> go bound f s
-      t@Con{} -> pure t
       Lam m v e ->
         -- A well scoped term will not refer to v as a type
         -- variable, so we do not need to add it to the bound set

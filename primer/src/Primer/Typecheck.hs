@@ -133,7 +133,6 @@ import Primer.TypeDef (
   TypeDefMap,
   ValCon (valConArgs, valConName),
   typeDefAST,
-  valConType,
  )
 import Primer.Typecheck.Cxt (Cxt (Cxt, globalCxt, localCxt, smartHoles, typeDefs))
 import Primer.Typecheck.Kindcheck (
@@ -438,10 +437,6 @@ synth = \case
   EmptyHole i -> pure $ annSynth0 (TEmptyHole ()) i EmptyHole
   -- We assume that constructor names are unique
   -- See Note [Synthesisable constructors] in Core.hs
-  Con i c -> do
-    asks (flip lookupConstructor c . typeDefs) >>= \case
-      Just (vc, tc, td) -> let t = valConType tc td vc in pure $ annSynth1 t i Con c
-      Nothing -> throwError' $ UnknownConstructor c
   -- When synthesising a hole, we first check that the expression inside it
   -- synthesises a type successfully (see Note [Holes and bidirectionality]).
   -- TODO: we would like to remove this hole (leaving e) if possible, but I

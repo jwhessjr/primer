@@ -113,7 +113,6 @@ data Expr' a b
   | EmptyHole a
   | Ann a (Expr' a b) (Type' b)
   | App a (Expr' a b) (Expr' a b)
-  | Con a ValConName -- See Note [Synthesisable constructors]
   | Lam a LVarName (Expr' a b)
   | Var a TmVarRef
   | Case a (Expr' a b) [CaseBranch' a b] -- See Note [Case]
