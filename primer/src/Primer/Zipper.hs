@@ -1,3 +1,4 @@
+{-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE OverloadedLabels #-}
 
 -- | This module contains the zipper types @ExprZ@ and @TypeZ@, and functions for
@@ -34,15 +35,9 @@ module Primer.Zipper (
   left,
   right,
   farthest,
-  FoldAbove,
-  current,
-  prior,
   unfocusExpr,
   unfocusLoc,
   locToEither,
-  LetBinding' (..),
-  LetBinding,
-  LetTypeBinding' (..),
   SomeNode (..),
   findNodeWithParent,
   findType,
@@ -56,8 +51,10 @@ import Data.Generics.Uniplate.Data ()
 import Data.Generics.Uniplate.Zipper (
   Zipper,
   fromZipper,
+  replaceHole,
   zipper,
  )
+import Data.Generics.Uniplate.Zipper qualified as Z
 import Data.List as List (delete)
 import Optics (
   AffineTraversal',
@@ -68,6 +65,7 @@ import Optics (
   iso,
   ix,
   only,
+  over,
   preview,
   set,
   view,
@@ -77,7 +75,8 @@ import Optics (
   (<%>),
   (^?),
  )
-import Optics.Lens (Lens', lens)
+import Optics.Lens (Lens', equality', lens)
+import Optics.Traversal (traverseOf)
 import Primer.Core (
   Bind,
   Bind' (..),
@@ -87,39 +86,99 @@ import Primer.Core (
   ExprMeta,
   HasID (..),
   ID,
-  LVarName,
   Type,
   Type' (),
   TypeMeta,
   getID,
   typesInExpr,
  )
-import Primer.Zipper.Type (
-  FoldAbove,
-  FoldAbove' (..),
-  IsZipper (..),
-  LetTypeBinding' (LetTypeBind),
-  TypeZip,
-  down,
-  farthest,
-  focus,
-  focusOnTy,
-  left,
-  replace,
-  right,
-  search,
-  target,
-  top,
-  up,
-  _target,
- )
+
+type TypeZip' b = Zipper (Type' b) (Type' b)
+
+-- | An ordinary zipper for 'Type's
+type TypeZip = TypeZip' TypeMeta
+
+-- | We want to use up, down, left, right, etc. on 'ExprZ' and 'TypeZ',
+-- despite them being very different types. This class enables that, by proxying
+-- each method through to the underlying Zipper.
+-- @za@ is the user-facing type, i.e. 'ExprZ' or 'TypeZ'.
+-- @a@ is the type of targets of the internal zipper, i.e. 'Expr' or 'Type'.
+class Data a => IsZipper za a | za -> a where
+  asZipper :: Lens' za (Z.Zipper a a)
+
+instance Data a => IsZipper (Z.Zipper a a) a where
+  asZipper = equality'
+
+target :: IsZipper za a => za -> a
+target = Z.hole . view asZipper
+
+-- | A 'Lens' for the target of a zipper
+_target :: IsZipper za a => Lens' za a
+_target = lens target (flip replace)
+
+up :: IsZipper za a => za -> Maybe za
+up = traverseOf asZipper Z.up
+
+down :: (IsZipper za a) => za -> Maybe za
+down = traverseOf asZipper Z.down
+
+left :: IsZipper za a => za -> Maybe za
+left = traverseOf asZipper Z.left
+
+right :: IsZipper za a => za -> Maybe za
+right = traverseOf asZipper Z.right
+
+top :: IsZipper za a => za -> za
+top = farthest up
+
+-- | Convert a normal 'Expr' or 'Type' to a cursored one, focusing on the root
+focus :: (Data a) => a -> Zipper a a
+focus = zipper
+
+-- | Replace the node at the cursor with the given value.
+replace :: (IsZipper za a) => a -> za -> za
+replace = over asZipper . replaceHole
+
+-- | Focus on the node with the given 'ID', if it exists in the type
+focusOnTy ::
+  (Data b, HasID b) =>
+  ID ->
+  Type' b ->
+  Maybe (Zipper (Type' b) (Type' b))
+focusOnTy i = focusOnTy' i . focus
+
+-- | Focus on the node with the given 'ID', if it exists in the focussed type
+focusOnTy' ::
+  (Data b, HasID b) =>
+  ID ->
+  Zipper (Type' b) (Type' b) ->
+  Maybe (Zipper (Type' b) (Type' b))
+focusOnTy' i = fmap snd . search matchesID
+  where
+    matchesID z
+      -- If the current target has the correct ID, return that
+      | getID (target z) == i = Just z
+      | otherwise = Nothing
+
+-- | Search for a node for which @f@ returns @Just@ something.
+-- Performs a depth-first, leftmost-first search.
+search :: (IsZipper za a) => (za -> Maybe b) -> za -> Maybe (za, b)
+search f z
+  | Just x <- f z = Just (z, x)
+  | otherwise =
+      -- if the node has children, recurse on the leftmost child
+      (down z >>= search f . farthest left)
+        -- then recurse on the sibling to the right
+        <|> (right z >>= search f)
+
+-- | Move the zipper focus as far in one direction as possible
+farthest :: (a -> Maybe a) -> a -> a
+farthest f = go where go a = maybe a go (f a)
 
 type ExprZ' a b = Zipper (Expr' a b) (Expr' a b)
 
 -- | An ordinary zipper for 'Expr's
 type ExprZ = ExprZ' ExprMeta TypeMeta
-
-type TypeZip' b = Zipper (Type' b) (Type' b)
 
 -- | A zipper for 'Type's embedded in expressions.
 -- For such types, we need a way
@@ -305,13 +364,6 @@ focusOn' i = fmap snd . search matchesID
           let inType = focusType z >>= search (guarded (== i) . getID . target) <&> fst <&> InType
               inCaseBinds = findInCaseBinds i z
            in inType <|> inCaseBinds
-
-data LetBinding' a b
-  = LetBind LVarName (Expr' a b)
-  | LetrecBind LVarName (Expr' a b) (Type' b)
-  | LetTyBind (LetTypeBinding' b)
-  deriving stock (Eq, Show)
-type LetBinding = LetBinding' ExprMeta TypeMeta
 
 -- | Find a node in the AST by its ID, and also return its parent
 findNodeWithParent ::
