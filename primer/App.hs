@@ -9,7 +9,6 @@ module App (
   runEditAppM,
   Prog (..),
   progAllDefs,
-  ProgError (..),
   handleEditRequest,
 ) where
 
@@ -49,7 +48,7 @@ import Optics (
   (.~),
   (?~),
  )
-import Errors (ProgError (..))
+import Errors (Error (..))
 import Zipper (
   locToEither,
   target,
@@ -102,7 +101,7 @@ instance HasID NodeSelection where
 
 -- * Request handlers
 
-handleEditRequest :: forall m l. MonadEditApp l ProgError m => [ProgAction] -> m Prog
+handleEditRequest :: forall m l. MonadEditApp l Error m => [ProgAction] -> m Prog
 handleEditRequest actions = do
   (prog, _) <- gets appProg >>= \p -> foldlM go (p, Nothing) actions
   modify (\s -> s & _prog .~ prog)
@@ -116,7 +115,7 @@ handleEditRequest actions = do
 -- | Handle a 'ProgAction'
 -- The 'GVarName' argument is the currently-selected definition, which is
 -- provided for convenience: it is the same as the one in the progSelection.
-applyProgAction :: MonadEdit m ProgError => Prog -> Maybe Text -> ProgAction -> m Prog
+applyProgAction :: MonadEdit m Error => Prog -> Maybe Text -> ProgAction -> m Prog
 applyProgAction prog mdefName = \case
   MoveToDef d -> do
     let m = progModule prog
@@ -140,7 +139,7 @@ applyProgAction prog mdefName = \case
   BodyAction actions -> editModuleOf mdefName prog $ \m defName def -> do
     res <- applyActionsToBody (progModule prog) def actions
     case res of
-      Left err -> throwError $ ActionError err
+      Left err -> throwError err
       Right (def', z) -> do
         let meta = either (view _exprMetaLens . target) (view _typeMetaLens . target) $ locToEither z
         pure
@@ -156,7 +155,7 @@ applyProgAction prog mdefName = \case
   SigAction actions -> editModuleOf mdefName prog $ \curMod defName def -> do
     res <- applyActionsToTypeSig curMod (defName, def) actions
     case res of
-      Left err -> throwError $ ActionError err
+      Left err -> throwError err
       Right (mod', zt) -> do
         let node = target zt
             meta = view _typeMetaLens node
@@ -172,7 +171,7 @@ applyProgAction prog mdefName = \case
               )
 
 editModule ::
-  MonadError ProgError m =>
+  MonadError Error m =>
   Prog ->
   (Module -> m (Module, Maybe Selection)) ->
   m Prog
@@ -185,7 +184,7 @@ editModule p f = do
       }
 
 editModuleOf ::
-  MonadError ProgError m =>
+  MonadError Error m =>
   Maybe Text ->
   Prog ->
   (Module -> Text -> ASTDef -> m (Module, Maybe Selection)) ->
@@ -234,8 +233,8 @@ runEditAppM (EditAppM m) appState =
 --
 -- Actions run in this monad cannot modify the 'App'. We use 'ExceptT'
 -- here for compatibility with 'EditApp'.
-newtype QueryAppM a = QueryAppM (ReaderT App (Except ProgError) a)
-  deriving newtype (Functor, Applicative, Monad, MonadReader App, MonadError ProgError)
+newtype QueryAppM a = QueryAppM (ReaderT App (Except Error) a)
+  deriving newtype (Functor, Applicative, Monad, MonadReader App, MonadError Error)
 
 -- | The student's application's state.
 --

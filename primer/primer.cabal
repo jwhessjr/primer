@@ -28,7 +28,6 @@ executable primer-test
     Typecheck
     TypeDef
     Zipper
-    NestedError
     Actions
     Errors
     Movement

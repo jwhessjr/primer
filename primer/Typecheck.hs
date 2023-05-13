@@ -20,8 +20,6 @@ module Typecheck (
   initialCxt,
   buildTypingContext,
   buildTypingContextFromModules,
-  TypeError (..),
-  KindError (..),
   exprTtoExpr,
   typeTtoType,
   consistentTypes,
@@ -55,18 +53,12 @@ import Def (
  )
 import Fresh (MonadFresh (..))
 import Errors (
-  KindError (
-    InconsistentKinds,
-    KindDoesNotMatchArrow,
-    UnknownTypeConstructor
-  ),
-  TypeError (..),
+  Error (..),
  )
 import Module (
   Module (moduleTypes, moduleDefs),
   _moduleDefs,
  )
-import NestedError (MonadNestedError (..), modifyError')
 import Optics (
   A_Traversal,
   AppendIndices,
@@ -109,8 +101,7 @@ type KindM e m =
   ( Monad m
   , MonadReader Cxt m -- has access to a typing context, and SmartHoles option
   , MonadFresh Int m -- can generate fresh IDs
-  -- can generate fresh names (needed for "smart holes" and polymorphism)
-  , MonadNestedError KindError e m -- can throw kind errors
+  , MonadError Error m
   )
 
 type TypeT = Type' TypeMeta
@@ -122,7 +113,7 @@ synthKind = \case
   TCon m c -> do
     typeDef <- asks (Map.lookup c . typeDefs)
     case typeDef of
-      Nothing -> throwError' $ UnknownTypeConstructor c
+      Nothing -> throwError $ UnknownTypeConstructor c
       Just def -> let k = typeDefKind def in pure (k, TCon m c)
   TFun m a b -> do
     a' <- checkKind KType a
@@ -134,8 +125,8 @@ checkKind _ t = do
   (_, t') <- synthKind t
   pure t'
 
-assert :: MonadNestedError TypeError e m => Bool -> Text -> m ()
-assert b s = unless b $ throwError' (InternalError s)
+assert :: MonadError Error m => Bool -> Text -> m ()
+assert b s = unless b $ throwError (InternalError s)
 
 extendGlobalCxt :: [(Text, Type)] -> Cxt -> Cxt
 extendGlobalCxt globals cxt = cxt{globalCxt = Map.fromList globals <> globalCxt cxt}
@@ -169,8 +160,7 @@ type TypeM e m =
   ( Monad m
   , MonadReader Cxt m -- has access to a typing context, and SmartHoles option
   , MonadFresh Int m -- can generate fresh IDs
-  -- can generate fresh names (needed for "smart holes" and polymorphism)
-  , MonadNestedError TypeError e m -- can throw type errors
+  , MonadError Error m
   )
 
 -- | Check all type definitions, as one recursive group, in some monadic environment
@@ -201,8 +191,8 @@ data CheckEverythingRequest = CheckEverything { toCheck :: Module}
 -- (If SmartHoles edits a type, the body of every function is checked in the
 -- environment with the updated type)
 checkEverything ::
-  forall e m.
-  (MonadFresh Int m, MonadNestedError TypeError e (ReaderT Cxt m)) =>
+  forall m.
+  (MonadFresh Int m , MonadError Error m) =>
   CheckEverythingRequest ->
   m Module
 checkEverything CheckEverything{toCheck} =
@@ -364,4 +354,4 @@ typeTtoType :: TypeT -> Type' TypeMeta
 typeTtoType = identity
 
 checkKind' :: TypeM e m => Kind -> Type' Int -> m TypeT
-checkKind' k t = modifyError' KindError (checkKind k t)
+checkKind' k t = checkKind k t

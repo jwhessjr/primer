@@ -1,6 +1,5 @@
 module Action (
   Action (..),
-  ActionError (..),
   Movement (..),
   ProgAction (..),
   applyActionsToBody,
@@ -31,7 +30,7 @@ import Def (
   ASTDef (..),
   Def (..),
  )
-import Errors (ActionError (..))
+import Errors (Error (..))
 import Fresh (MonadFresh)
 import Module (Module, insertDef)
 import ProgAction (ProgAction (..))
@@ -65,7 +64,7 @@ import Zipper (
 type ActionM m =
   ( Monad m
   , MonadFresh Int m -- can generate fresh IDs
-  , MonadError ActionError m -- can raise errors
+  , MonadError Error m -- can raise errors
   , MonadReader TC.Cxt m -- has access to a typing context
   )
 
@@ -81,7 +80,7 @@ applyActionsToTypeSig ::
   -- | This must be one of the definitions in the @Module@, with its correct name
   (Text, ASTDef) ->
   [Action] ->
-  m (Either ActionError (Module, TypeZ))
+  m (Either Error (Module, TypeZ))
 applyActionsToTypeSig mod (defName, def) actions =
   runReaderT
     go
@@ -152,7 +151,7 @@ applyActionsToBody ::
   Module ->
   ASTDef ->
   [Action] ->
-  m (Either ActionError (ASTDef, Loc))
+  m (Either Error (ASTDef, Loc))
 applyActionsToBody mod def actions =
   go
     & flip runReaderT (buildTypingContextFromModules [mod])
@@ -220,7 +219,7 @@ toProgActionNoInput ::
   Text ->
   Maybe (NodeType, Int) ->
   Available.NoInputAction ->
-  Either ActionError [ProgAction]
+  Either Error [ProgAction]
 toProgActionNoInput defName mNodeSel = \case
   Available.MakeFun ->
     -- We arbitrarily choose that the "construct a function type" action places the focused expression
@@ -239,7 +238,7 @@ toProgActionInput ::
   Text ->
   Available.Option ->
   Available.InputAction ->
-  Either ActionError [ProgAction]
+  Either Error [ProgAction]
 toProgActionInput defName opt = \case
   Available.RenameDef -> pure [RenameDef defName $ Available.option opt]
 

@@ -3,7 +3,6 @@ module Main (main) where
 import Foreword
 
 import Action (
-  ActionError (NameCapture),
   toProgActionInput,
   toProgActionNoInput,
  )
@@ -12,7 +11,6 @@ import App (
   EditAppM,
   NodeType (..),
   Prog (..),
-  ProgError (ActionError, DefAlreadyExists),
   appProg,
   handleEditRequest,
   mkApp,
@@ -60,6 +58,7 @@ import Module (
 import Numeric.Natural (Natural)
 import Optics (toListOf)
 import TypeDef (ASTTypeDef (..), TypeDef (..))
+import Errors (Error(NameCapture, DefAlreadyExists))
 
 main :: IO ()
 main = do
@@ -184,17 +183,17 @@ runRandomAvailableAction a = do
           progActs <- either (const failure) pure $ toProgActionInput defName (Available.Option n) act'
           actionSucceedsOrCapture StudentProvided (handleEditRequest progActs) a
   where
-    actionSucceeds :: (HasCallStack, Monad m) => EditAppM Identity ProgError a -> App -> PropertyT m App
+    actionSucceeds :: (HasCallStack, Monad m) => EditAppM Identity Error a -> App -> PropertyT m App
     actionSucceeds m a' =
       runEditAppMLogs m a' & \case
         (Left _, _) -> failure
         (Right _, a'') -> pure a''
     -- If we submit our own name rather than an offered one, then
     -- we should expect that name capture/clashing may happen
-    actionSucceedsOrCapture :: (HasCallStack, Monad m) => Provenance -> EditAppM Identity ProgError a -> App -> PropertyT m (Maybe App)
+    actionSucceedsOrCapture :: (HasCallStack, Monad m) => Provenance -> EditAppM Identity Error a -> App -> PropertyT m (Maybe App)
     actionSucceedsOrCapture p m a' = do
       case (p, runEditAppMLogs m a') of
-        (StudentProvided, (Left (ActionError NameCapture), _)) -> do
+        (StudentProvided, (Left NameCapture, _)) -> do
           label "name-capture with entered name"
           pure Nothing
         (StudentProvided, (Left DefAlreadyExists{}, _)) -> do
@@ -203,7 +202,7 @@ runRandomAvailableAction a = do
         (_, (Left _, _)) -> failure
         (_, (Right _, a''')) -> pure $ Just a'''
 
-runEditAppMLogs :: EditAppM Identity ProgError a -> App -> (Either ProgError a, App)
+runEditAppMLogs :: EditAppM Identity Error a -> App -> (Either Error a, App)
 runEditAppMLogs m a' = runIdentity $ runEditAppM m a'
 
 prog :: MonadFresh Int m => m Prog
