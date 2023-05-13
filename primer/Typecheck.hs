@@ -8,7 +8,6 @@
 module Typecheck (
   Type,
   Expr,
-  ExprT,
   SmartHoles (..),
   synth,
   check,
@@ -42,14 +41,9 @@ import Core (
   Kind (..),
   Meta (..),
   Type' (..),
-  TypeCache (..),
-  TypeCacheBoth (..),
   TypeMeta,
   qualifyName,
-  _exprMeta,
   _exprMetaLens,
-  _exprTypeMeta,
-  _typeMeta,
  )
 import CoreUtils (
   alphaEqTy,
@@ -100,7 +94,6 @@ import Optics (
   icompose,
   itoListOf,
   itraversed,
-  over,
   reindexed,
   selfIndex,
   set,
@@ -146,21 +139,21 @@ type KindM e m =
   , MonadNestedError KindError e m -- can throw kind errors
   )
 
-type TypeT = Type' (Meta Kind)
+type TypeT = Type' TypeMeta
 
 -- Synthesise a kind for the given type
 synthKind :: KindM e m => Type' (Meta a) -> m (Kind, TypeT)
 synthKind = \case
-  TEmptyHole m -> pure (KType, TEmptyHole (annotate KType m))
+  TEmptyHole m -> pure (KType, TEmptyHole (annotate () m))
   TCon m c -> do
     typeDef <- asks (Map.lookup c . typeDefs)
     case typeDef of
       Nothing -> throwError' $ UnknownTypeConstructor c
-      Just def -> let k = typeDefKind def in pure (k, TCon (annotate k m) c)
+      Just def -> let k = typeDefKind def in pure (k, TCon (annotate () m) c)
   TFun m a b -> do
     a' <- checkKind KType a
     b' <- checkKind KType b
-    pure (KType, TFun (annotate KType m) a' b')
+    pure (KType, TFun (annotate () m) a' b')
 
 checkKind :: KindM e m => Kind -> Type' (Meta a) -> m TypeT
 checkKind _ t = do
@@ -171,18 +164,6 @@ checkKind _ t = do
 -- (usually with a 'TypeCache' or 'Kind')
 annotate :: b -> Meta a -> Meta b
 annotate t (Meta i _) = Meta i t
-
--- | Typechecking takes as input an Expr with 'Maybe Type' annotations and
--- produces an Expr with 'Type' annotations - i.e. every node in the output is
--- given a type. The type annotation isn't itself part of the editable program
--- so it has no metadata - hence the '()' argument inside 'TypeCache'.
---
--- The 'Type' annotations cache the type which a term synthesised/was checked
--- at. For "embeddings" where typechecking defers to synthesis, we record the
--- synthesised type, not the checked one. For example, when checking that
--- @Int -> ?@ accepts @\x . x@, we record that the variable node has type
--- @Int@, rather than @?@.
-type ExprT = Expr' (Meta TypeCache) (Meta Kind)
 
 assert :: MonadNestedError TypeError e m => Bool -> Text -> m ()
 assert b s = unless b $ throwError' (InternalError s)
@@ -331,7 +312,7 @@ checkEverything sh CheckEverything{trusted, toCheck} =
 -- the cached type in the output being TCSynthed.
 -- INVARIANT: if @synth e@ gives @(T,e')@, then @e@ and @e'@ agree up to their
 -- cached types, and @TCSynthed T == typeOf e'@
-synth :: TypeM e m => Expr -> m (Type, ExprT)
+synth :: TypeM e m => Expr -> m (Type, Expr)
 synth = \case
   Ann i e t -> do
     -- Check that the type is well-formed by synthesising its kind
@@ -363,22 +344,22 @@ synth = \case
     -- We could combine these with some type class shenanigans, but it doesn't
     -- seem worth it. The general scheme is
     -- annSynthN t i c x1 ... xn = (t,c (annotate (TCSynthed t) i) x1 ... xn)
-    annSynth0 t i x = (t, x $ annotate (TCSynthed t) i)
+    annSynth0 t i x = (t, x $ annotate () i)
     annSynth1 t i c = annSynth0 t i . flip c
     annSynth2 t i c = annSynth1 t i . flip c
 
 -- | Similar to synth, but for checking rather than synthesis.
-check :: TypeM e m => Type -> Expr -> m ExprT
+check :: TypeM e m => Type -> Expr -> m Expr
 check t = \case
   e -> do
     sh <- asks smartHoles
     let default_ = do
           (t', e') <- synth e
           if consistentTypes t t'
-            then pure (set _typecache (TCEmb TCBoth{tcChkedAt = t, tcSynthed = t'}) e')
+            then pure (set _typecache () e')
             else case sh of
               NoSmartHoles -> throwError' (InconsistentTypes t t')
-              SmartHoles -> Hole <$> meta' (TCEmb TCBoth{tcChkedAt = t, tcSynthed = TEmptyHole ()}) <*> pure e'
+              SmartHoles -> Hole <$> meta' () <*> pure e'
     case (e, sh) of
       -- If the hole can be dropped leaving a type-correct term, do so
       -- We don't want the recursive call to create a fresh hole though -
@@ -432,12 +413,12 @@ eqType :: Type' a -> Type' b -> Bool
 eqType t1 t2 = forgetTypeMetadata t1 `alphaEqTy` forgetTypeMetadata t2
 
 -- | Convert @Expr (Meta Type) (Meta Kind)@ to @Expr (Meta (Maybe Type)) (Meta (Maybe Kind))@
-exprTtoExpr :: ExprT -> Expr
-exprTtoExpr = over _exprTypeMeta (fmap Just) . over _exprMeta (fmap Just)
+exprTtoExpr :: Expr -> Expr
+exprTtoExpr = identity
 
 -- | Convert @Type (Meta Kind)@ to @Type (Meta (Maybe Kind))@
 typeTtoType :: TypeT -> Type' TypeMeta
-typeTtoType = over _typeMeta (fmap Just)
+typeTtoType = identity
 
 checkKind' :: TypeM e m => Kind -> Type' (Meta a) -> m TypeT
 checkKind' k t = modifyError' KindError (checkKind k t)

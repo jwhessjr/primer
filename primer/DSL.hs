@@ -44,8 +44,8 @@ create = flip runState 0 . unS
 create' :: S a -> a
 create' = fst . create
 
-meta :: MonadFresh ID m => m (Meta (Maybe a))
-meta = meta' Nothing
+meta :: MonadFresh ID m => m (Meta ())
+meta = meta' ()
 
 meta' :: MonadFresh ID m => a -> m (Meta a)
 meta' a = Meta <$> fresh <*> pure a
