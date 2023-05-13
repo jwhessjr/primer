@@ -22,7 +22,6 @@ substTySimul sub
   where
     go = \case
       t@TEmptyHole{} -> pure t
-      THole m t -> THole m <$> go t
       t@TCon{} -> pure t
       TFun _ s t -> TFun () <$> go s <*> go t
 

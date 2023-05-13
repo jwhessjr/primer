@@ -17,15 +17,14 @@ import Foreword
 import Control.Monad.Fresh (MonadFresh)
 import Control.Monad.NestedError (MonadNestedError, throwError')
 import Data.Map qualified as Map
-import Primer.Core.DSL.Meta (meta')
 import Primer.Core.Meta (ID, Meta (Meta), TyVarName, unLocalName)
 import Primer.Core.Type (
   Kind (KType),
-  Type' (TCon, TEmptyHole, TFun, THole),
+  Type' (TCon, TEmptyHole, TFun),
  )
 import Primer.Name (NameCounter)
 import Primer.TypeDef (typeDefKind)
-import Primer.Typecheck.Cxt (Cxt (localCxt, smartHoles, typeDefs), KindOrType (K, T), Type)
+import Primer.Typecheck.Cxt (Cxt (localCxt, typeDefs), KindOrType (K, T), Type)
 import Primer.Typecheck.KindError (
   KindError (
     InconsistentKinds,
@@ -36,7 +35,6 @@ import Primer.Typecheck.KindError (
     UnknownTypeVariable
   ),
  )
-import Primer.Typecheck.SmartHoles (SmartHoles (NoSmartHoles, SmartHoles))
 
 -- | A shorthand for the constraints needed when kindchecking
 type KindM e m =
@@ -66,12 +64,6 @@ extendLocalCxtTys x cxt = cxt{localCxt = Map.fromList (bimap unLocalName K <$> x
 synthKind :: KindM e m => Type' (Meta a) -> m (Kind, TypeT)
 synthKind = \case
   TEmptyHole m -> pure (KType, TEmptyHole (annotate KType m))
-  THole m t -> do
-    sh <- asks smartHoles
-    (k, t') <- synthKind t
-    case sh of
-      NoSmartHoles -> pure (KType, THole (annotate KType m) t')
-      SmartHoles -> pure (k, t')
   TCon m c -> do
     typeDef <- asks (Map.lookup c . typeDefs)
     case typeDef of
@@ -83,23 +75,9 @@ synthKind = \case
     pure (KType, TFun (annotate KType m) a' b')
 
 checkKind :: KindM e m => Kind -> Type' (Meta a) -> m TypeT
-checkKind k (THole m t) = do
-  -- If we didn't have this special case, we might remove this hole (in a
-  -- recursive call), only to reintroduce it again with a different ID
-  -- TODO: ugly and duplicated...
-  sh <- asks smartHoles
-  (k', t') <- synthKind t
-  case (consistentKinds k k', sh) of
-    (_, NoSmartHoles) -> pure $ THole (annotate KType m) t'
-    (True, SmartHoles) -> pure t'
-    (False, SmartHoles) -> pure $ THole (annotate KType m) t'
-checkKind k t = do
-  sh <- asks smartHoles
-  (k', t') <- synthKind t
-  case (consistentKinds k k', sh) of
-    (True, _) -> pure t'
-    (False, NoSmartHoles) -> throwError' $ InconsistentKinds k k'
-    (False, SmartHoles) -> THole <$> meta' KType <*> pure t'
+checkKind _ t = do
+  (_, t') <- synthKind t
+  pure t'
 
 -- | Extend the metadata of an 'Expr' or 'Type'
 -- (usually with a 'TypeCache' or 'Kind')

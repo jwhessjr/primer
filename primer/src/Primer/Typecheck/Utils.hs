@@ -24,7 +24,7 @@ import Data.Set qualified as S
 import Optics (Lens', view, (%))
 import Primer.Core (Expr', GlobalName (baseName, qualifiedModule), ModuleName, TypeCache, _exprMetaLens)
 import Primer.Core.Meta (Meta, TyConName, ValConName, _type)
-import Primer.Core.Type (Kind, Type' (TCon, TEmptyHole, THole))
+import Primer.Core.Type (Kind, Type' (TCon, TEmptyHole))
 import Primer.Name (Name, NameCounter)
 import Primer.TypeDef (
   ASTTypeDef,
@@ -48,7 +48,6 @@ data TypeDefInfo a = TypeDefInfo [Type' a] TyConName (TypeDef ()) -- instantiate
 
 getTypeDefInfo' :: TypeDefMap -> Type' a -> Either TypeDefError (TypeDefInfo a)
 getTypeDefInfo' _ (TEmptyHole _) = Left TDIHoleType
-getTypeDefInfo' _ (THole _ _) = Left TDIHoleType
 getTypeDefInfo' tydefs (TCon _ tycon) =
       case M.lookup tycon tydefs of
         Nothing -> Left $ TDIUnknown tycon

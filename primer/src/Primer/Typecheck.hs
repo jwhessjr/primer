@@ -590,7 +590,6 @@ checkBranch t (vc, args) (CaseBranch nb patterns rhs) =
 -- holes on both sides.
 matchArrowType :: Type -> Maybe (Type, Type)
 matchArrowType (TEmptyHole _) = pure (TEmptyHole (), TEmptyHole ())
-matchArrowType (THole _ _) = pure (TEmptyHole (), TEmptyHole ())
 matchArrowType (TFun _ a b) = pure (a, b)
 matchArrowType _ = Nothing
 
@@ -604,8 +603,6 @@ consistentTypes x y = uncurry eqType $ holepunch x y
     -- obviously different constructors.)
     holepunch (TEmptyHole _) _ = (TEmptyHole (), TEmptyHole ())
     holepunch _ (TEmptyHole _) = (TEmptyHole (), TEmptyHole ())
-    holepunch (THole _ _) _ = (TEmptyHole (), TEmptyHole ())
-    holepunch _ (THole _ _) = (TEmptyHole (), TEmptyHole ())
     holepunch (TFun _ s t) (TFun _ s' t') =
       let (hs, hs') = holepunch s s'
           (ht, ht') = holepunch t t'

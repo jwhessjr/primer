@@ -59,7 +59,6 @@ forgetTypeMetadata = set _typeMeta ()
 -- (empty or non-empty, or inside a kind)
 noHoles :: Data a => Type' a -> Bool
 noHoles t = flip all (universe t) $ \case
-  THole{} -> False
   TEmptyHole{} -> False
   _ -> True
 
@@ -76,7 +75,6 @@ traverseFreeVarsTy = go
   where
     go bound f = \case
       t@TEmptyHole{} -> pure t
-      THole m t -> THole m <$> go bound f t
       t@TCon{} -> pure t
       TFun m s t -> TFun m <$> go bound f s <*> go bound f t
 
@@ -92,7 +90,6 @@ alphaEqTy :: Type' () -> Type' () -> Bool
 alphaEqTy = go
   where
     go (TEmptyHole _) (TEmptyHole _) = True
-    go (THole _ s) (THole _ t) = go s t
     go (TCon _ n) (TCon _ m) = n == m
     go  (TFun _ a b) (TFun _ c d) = go a c && go b d
     go _ _ = False

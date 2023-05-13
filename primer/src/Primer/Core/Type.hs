@@ -37,7 +37,6 @@ type TypeMeta = Meta (Maybe Kind)
 -- | NB: Be careful with equality -- it is on-the-nose, rather than up-to-alpha: see Subst:alphaEqTy
 data Type' a
   = TEmptyHole a
-  | THole a (Type' a)
   | TCon a TyConName
   | TFun a (Type' a) (Type' a)
   deriving stock (Eq, Show, Read, Data, Generic)
