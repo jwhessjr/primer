@@ -218,7 +218,7 @@ handleEditRequest actions = do
   (prog, _) <- gets appProg >>= \p -> foldlM go (p, Nothing) actions
   let l = progLog prog
   let prog' = prog{progLog = push actions l}
-  modify (\s -> s & _currentState % _prog .~ prog')
+  modify (\s -> s & _prog .~ prog')
   pure prog'
   where
     go :: (Prog, Maybe GVarName) -> ProgAction -> m (Prog, Maybe GVarName)
@@ -413,32 +413,19 @@ newtype QueryAppM a = QueryAppM (ReaderT App (Except ProgError) a)
 -- Building an 'App' can be tricky, so we don't export the
 -- constructor. See 'mkApp' and 'mkAppSafe'.
 data App = App
-  { currentState :: AppState
-  , initialState :: AppState
-  }
-  deriving stock (Eq, Show, Read)
-
-_currentState :: Setter' App AppState
-_currentState = sets $ \f a -> a{currentState = f $ currentState a}
-
--- Internal app state. Note that this type is not exported, as we want
--- to guarantee that the counters are kept in sync with the 'Prog',
--- and this should only be done via the 'MonadFresh' instances in this
--- module.
-data AppState = AppState
   { idCounter :: ID
   , nameCounter :: NameCounter
   , prog :: Prog
   }
   deriving stock (Eq, Show, Read)
 
-_idCounter :: Setter' AppState ID
+_idCounter :: Setter' App ID
 _idCounter = sets $ \f as -> as{idCounter = f $ idCounter as}
 
-_nameCounter :: Setter' AppState NameCounter
+_nameCounter :: Setter' App NameCounter
 _nameCounter = sets $ \f as -> as{nameCounter = f $ nameCounter as}
 
-_prog :: Setter' AppState Prog
+_prog :: Setter' App Prog
 _prog = sets $ \f as -> as{prog = f $ prog as}
 
 -- | Construct an 'App' from an 'ID' and a 'Prog'.
@@ -480,28 +467,26 @@ _prog = sets $ \f as -> as{prog = f $ prog as}
 --
 -- https://github.com/hackworthltd/primer/issues/510
 mkApp :: ID -> NameCounter -> Prog -> App
-mkApp i n p =
-  let s = AppState i n p
-   in App s s
+mkApp i n p = App i n p
 
 -- | Given an 'App', return the next 'ID' that should be used to
 -- create a new node.
 appIdCounter :: App -> ID
-appIdCounter = idCounter . currentState
+appIdCounter = idCounter
 
 -- | Given an 'App', return its 'NameCounter'.
 appNameCounter :: App -> NameCounter
-appNameCounter = nameCounter . currentState
+appNameCounter = nameCounter
 
 -- | Given an 'App', return its 'Prog'.
 appProg :: App -> Prog
-appProg = prog . currentState
+appProg = prog
 
 -- | Support for generating fresh IDs
 instance Monad m => MonadFresh ID (EditAppM m e) where
   fresh = do
     id_ <- gets appIdCounter
-    modify (\s -> s & _currentState % _idCounter .~ id_ + 1)
+    modify (\s -> s & _idCounter .~ id_ + 1)
     pure id_
 
 -- | Support for generating names. Basically just a counter so we don't
@@ -509,7 +494,7 @@ instance Monad m => MonadFresh ID (EditAppM m e) where
 instance Monad m => MonadFresh NameCounter (EditAppM m e) where
   fresh = do
     nc <- gets appNameCounter
-    modify (\s -> s & _currentState % _nameCounter .~ succ nc)
+    modify (\s -> s & _nameCounter .~ succ nc)
     pure nc
 
 copyPasteSig :: MonadEdit m ProgError => Prog -> (GVarName, ID) -> GVarName -> [Action] -> m Prog
