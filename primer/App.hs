@@ -37,7 +37,6 @@ import Action (
  )
 import Available (
   Editable (..),
-  Level (..),
   NodeType (..),
  )
 import Core (

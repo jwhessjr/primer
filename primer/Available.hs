@@ -1,7 +1,6 @@
 -- | Compute all the possible actions which can be performed on a definition.
 -- This module is expected to be imported qualified, due to various potential name clashes.
 module Available (
-  Level (..),
   Editable (..),
   NodeType (..),
   Action (..),
@@ -34,20 +33,6 @@ import Zipper (
   findNodeWithParent,
   findType,
  )
-
--- | The current programming "level". This setting determines which
--- actions are displayed to the student, the labels on UI elements,
--- etc.
-data Level
-  = -- | Bare minimum features to define sum types, and functions on
-    -- those types using simple pattern matching.
-    Beginner
-  | -- | Function application & monomorphic HoF. (Support for the latter
-    -- should probably be split into a separate level.)
-    Intermediate
-  | -- | All features.
-    Expert
-  deriving stock (Eq, Read, Show, Enum, Bounded)
 
 data Editable = Editable | NonEditable
   deriving stock (Bounded, Enum, Show)
