@@ -30,7 +30,6 @@ executable primer-test
     Zipper
     Actions
     Errors
-    Movement
     ProgAction
     Meta
     Type

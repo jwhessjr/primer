@@ -1,11 +1,8 @@
 module Actions (
   Action (..),
-  Movement (..),
 ) where
 
 import Foreword
-
-import Movement (Movement (..))
 
 -- We split this module to increase parallelism in our build.
 -- This module does not depend on much, but takes a long time

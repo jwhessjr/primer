@@ -1,6 +1,5 @@
 module Action (
   Action (..),
-  Movement (..),
   ProgAction (..),
   applyActionsToBody,
   applyActionsToTypeSig,
@@ -10,7 +9,7 @@ module Action (
 
 import Foreword hiding (mod)
 
-import Actions (Action (..), Movement (..))
+import Actions (Action (..))
 import Available (NodeType (..))
 import Available qualified as Available
 import Core (
