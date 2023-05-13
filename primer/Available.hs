@@ -34,7 +34,7 @@ import Zipper (
   findType,
  )
 
-data Editable = Editable | NonEditable
+data Editable = Editable
   deriving stock (Bounded, Enum, Show)
 
 data NodeType = BodyNode | SigNode
@@ -64,7 +64,6 @@ forDef ::
   Editable ->
   GVarName ->
   [Action]
-forDef _ NonEditable _ = mempty
 forDef defs Editable defName =
   [Input RenameDef]
     <> mwhen
@@ -77,7 +76,6 @@ forBody ::
   Expr ->
   ID ->
   [Action]
-forBody NonEditable _ _ = mempty
 forBody Editable expr id = case findNodeWithParent id expr of
   Nothing -> mempty
   Just (ExprNode _, p) -> case p of
@@ -95,7 +93,6 @@ forSig ::
   Type ->
   ID ->
   [Action]
-forSig NonEditable _ _ = mempty
 forSig Editable ty id = case findType id ty of
   Nothing -> mempty
   Just t -> forType t

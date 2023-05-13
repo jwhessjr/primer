@@ -167,7 +167,6 @@ pickPos p = ((\(defName, (editable, def)) -> (defName,editable,) <$> pickLoc def
   where
     isMutable = \case
       Editable -> True
-      NonEditable -> False
     pickDef = case partition (isMutable . fst . snd) $ Map.toList $ progAllDefs p of
       ([], []) -> Nothing
       (mut, []) -> Just $ Gen.element mut
