@@ -55,7 +55,7 @@ import DSL
 import Hedgehog.Internal.Runner (checkReport)
 import Hedgehog.Internal.Property (Property(propertyConfig, propertyTest), Skip(SkipToShrink), TestCount, ShrinkPath, forAllT)
 import qualified Hedgehog.Internal.Seed as Seed
-import Hedgehog.Internal.Report (reportStatus, Report (reportSeed, reportTests), Result (..), FailureReport (failureShrinkPath, failureAnnotations), FailedAnnotation (FailedAnnotation))
+import Hedgehog.Internal.Report (reportStatus, Report (reportSeed, reportTests), Result (..), FailureReport (failureShrinkPath, failureAnnotations), FailedAnnotation) -- (FailedAnnotation))
 import Numeric.Natural (Natural)
 import qualified Data.Map.Strict as M
 import Data.List.Extra (enumerate)
@@ -86,7 +86,7 @@ runAndRecheck = either identity absurd <$> runExceptT go
    go :: ExceptT RRInfo IO Void
    go = do
     seed <- Seed.random
-    (shrink, failann) <- ExceptT $ runProp seed tasty_undo_redo <&> \case
+    (shrink, _failann) <- ExceptT $ runProp seed tasty_undo_redo <&> \case
       Passed -> Left RunPass
       Defeat -> Left RunDefeat
       Fail tc sp failann -> Right (SkipToShrink tc sp, failann)
