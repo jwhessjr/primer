@@ -165,8 +165,7 @@ instance HasID NodeSelection where
 
 -- | The type of requests which can mutate the application state.
 data MutationRequest
-  = Undo
-  | Edit [ProgAction]
+  = Edit [ProgAction]
   deriving stock (Eq, Show, Read)
 
 -- * Request handlers
