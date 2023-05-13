@@ -88,7 +88,6 @@ import ProgError (ProgError (..))
 import Typecheck (
   CheckEverythingRequest (CheckEverything, toCheck, trusted),
   Cxt,
-  SmartHoles,
   TypeError,
   checkEverything,
  )
@@ -113,7 +112,6 @@ data Prog = Prog
   { progModules :: [Module]
   -- ^ The editable "home" modules
   , progSelection :: Maybe Selection
-  , progSmartHoles :: SmartHoles
   }
   deriving stock (Eq, Show, Read)
 
@@ -231,8 +229,7 @@ applyProgAction prog mdefName = \case
         let m' = m{moduleDefs = Map.insert newNameBase (DefAST def) $ Map.delete defName defs}
         pure (m' : ms, Just $ Selection newName Nothing)
   BodyAction actions -> editModuleOf mdefName prog $ \m defName def -> do
-    let smartHoles = progSmartHoles prog
-    res <- applyActionsToBody smartHoles (progAllModules prog) def actions
+    res <- applyActionsToBody (progAllModules prog) def actions
     case res of
       Left err -> throwError $ ActionError err
       Right (def', z) -> do
@@ -248,8 +245,7 @@ applyProgAction prog mdefName = \case
                     }
           )
   SigAction actions -> editModuleOfCross mdefName prog $ \ms@(curMod, _) defName def -> do
-    let smartHoles = progSmartHoles prog
-    res <- applyActionsToTypeSig smartHoles [] ms (defName, def) actions
+    res <- applyActionsToTypeSig [] ms (defName, def) actions
     case res of
       Left err -> throwError $ ActionError err
       Right (mod', zt) -> do
@@ -481,7 +477,6 @@ copyPasteSig p (fromDefName, fromTyId) toDefName setup = do
     Left (Left _) -> throwError $ CopyPasteError "tried to copy-paste an expression into a signature"
     Left (Right zt) -> pure $ Left zt
     Right zt -> pure $ Right zt
-  let smartHoles = progSmartHoles p
   finalProg <- editModuleOf (Just toDefName) p $ \mod toDefBaseName oldDef -> do
     let otherModules = filter ((/= moduleName mod) . moduleName) (progModules p)
     -- We intentionally throw away any changes in doneSetup other than via 'tgt'
@@ -490,7 +485,7 @@ copyPasteSig p (fromDefName, fromTyId) toDefName setup = do
     -- which will pick up any problems. It is better to do it in one batch,
     -- in case the intermediate state after 'setup' causes more problems
     -- than the final state does.
-    doneSetup <- applyActionsToTypeSig smartHoles [] (mod, otherModules) (toDefBaseName, oldDef) setup
+    doneSetup <- applyActionsToTypeSig [] (mod, otherModules) (toDefBaseName, oldDef) setup
     tgt <- case doneSetup of
       Left err -> throwError $ ActionError err
       Right (_, tgt) -> pure $ focusOnlyType tgt
@@ -518,7 +513,6 @@ tcWholeProg ::
 tcWholeProg p = do
   mods' <-
     checkEverything
-      (progSmartHoles p)
       CheckEverything
         { trusted = []
         , toCheck = progModules p
@@ -554,11 +548,10 @@ copyPasteBody p (fromDefName, fromId) toDefName setup = do
         Left (Left e) -> Left e
         Left (Right t) -> Right (Left t)
         Right t -> Right (Right t)
-  let smartHoles = progSmartHoles p
   finalProg <- editModuleOf (Just toDefName) p $ \mod toDefBaseName oldDef -> do
     -- The Loc zipper captures all the changes, they are only reflected in the
     -- returned Def, which we thus ignore
-    doneSetup <- applyActionsToBody smartHoles (progAllModules p) oldDef setup
+    doneSetup <- applyActionsToBody (progAllModules p) oldDef setup
     tgt <- case doneSetup of
       Left err -> throwError $ ActionError err
       Right (_, tgt) -> pure tgt

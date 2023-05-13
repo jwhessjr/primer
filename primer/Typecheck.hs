@@ -8,7 +8,6 @@
 module Typecheck (
   Type,
   Expr,
-  SmartHoles (..),
   synth,
   check,
   synthKind,
@@ -103,15 +102,11 @@ import TypeError (TypeError (..))
 
 type Type = Type' ()
 
-data SmartHoles = SmartHoles | NoSmartHoles
-  deriving stock (Eq, Show, Read)
-
 data KindOrType = K Kind | T Type
   deriving stock (Show, Eq)
 
 data Cxt = Cxt
-  { smartHoles :: SmartHoles
-  , typeDefs :: TypeDefMap
+  { typeDefs :: TypeDefMap
   , localCxt :: Map Name KindOrType
   -- ^ local variables. invariant: the Name comes from a @LocalName k@, and
   -- the tag @k@ should say whether the value is a kind or a type.
@@ -163,22 +158,21 @@ extendTypeDefCxt :: TypeDefMap -> Cxt -> Cxt
 extendTypeDefCxt typedefs cxt = cxt{typeDefs = typedefs <> typeDefs cxt}
 
 -- An empty typing context
-initialCxt :: SmartHoles -> Cxt
-initialCxt sh =
+initialCxt :: Cxt
+initialCxt =
   Cxt
-    { smartHoles = sh
-    , typeDefs = mempty
+    { typeDefs = mempty
     , localCxt = mempty
     , globalCxt = mempty
     }
 
 -- | Construct an initial typing context, with all given definitions in scope as global variables.
-buildTypingContext :: TypeDefMap -> DefMap -> SmartHoles -> Cxt
-buildTypingContext tydefs defs sh =
+buildTypingContext :: TypeDefMap -> DefMap -> Cxt
+buildTypingContext tydefs defs =
   let globals = Map.assocs $ fmap defType defs
-   in extendTypeDefCxt tydefs $ extendGlobalCxt globals $ initialCxt sh
+   in extendTypeDefCxt tydefs $ extendGlobalCxt globals initialCxt
 
-buildTypingContextFromModules :: [Module] -> SmartHoles -> Cxt
+buildTypingContextFromModules :: [Module] -> Cxt
 buildTypingContextFromModules modules =
   buildTypingContext
     (foldMap' moduleTypesQualified modules)
@@ -227,11 +221,10 @@ data CheckEverythingRequest = CheckEverything
 checkEverything ::
   forall e m.
   (MonadFresh ID m, MonadFresh NameCounter m, MonadNestedError TypeError e (ReaderT Cxt m)) =>
-  SmartHoles ->
   CheckEverythingRequest ->
   m [Module]
-checkEverything sh CheckEverything{trusted, toCheck} =
-  let cxt = buildTypingContextFromModules trusted sh
+checkEverything CheckEverything{trusted, toCheck} =
+  let cxt = buildTypingContextFromModules trusted
    in flip runReaderT cxt $ do
         let newTypes = foldMap' moduleTypesQualified toCheck
         checkTypeDefs newTypes
@@ -328,23 +321,20 @@ synth = \case
 check :: TypeM e m => Type -> Expr -> m Expr
 check t = \case
   e -> do
-    sh <- asks smartHoles
     let default_ = do
           (t', e') <- synth e
           if consistentTypes t t'
             then pure e'
-            else case sh of
-              NoSmartHoles -> throwError' (InconsistentTypes t t')
-              SmartHoles -> Hole <$> fresh <*> pure e'
-    case (e, sh) of
+            else Hole <$> fresh <*> pure e'
+    case e of
       -- If the hole can be dropped leaving a type-correct term, do so
       -- We don't want the recursive call to create a fresh hole though -
       -- this can lead to the output being the same as the input, but with
       -- ID of the top hole changed, leading to losing cursor positions etc.
       -- But we do want to remove nested holes.
-      (Hole _ e'@Hole{}, SmartHoles) ->
+      Hole _ e'@Hole{} ->
         check t e' -- we strip off one layer, and hit this case again.
-      (Hole _ (Ann _ e' TEmptyHole{}), SmartHoles) ->
+      Hole _ (Ann _ e' TEmptyHole{}) ->
         -- We do want to remove (e.g.) {? λx.x : ? ?} to get λx.x,
         -- if that typechecks. (But only a simple hole annotation, as we do
         -- not wish to delete any interesting annotations.)
@@ -352,7 +342,7 @@ check t = \case
           check t e' >>= \case
             Hole{} -> default_ -- Don't let the recursive call mint a hole.
             e'' -> pure e''
-      (Hole _ (Ann _ _ ty), SmartHoles)
+      Hole _ (Ann _ _ ty)
         | not (noHoles ty) ->
             -- Don't want to, e.g., remove {? λx.x : ? ?} to get λx.x : ?
             -- Since holey annotations behave like non-empty holes, we will
@@ -361,7 +351,7 @@ check t = \case
             -- holes with holey-annotated contents in the case a construction
             -- cannot typecheck, e.g. Bool ∋ λx.t returns {? λx.t : ? ?}
             default_
-      (Hole _ e', SmartHoles) ->
+      Hole _ e' ->
         flip catchError (const default_) $
           check t e' >>= \case
             Hole{} -> default_ -- Don't let the recursive call mint a hole.

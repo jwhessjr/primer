@@ -67,9 +67,6 @@ import Name (Name (unName), unsafeMkName)
 import Numeric.Natural (Natural)
 import Optics (toListOf)
 import TypeDef (ASTTypeDef (..), TypeDef (..))
-import Typecheck (
-  SmartHoles (..),
- )
 
 main :: IO ()
 main = do
@@ -249,7 +246,6 @@ prog = do
     Prog
       { progModules = [m]
       , progSelection = Nothing
-      , progSmartHoles = SmartHoles
       }
 
 tasty_undo_redo :: Property

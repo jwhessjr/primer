@@ -41,7 +41,6 @@ import Name (Name, NameCounter)
 import ProgAction (ProgAction (..))
 import Typecheck (
   CheckEverythingRequest (CheckEverything, toCheck, trusted),
-  SmartHoles,
   buildTypingContextFromModules,
   check,
   checkEverything,
@@ -85,7 +84,6 @@ type ActionM m =
 -- change.
 applyActionsToTypeSig ::
   (MonadFresh ID m, MonadFresh NameCounter m) =>
-  SmartHoles ->
   [Module] ->
   -- | The @Module@ we are focused on, and all the other editable modules
   (Module, [Module]) ->
@@ -93,10 +91,10 @@ applyActionsToTypeSig ::
   (Name, ASTDef) ->
   [Action] ->
   m (Either ActionError ([Module], TypeZ))
-applyActionsToTypeSig smartHoles _imports (mod, mods) (defName, def) actions =
+applyActionsToTypeSig _imports (mod, mods) (defName, def) actions =
   runReaderT
     go
-    (buildTypingContextFromModules (mod : mods) smartHoles)
+    (buildTypingContextFromModules (mod : mods))
     & runExceptT
   where
     go :: ActionM m => m ([Module], TypeZ)
@@ -112,7 +110,7 @@ applyActionsToTypeSig smartHoles _imports (mod, mods) (defName, def) actions =
       -- We make sure that the updated type is present in the global context.
       -- Here we just check the whole of the mutable prog, excluding imports.
       -- (for efficiency, we need not check the type definitions, but we do not implement this optimisation)
-      checkEverything smartHoles (CheckEverything{trusted = [], toCheck = mod' : mods})
+      checkEverything (CheckEverything{trusted = [], toCheck = mod' : mods})
         >>= \checkedMods -> pure (checkedMods, zt)
     -- Actions expect that all ASTs have a top-level expression of some sort.
     -- Signatures don't have this: they're just a type.
@@ -143,10 +141,7 @@ data Refocus = Refocus
 -- or the expression under an elided annotation
 refocus :: MonadReader TC.Cxt m => Refocus -> m (Maybe Loc)
 refocus Refocus{pre, post} = do
-  sh <- asks TC.smartHoles
-  let candidateIDs = case sh of
-        TC.NoSmartHoles -> [getID pre]
-        TC.SmartHoles -> case pre of
+  let candidateIDs = case pre of
           InExpr e -> candidateIDsExpr $ target e
           InType t -> candidateIDsType $ target t
   pure . getFirst . mconcat $ fmap (\i -> First $ focusOn i post) candidateIDs
@@ -163,14 +158,13 @@ refocus Refocus{pre, post} = do
 -- After applying the actions, we check the new Expr against the type sig of the definition.
 applyActionsToBody ::
   (MonadFresh ID m, MonadFresh NameCounter m) =>
-  SmartHoles ->
   [Module] ->
   ASTDef ->
   [Action] ->
   m (Either ActionError (ASTDef, Loc))
-applyActionsToBody sh modules def actions =
+applyActionsToBody modules def actions =
   go
-    & flip runReaderT (buildTypingContextFromModules modules sh)
+    & flip runReaderT (buildTypingContextFromModules modules)
     & runExceptT
   where
     go :: ActionM m => m (ASTDef, Loc)
