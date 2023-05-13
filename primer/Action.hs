@@ -5,7 +5,6 @@ module Action (
   ProgAction (..),
   applyActionsToBody,
   applyActionsToTypeSig,
-  moveExpr,
   toProgActionInput,
   toProgActionNoInput,
 ) where
@@ -24,7 +23,6 @@ import Core (
   Type,
   getID,
  )
-import Core qualified as C
 import CoreUtils (forgetTypeMetadata)
 import DSL (
   ann,
@@ -32,7 +30,6 @@ import DSL (
   tEmptyHole,
   tfun,
  )
-import Data.List (findIndex)
 import Def (
   ASTDef (..),
   Def (..),
@@ -59,13 +56,11 @@ import Zipper (
   Loc,
   Loc' (..),
   TypeZ,
-  down,
   focus,
   focusLoc,
   focusOn,
   focusType,
   replace,
-  right,
   target,
   top,
   unfocus,
@@ -221,13 +216,12 @@ applyAction' :: ActionM m => Action -> Loc -> m Loc
 applyAction' a = case a of
   SetCursor i -> setCursor i . unfocusLoc
   Move m -> \case
-    InExpr z -> InExpr <$> moveExpr m z
-    InType z -> InType <$> moveType m z
+    InExpr z -> InExpr <$> moveUp z
+    InType z -> InType <$> moveUp z
     z@(InBind _) -> case m of
       -- If we're moving up from a binding, then shift focus to the nearest parent expression.
       -- This is exactly what 'unfocusLoc' does if the 'Loc' is a binding.
       Parent -> pure . InExpr $ unfocusLoc z
-      _ -> throwError $ CustomFailure (Move m) "Can only move up from a binding"
   Delete -> \case
     InExpr ze -> InExpr . flip replace ze <$> emptyHole
     InType zt -> InType . flip replace zt <$> tEmptyHole
@@ -243,41 +237,11 @@ setCursor i e = case focusOn i (unfocusExpr e) of
   Just e' -> pure e'
   Nothing -> throwError $ IDNotFound i
 
--- | Apply a movement to a zipper
-moveExpr :: ActionM m => Movement -> ExprZ -> m ExprZ
-moveExpr m@(Branch c) z | Case _ _ brs <- target z =
-  case findIndex (\(C.CaseBranch n _ _) -> c == n) brs of
-    Nothing -> throwError $ CustomFailure (Move m) "Move-to-branch failed: no such branch"
-    -- 'down' moves into the scrutinee, 'right' then steps through branch
-    -- rhss
-    Just i -> case foldr (\_ z' -> right =<< z') (down z) [0 .. i] of
-      Just z' -> pure z'
-      Nothing -> throwError $ CustomFailure (Move m) "internal error: movement failed, even though branch exists"
-moveExpr m@(Branch _) _ = throwError $ CustomFailure (Move m) "Move-to-branch failed: this is not a case expression"
-moveExpr Child2 z
-  | Case{} <- target z =
-      throwError $ CustomFailure (Move Child2) "cannot move to 'Child2' of a case: use Branch instead"
-moveExpr m z = move m z
-
--- | Apply a movement to a zipper
-moveType :: ActionM m => Movement -> TypeZ -> m TypeZ
-moveType m@(Branch _) _ = throwError $ CustomFailure (Move m) "Move-to-branch unsupported in types (there are no cases in types!)"
-moveType m z = move m z
-
--- | Apply a movement to a generic zipper - does not support movement to a case
--- branch
-move :: forall m za a. (ActionM m, IsZipper za a, HasID za) => Movement -> za -> m za
-move m z = do
-  mz' <- move' m z
-  case mz' of
+moveUp :: forall m za a. (ActionM m, IsZipper za a, HasID za) => za -> m za
+moveUp z = do
+  case up z of
     Just z' -> pure z'
-    Nothing -> throwError $ MovementFailed (getID z, m)
-  where
-    move' :: Movement -> za -> m (Maybe za)
-    move' Parent = pure . up
-    move' Child1 = pure . down
-    move' Child2 = pure . (down >=> right)
-    move' (Branch _) = const $ throwError $ InternalFailure "move does not support Branch moves"
+    Nothing -> throwError $ MovementFailed (getID z, Parent)
 
 constructArrowL :: ActionM m => TypeZ -> m TypeZ
 constructArrowL zt = flip replace zt <$> tfun (pure (target zt)) tEmptyHole
@@ -295,7 +259,7 @@ toProgActionNoInput defName mNodeSel = \case
   Available.MakeFun ->
     -- We arbitrarily choose that the "construct a function type" action places the focused expression
     -- on the domain (left) side of the arrow.
-    toProgAction [ConstructArrowL, Move Child1]
+    toProgAction [ConstructArrowL]
   Available.DeleteType ->
     toProgAction [Delete]
   Available.DeleteDef ->

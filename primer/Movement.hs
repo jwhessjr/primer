@@ -2,8 +2,6 @@ module Movement (Movement (..)) where
 
 import Foreword
 
-import Meta (ValConName)
-
 -- | Core movements
-data Movement = Child1 | Child2 | Parent | Branch ValConName
+data Movement = Parent
   deriving stock (Eq, Show, Read)
