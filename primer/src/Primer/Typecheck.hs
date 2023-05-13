@@ -1,3 +1,5 @@
+{-# LANGUAGE ImpredicativeTypes #-}
+
 -- | Typechecking for Core expressions.
 -- This closely follows the type system of Hazelnut, but supports arbitrary
 -- types rather than just numbers.
@@ -41,8 +43,10 @@ module Primer.Typecheck (
 
 import Foreword
 
+import Control.Arrow ((&&&))
 import Control.Monad.Fresh (MonadFresh (..))
 import Control.Monad.NestedError (MonadNestedError (..), modifyError')
+import Data.Functor.Compose (Compose (Compose, getCompose))
 import Data.Foldable (foldMap')
 import Data.Map qualified as M
 import Data.Map.Strict qualified as Map
@@ -53,6 +57,7 @@ import Optics (
   IxFold,
   IxTraversal',
   JoinKinds,
+  Lens',
   Optic',
   WithIx,
   equality,
@@ -74,10 +79,12 @@ import Primer.Core (
   Expr,
   Expr' (..),
   ExprMeta,
+  GlobalName (baseName, qualifiedModule),
   GVarName,
   ID,
   Kind (..),
   LVarName,
+  ModuleName,
   Meta (..),
   Type' (..),
   TypeCache (..),
@@ -89,10 +96,12 @@ import Primer.Core (
   unLocalName,
   _bindMeta,
   _exprMeta,
+  _exprMetaLens,
   _exprTypeMeta,
   _typeMeta,
  )
 import Primer.Core.DSL (S, branch, create', emptyHole, meta, meta')
+import Primer.Core.Meta (TyConName, _type)
 import Primer.Core.Utils (
   alphaEqTy,
   forgetTypeMetadata,
@@ -117,6 +126,8 @@ import Primer.Module (
  )
 import Primer.Name (Name, NameCounter)
 import Primer.TypeDef (
+  ASTTypeDef,
+  TypeDef (TypeDefAST),
   TypeDefMap,
  )
 import Primer.Typecheck.Cxt (Cxt (Cxt, globalCxt, localCxt, smartHoles, typeDefs))
@@ -131,16 +142,7 @@ import Primer.Typecheck.Kindcheck (
  )
 import Primer.Typecheck.SmartHoles (SmartHoles (..))
 import Primer.Typecheck.TypeError (TypeError (..))
-import Primer.Typecheck.Utils (
-  TypeDefError (TDIHoleType, TDINotADT, TDINotSaturated, TDIUnknown),
-  TypeDefInfo (TypeDefInfo),
-  getGlobalBaseNames,
-  getGlobalNames,
-  getTypeDefInfo',
-  instantiateValCons,
-  instantiateValCons',
-  _typecache,
- )
+
 
 -- | Typechecking takes as input an Expr with 'Maybe Type' annotations and
 -- produces an Expr with 'Type' annotations - i.e. every node in the output is
@@ -528,3 +530,81 @@ typeTtoType = over _typeMeta (fmap Just)
 
 checkKind' :: TypeM e m => Kind -> Type' (Meta a) -> m TypeT
 checkKind' k t = modifyError' KindError (checkKind k t)
+
+data TypeDefError
+  = TDIHoleType -- a type hole
+  | TDINotADT -- e.g. a function type etc
+  | TDIUnknown TyConName -- not in scope
+  | TDINotSaturated -- e.g. @List@ or @List a b@ rather than @List a@
+
+data TypeDefInfo a = TypeDefInfo [Type' a] TyConName (TypeDef ()) -- instantiated parameters, and the typedef (with its name), i.e. [Int] are the parameters for @List Int@
+
+getTypeDefInfo' :: TypeDefMap -> Type' a -> Either TypeDefError (TypeDefInfo a)
+getTypeDefInfo' _ (TEmptyHole _) = Left TDIHoleType
+getTypeDefInfo' tydefs (TCon _ tycon) =
+      case M.lookup tycon tydefs of
+        Nothing -> Left $ TDIUnknown tycon
+        Just tydef
+          -- this check would be redundant if we were sure that the input type
+          -- were of kind KType, alternatively we should do kind checking here
+          | otherwise -> Right $ TypeDefInfo [] tycon tydef
+getTypeDefInfo' _ _ = Left TDINotADT
+
+-- | Takes a particular instance of a parameterised type (e.g. @List Nat@), and
+-- extracts both both the raw typedef (e.g. @List a = Nil | Cons a (List a)@)
+-- and the constructors with instantiated argument types
+-- (e.g. @Nil : List Nat ; Cons : Nat -> List Nat -> List Nat@)
+instantiateValCons ::
+  (MonadFresh NameCounter m, MonadReader Cxt m) =>
+  Type' () ->
+  m (Either TypeDefError (TyConName, ASTTypeDef (), [(ValConName, [Type' ()])]))
+instantiateValCons t = do
+  tds <- asks typeDefs
+  let instCons = instantiateValCons' tds t
+      -- Because @(,,) a b@ does not have a Traversable instance
+      -- we reassociate so we use the one of @(,) a@
+      reassoc (a, b, c) = ((a, b), c)
+      reassoc' ((a, b), c) = (a, b, c)
+      sequence4 =
+        fmap (getCompose . getCompose . getCompose . getCompose)
+          . sequence
+          . Compose
+          . Compose
+          . Compose
+          . Compose
+  -- We eta-expand here to deal with simplified subsumption
+  {- HLINT ignore instantiateValCons "Use id" -}
+  fmap (fmap reassoc') $ sequence4 $ fmap (fmap (fmap $ fmap $ \x -> x) . reassoc) instCons
+
+-- | As 'instantiateValCons', but pulls out the relevant bits of the monadic
+-- context into an argument
+instantiateValCons' ::
+  TypeDefMap ->
+  Type' () ->
+  Either TypeDefError (TyConName, ASTTypeDef (), [(ValConName, forall m. MonadFresh NameCounter m => [m (Type' ())])])
+instantiateValCons' tyDefs t =
+  getTypeDefInfo' tyDefs t
+    >>= \(TypeDefInfo _params tc def) -> case def of
+      TypeDefAST tda -> pure (tc, tda, [])
+
+-- | A lens for the type annotation of an 'Expr' or 'ExprT'
+_typecache :: Lens' (Expr' (Meta a) b) a
+_typecache = _exprMetaLens % _type
+
+-- Helper to create fresh names
+getGlobalNames :: MonadReader Cxt m => m (S.Set (ModuleName, Name))
+getGlobalNames = do
+  tyDefs <- asks typeDefs
+  topLevel <- asks $ S.fromList . map f . M.keys . globalCxt
+  let ctors =
+        Map.foldMapWithKey
+          ( \t _def ->
+              S.fromList [f t]
+          )
+          tyDefs
+  pure $ S.union topLevel ctors
+  where
+    f = qualifiedModule &&& baseName
+
+getGlobalBaseNames :: MonadReader Cxt m => m (S.Set Name)
+getGlobalBaseNames = S.map snd <$> getGlobalNames
