@@ -40,7 +40,6 @@ data Type' a
   | THole a (Type' a)
   | TCon a TyConName
   | TFun a (Type' a) (Type' a)
-  | TApp a (Type' a) (Type' a)
   deriving stock (Eq, Show, Read, Data, Generic)
 
 -- | A traversal over the metadata of a type

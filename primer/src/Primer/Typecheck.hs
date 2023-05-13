@@ -26,8 +26,6 @@ module Primer.Typecheck (
   typeOf,
   matchArrowType,
   matchForallType,
-  decomposeTAppCon,
-  mkTAppCon,
   TypeDefInfo (..),
   TypeDefError (..),
   getTypeDefInfo',
@@ -106,7 +104,6 @@ import Primer.Core (
   _typeMeta,
  )
 import Primer.Core.DSL (S, branch, create', emptyHole, meta, meta')
-import Primer.Core.Transform (decomposeTAppCon, mkTAppCon)
 import Primer.Core.Utils (
   alphaEqTy,
   forgetTypeMetadata,
@@ -648,10 +645,6 @@ consistentTypes x y = uncurry eqType $ holepunch x y
       let (hs, hs') = holepunch s s'
           (ht, ht') = holepunch t t'
        in (TFun () hs ht, TFun () hs' ht')
-    holepunch (TApp _ s t) (TApp _ s' t') =
-      let (hs, hs') = holepunch s s'
-          (ht, ht') = holepunch t t'
-       in (TApp () hs ht, TApp () hs' ht')
     holepunch s t = (s, t)
 
 -- | Compare two types for alpha equality, ignoring their IDs

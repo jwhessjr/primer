@@ -25,7 +25,6 @@ substTySimul sub
       THole m t -> THole m <$> go t
       t@TCon{} -> pure t
       TFun _ s t -> TFun () <$> go s <*> go t
-      TApp _ s t -> TApp () <$> go s <*> go t
 
 -- | Simple and inefficient capture-avoiding substitution.
 -- @substTy n a t@  is @t[a/n]@

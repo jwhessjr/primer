@@ -20,10 +20,9 @@ import Primer.Core.Meta (
   TyConName,
   ValConName,
  )
-import Primer.Core.Transform (mkTAppCon)
 import Primer.Core.Type (
   Kind (KType),
-  Type' (TFun),
+  Type' (TFun, TCon),
  )
 import Primer.Core.Utils (forgetTypeMetadata)
 
@@ -57,7 +56,7 @@ _valConArgs = lens valConArgs $ \c as -> c {valConArgs = as}
 
 valConType :: TyConName -> ASTTypeDef () -> ValCon () -> Type' ()
 valConType tc _td vc =
-  let ret = mkTAppCon tc []
+  let ret = TCon () tc
       args = foldr (TFun ()) ret (forgetTypeMetadata <$> valConArgs vc)
    in args
 

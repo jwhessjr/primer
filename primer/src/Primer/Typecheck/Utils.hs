@@ -24,8 +24,7 @@ import Data.Set qualified as S
 import Optics (Lens', view, (%))
 import Primer.Core (Expr', GlobalName (baseName, qualifiedModule), ModuleName, TypeCache, _exprMetaLens)
 import Primer.Core.Meta (Meta, TyConName, ValConName, _type)
-import Primer.Core.Transform (decomposeTAppCon)
-import Primer.Core.Type (Kind, Type' (TEmptyHole, THole))
+import Primer.Core.Type (Kind, Type' (TCon, TEmptyHole, THole))
 import Primer.Name (Name, NameCounter)
 import Primer.TypeDef (
   ASTTypeDef,
@@ -50,16 +49,14 @@ data TypeDefInfo a = TypeDefInfo [Type' a] TyConName (TypeDef ()) -- instantiate
 getTypeDefInfo' :: TypeDefMap -> Type' a -> Either TypeDefError (TypeDefInfo a)
 getTypeDefInfo' _ (TEmptyHole _) = Left TDIHoleType
 getTypeDefInfo' _ (THole _ _) = Left TDIHoleType
-getTypeDefInfo' tydefs ty =
-  case decomposeTAppCon ty of
-    Nothing -> Left TDINotADT
-    Just (tycon, params) -> do
+getTypeDefInfo' tydefs (TCon _ tycon) =
       case M.lookup tycon tydefs of
         Nothing -> Left $ TDIUnknown tycon
         Just tydef
           -- this check would be redundant if we were sure that the input type
           -- were of kind KType, alternatively we should do kind checking here
-          | otherwise -> Right $ TypeDefInfo params tycon tydef
+          | otherwise -> Right $ TypeDefInfo [] tycon tydef
+getTypeDefInfo' _ _ = Left TDINotADT
 
 -- | Takes a particular instance of a parameterised type (e.g. @List Nat@), and
 -- extracts both both the raw typedef (e.g. @List a = Nil | Cons a (List a)@)

@@ -79,7 +79,6 @@ traverseFreeVarsTy = go
       THole m t -> THole m <$> go bound f t
       t@TCon{} -> pure t
       TFun m s t -> TFun m <$> go bound f s <*> go bound f t
-      TApp m s t -> TApp m <$> go bound f s <*> go bound f t
 
 -- Check two types for alpha equality
 --
@@ -96,7 +95,6 @@ alphaEqTy = go
     go (THole _ s) (THole _ t) = go s t
     go (TCon _ n) (TCon _ m) = n == m
     go  (TFun _ a b) (TFun _ c d) = go a c && go b d
-    go (TApp _ a b) (TApp _ c d) = go a c && go b d
     go _ _ = False
 
 -- | Traverse the 'ID's in a 'Type''.

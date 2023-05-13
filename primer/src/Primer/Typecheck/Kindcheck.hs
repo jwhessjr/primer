@@ -21,7 +21,7 @@ import Primer.Core.DSL.Meta (meta')
 import Primer.Core.Meta (ID, Meta (Meta), TyVarName, unLocalName)
 import Primer.Core.Type (
   Kind (KFun, KHole, KType),
-  Type' (TApp, TCon, TEmptyHole, TFun, THole),
+  Type' (TCon, TEmptyHole, TFun, THole),
  )
 import Primer.Name (NameCounter)
 import Primer.TypeDef (typeDefKind)
@@ -96,26 +96,6 @@ synthKind = \case
     a' <- checkKind KType a
     b' <- checkKind KType b
     pure (KType, TFun (annotate KType m) a' b')
-  TApp ma (THole mh s) t -> do
-    -- If we didn't have this special case, we might remove this hole (in a
-    -- recursive call), only to reintroduce it again with a different ID
-    -- TODO: ugly and duplicated...
-    sh <- asks smartHoles
-    (k, s') <- synthKind s
-    case (matchArrowKind k, sh) of
-      (_, NoSmartHoles) -> checkKind KHole t >>= \t' -> pure (KHole, TApp (annotate KHole ma) (THole (annotate KHole mh) s') t')
-      (Nothing, SmartHoles) -> checkKind KHole t >>= \t' -> pure (KHole, TApp (annotate KHole ma) (THole (annotate KHole mh) s') t')
-      (Just (k1, k2), SmartHoles) -> checkKind k1 t >>= \t' -> pure (k2, TApp (annotate k2 ma) s' t')
-  TApp m s t -> do
-    sh <- asks smartHoles
-    (k, s') <- synthKind s
-    case (matchArrowKind k, sh) of
-      (Nothing, NoSmartHoles) -> throwError' $ KindDoesNotMatchArrow k
-      (Nothing, SmartHoles) -> do
-        sWrap <- THole <$> meta' KHole <*> pure s'
-        t' <- checkKind KHole t
-        pure (KHole, TApp (annotate KHole m) sWrap t')
-      (Just (k1, k2), _) -> checkKind k1 t >>= \t' -> pure (k2, TApp (annotate k2 m) s' t')
 
 checkKind :: KindM e m => Kind -> Type' (Meta a) -> m TypeT
 checkKind k (THole m t) = do
@@ -140,11 +120,6 @@ checkKind k t = do
 -- (usually with a 'TypeCache' or 'Kind')
 annotate :: b -> Meta a -> Meta b
 annotate t (Meta i _ v) = Meta i t v
-
-matchArrowKind :: Kind -> Maybe (Kind, Kind)
-matchArrowKind KHole = pure (KHole, KHole)
-matchArrowKind KType = Nothing
-matchArrowKind (KFun k1 k2) = pure (k1, k2)
 
 consistentKinds :: Kind -> Kind -> Bool
 consistentKinds KHole _ = True
