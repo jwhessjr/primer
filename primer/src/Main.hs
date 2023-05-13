@@ -231,7 +231,6 @@ prog = do
                             ASTTypeDef
                               { astTypeDefParameters = []
                               , astTypeDefConstructors = []
-                              , astTypeDefNameHints = []
                               }
                         )]
                 , moduleDefs = Map.fromList [ ( "a" , DefAST $ ASTDef e t)]

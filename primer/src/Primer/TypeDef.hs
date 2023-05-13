@@ -29,7 +29,6 @@ import Primer.Core.Type (
   Type' (TForall, TFun, TVar),
  )
 import Primer.Core.Utils (forgetTypeMetadata)
-import Primer.Name (Name)
 
 data TypeDef b
   = TypeDefAST (ASTTypeDef b)
@@ -50,7 +49,6 @@ type TypeDefMap = Map TyConName (TypeDef ())
 data ASTTypeDef b = ASTTypeDef
   { astTypeDefParameters :: [(TyVarName, Kind)] -- These names scope over the constructors
   , astTypeDefConstructors :: [ValCon b]
-  , astTypeDefNameHints :: [Name]
   }
   deriving stock (Eq, Show, Read, Data)
 
