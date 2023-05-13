@@ -8,7 +8,6 @@ module App (
   appProg,
   appIdCounter,
   appNameCounter,
-  appInit,
   EditAppM,
   QueryAppM,
   runEditAppM,
@@ -17,7 +16,6 @@ module App (
   progAllDefs,
   ProgAction (..),
   ProgError (..),
-  handleMutationRequest,
   handleEditRequest,
   MutationRequest (..),
   Selection (..),
@@ -212,12 +210,6 @@ focusNodeDefs defs defname nodeid =
             Nothing -> throwError $ ActionError (IDNotFound nodeid)
             Just x -> pure x
 
--- | Handle a request to mutate the app state
-handleMutationRequest :: MonadEditApp l ProgError m => MutationRequest -> m Prog
-handleMutationRequest = \case
-  Edit as -> handleEditRequest as
-  Undo -> handleUndoRequest
-
 -- | Handle an edit request
 --
 -- Note that a successful edit resets the redo log.
@@ -376,38 +368,6 @@ editModuleOfCross mdefName prog f = case mdefName of
       Just (DefAST def) -> f ms (baseName defname) def
       _ -> throwError $ DefNotFound defname
 
--- | Undo the last block of actions.
---
--- If there are no actions in the log we return the program unchanged.
---
--- Otherwise, we undo by replaying the whole log from the start.
--- Because actions often refer to the IDs of nodes created by previous
--- actions we must reset the ID and name counter to their original
--- state before we replay. We do this by resetting the entire app
--- state.
---
--- If the replay is successful, then we return the new program and
--- push the block of actions that were undone onto the redo log.
---
--- If the replay is unsuccessful, then we throw a 'ProgError' and
--- leave it to the caller to decide how to handle it.
-handleUndoRequest :: MonadEditApp l ProgError m => m Prog
-handleUndoRequest = do
-  prog <- gets appProg
-  start <- gets appInit
-  case unlog (progLog prog) of
-    [] -> pure prog
-    (_ : as) -> do
-      runEditAppM (replay (reverse as)) start >>= \case
-        (Right _, app') -> do
-          put app'
-          gets appProg
-        (Left err, _) -> throwError err
-
--- Replay a series of actions, updating the app state with the new program
-replay :: MonadEditApp l ProgError m => [[ProgAction]] -> m ()
-replay = mapM_ handleEditRequest
-
 -- | A shorthand for the constraints we need when performing mutation
 -- operations on the application.
 --
@@ -536,12 +496,6 @@ appNameCounter = nameCounter . currentState
 -- | Given an 'App', return its 'Prog'.
 appProg :: App -> Prog
 appProg = prog . currentState
-
--- | Given an 'App', return its initial state.
-appInit :: App -> App
-appInit a =
-  let s = initialState a
-   in App s s
 
 -- | Support for generating fresh IDs
 instance Monad m => MonadFresh ID (EditAppM m e) where

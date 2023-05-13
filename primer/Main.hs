@@ -11,13 +11,11 @@ import App (
   App,
   EditAppM,
   Log (..),
-  MutationRequest (Undo),
   NodeType (..),
   Prog (..),
   ProgError (ActionError, DefAlreadyExists),
   appProg,
   handleEditRequest,
-  handleMutationRequest,
   mkApp,
   progAllDefs,
   progModules,
@@ -272,12 +270,7 @@ tasty_undo_redo = withTests 500 $
       nc <- lift $ isolateWT fresh
       let a = mkApp i nc p'
       let n = 4
-      a' <- iterateNM n a $ \a' -> runRandomAction a'
-      if null $ unlog $ progLog $ appProg a' -- TODO: expose a "log-is-null" helper from App?
-      -- It is possible for the random actions to undo everything!
-        then success
-        else do
-          void $ runEditAppMLogs (handleMutationRequest Undo) a'
+      void $ iterateNM n a $ \a' -> runRandomAction a'
   where
     runRandomAction a = fromMaybe a <$> runRandomAvailableAction a
 
