@@ -1,7 +1,3 @@
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE OverloadedLabels #-}
-{-# LANGUAGE ViewPatterns #-}
-
 -- This module defines the high level application functions.
 
 module Primer.App (
@@ -43,22 +39,16 @@ import Control.Monad.Fresh (MonadFresh (..))
 import Control.Monad.Log (MonadLog, WithSeverity)
 import Control.Monad.NestedError (MonadNestedError)
 import Data.Data (Data)
-import Data.Generics.Uniplate.Operations (descendM, transform, transformM)
 import Data.Generics.Uniplate.Zipper (
   fromZipper,
  )
-import Data.List.Extra ((!?))
 import Data.Map.Strict qualified as Map
 import Data.Set qualified as Set
 import Optics (
-  Field1 (_1),
-  Field2 (_2),
-  Field3 (_3),
   ReversibleOptic (re),
   Setter',
   ifoldMap,
   lens,
-  mapped,
   over,
   set,
   sets,
@@ -66,12 +56,9 @@ import Optics (
   traversed,
   view,
   (%),
-  (%~),
   (.~),
   (?~),
   (^.),
-  (^?),
-  _Just,
   _Left,
   _Right, Getter, to,
  )
@@ -89,45 +76,30 @@ import Primer.App.Base (
   NodeType (..),
  )
 import Primer.Core (
-  Bind' (Bind),
-  CaseBranch,
-  CaseBranch' (CaseBranch),
-  Expr,
-  Expr' (Case, Con, EmptyHole, Hole, Var),
+  Expr' (EmptyHole, Var),
   ExprMeta,
   GVarName,
   GlobalName (baseName, qualifiedModule),
   HasID (_id),
   ID (..),
-  LocalName (LocalName, unLocalName),
+  LocalName (unLocalName),
   Meta (..),
-  ModuleName (ModuleName),
+  ModuleName,
   TmVarRef (GlobalVarRef, LocalVarRef),
   TyConName,
-  Type,
   Type' (..),
-  TypeCache (TCSynthed),
   TypeMeta,
   ValConName,
   getID,
   qualifyName,
-  typesInExpr,
-  unModuleName,
-  unsafeMkGlobalName,
-  unsafeMkLocalName,
-  _chkedAt,
   _exprMetaLens,
-  _synthed,
   _typeMetaLens,
  )
-import Primer.Core.DSL (ann, hole, tEmptyHole, tvar)
-import Primer.Core.DSL qualified as DSL
-import Primer.Core.Transform (foldApp, renameVar, unfoldAPP, unfoldApp, unfoldTApp)
-import Primer.Core.Utils (freeVars, generateTypeIDs, regenerateExprIDs, regenerateTypeIDs, _freeTmVars, _freeTyVars, _freeVarsTy)
+import Primer.Core.Transform (renameVar)
+import Primer.Core.Utils (regenerateExprIDs, regenerateTypeIDs, _freeTmVars, _freeTyVars, _freeVarsTy)
 import Primer.Def (
   ASTDef (..),
   _astDefExpr,
-  _astDefType,
   Def (..),
   _DefAST,
   DefMap,
@@ -135,45 +107,33 @@ import Primer.Def (
  )
 import Primer.Def.Utils (globalInUse)
 import Primer.Module (
-  Module (moduleDefs, moduleName, moduleTypes),
-  _moduleTypes,
+  Module (moduleDefs, moduleName),
   _moduleDefs,
   deleteDef,
   insertDef,
   moduleDefsQualified,
   moduleTypesQualified,
   qualifyDefName,
-  renameModule,
-  renameModule',
  )
-import Primer.Name (Name (unName), NameCounter, freshName, unsafeMkName)
+import Primer.Name (Name, NameCounter, unsafeMkName)
 import Primer.Questions (
   Question (..),
  )
 import Primer.TypeDef (
   ASTTypeDef (..),
-  _astTypeDefConstructors,
-  _astTypeDefParameters,
   TypeDef (..),
-  _TypeDefAST,
   TypeDefMap,
   ValCon (..),
-  _valConArgs,
-  _valConName,
-  generateTypeDefIDs,
   typeDefAST,
  )
 import Primer.Typecheck (
   CheckEverythingRequest (CheckEverything, toCheck, trusted),
   Cxt,
-  SmartHoles (NoSmartHoles),
+  SmartHoles,
   TypeError,
   buildTypingContextFromModules,
   checkEverything,
-  checkTypeDefs,
-  synth,
  )
-import Primer.Typecheck.Utils (_typecache)
 import Primer.Zipper (
   ExprZ,
   Loc' (InBind, InExpr, InType),
@@ -426,10 +386,6 @@ applyProgAction prog mdefName = \case
     Nothing -> throwError NoDefSelected
     Just i -> copyPasteBody prog fromIds i setup
 
--- Helper for RenameModule action
-data RenameMods a = RM {imported :: [a], editable :: [a]}
-  deriving stock (Functor, Foldable, Traversable)
-
 lookupEditableModule :: MonadError ProgError m => ModuleName -> Prog -> m Module
 lookupEditableModule n p =
   lookupModule' n p >>= \case
@@ -477,23 +433,6 @@ editModuleCross n p f = do
       { progModules = m'
       , progSelection = s
       }
-
-editModuleSameSelection ::
-  MonadError ProgError m =>
-  ModuleName ->
-  Prog ->
-  (Module -> m Module) ->
-  m Prog
-editModuleSameSelection n p f = editModule n p (fmap (,progSelection p) . f)
-
--- A variant of 'editModuleSameSelection' for actions which can affect multiple modules
-editModuleSameSelectionCross ::
-  MonadError ProgError m =>
-  ModuleName ->
-  Prog ->
-  ((Module, [Module]) -> m [Module]) ->
-  m Prog
-editModuleSameSelectionCross n p f = editModuleCross n p (fmap (,progSelection p) . f)
 
 editModuleOf ::
   MonadError ProgError m =>
@@ -688,18 +627,6 @@ appInit :: App -> App
 appInit a =
   let s = initialState a
    in App s s
-
--- | Construct a new, empty expression
-newExpr :: MonadFresh ID m => m Expr
-newExpr = do
-  id_ <- fresh
-  pure $ EmptyHole (Meta id_ Nothing Nothing)
-
--- | Construct a new, empty type
-newType :: MonadFresh ID m => m Type
-newType = do
-  id_ <- fresh
-  pure $ TEmptyHole (Meta id_ Nothing Nothing)
 
 -- | Support for generating fresh IDs
 instance Monad m => MonadFresh ID (EditAppM m e) where
@@ -951,50 +878,6 @@ copyPasteBody p (fromDefName, fromId) toDefName setup = do
 
 lookupASTDef :: GVarName -> DefMap -> Maybe ASTDef
 lookupASTDef name = defAST <=< Map.lookup name
-
-alterTypeDef ::
-  MonadError ProgError m =>
-  (ASTTypeDef TypeMeta -> m (ASTTypeDef TypeMeta)) ->
-  TyConName ->
-  Module ->
-  m Module
-alterTypeDef f type_ m = do
-  unless (qualifiedModule type_ == moduleName m) $ throwError $ TypeDefNotFound type_
-  traverseOf
-    _moduleTypes
-    ( Map.alterF
-        ( maybe
-            (throwError $ TypeDefNotFound type_)
-            ( maybe
-                (throwError $ TypeDefIsPrim type_)
-                (map (Just . TypeDefAST) . f)
-                . typeDefAST
-            )
-        )
-        (baseName type_)
-    )
-    m
-
--- | Apply a bottom-up transformation to all branches of case expressions on the given type.
-transformCaseBranches ::
-  MonadEdit m ProgError =>
-  Prog ->
-  TyConName ->
-  ([CaseBranch] -> m [CaseBranch]) ->
-  Expr ->
-  m Expr
-transformCaseBranches prog type_ f = transformM $ \case
-  Case m scrut bs -> do
-    scrutType <-
-      fst
-        <$> runReaderT
-          (liftError (ActionError . TypeError) $ synth scrut)
-          (progCxt prog)
-    Case m scrut
-      <$> if fst (unfoldTApp scrutType) == TCon () type_
-        then f bs
-        else pure bs
-  e -> pure e
 
 progCxt :: Prog -> Cxt
 progCxt p = buildTypingContextFromModules (progAllModules p) (progSmartHoles p)

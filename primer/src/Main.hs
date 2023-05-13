@@ -24,7 +24,6 @@ import Primer.App (
   NodeType (..),
   Prog (..),
   ProgError (ActionError, DefAlreadyExists),
-  MutationRequest(Edit),
   appProg,
   handleEditRequest,
   progAllDefs,
@@ -45,9 +44,8 @@ import Primer.Def (
   Def (DefAST),
   defAST,
  )
-import Primer.Gen.App (extendCxtByModules)
 import Primer.Gen.Core.Raw (genName)
-import Primer.Gen.Core.Typed (WT, forAllT, propertyWT, freshNameForCxt, isolateWT)
+import Primer.Gen.Core.Typed (WT, forAllT, propertyWT, isolateWT)
 import Primer.Log (PureLog, runPureLog)
 import Primer.Module (
   Module (..),

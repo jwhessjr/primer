@@ -11,10 +11,7 @@ module Primer.Action.ProgAction (ProgAction (..)) where
 import Foreword
 
 import Primer.Action.Actions (Action)
-import Primer.Core.Meta (GVarName, ID, ModuleName, TyConName, TyVarName, ValConName)
-import Primer.Core.Type (Type')
-import Primer.TypeDef (ASTTypeDef)
-import Primer.Typecheck.SmartHoles (SmartHoles)
+import Primer.Core.Meta (GVarName, ID)
 
 -- | High level actions
 -- These actions move around the whole program or modify definitions
