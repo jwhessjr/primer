@@ -131,8 +131,6 @@ import Primer.TypeDef (
   TypeDefMap,
   typeDefKind
  )
-import Primer.Typecheck.Cxt (Cxt (Cxt, globalCxt, localCxt, smartHoles, typeDefs)
-                            ,KindOrType (K, T), Type)
 import Primer.Typecheck.SmartHoles (SmartHoles (..))
 import Primer.Typecheck.TypeError (TypeError (..))
 import Primer.Typecheck.KindError (
@@ -145,6 +143,24 @@ import Primer.Typecheck.KindError (
     UnknownTypeVariable
   ),
  )
+
+type Type = Type' ()
+
+data KindOrType = K Kind | T Type
+  deriving stock (Show, Eq)
+
+data Cxt = Cxt
+  { smartHoles :: SmartHoles
+  , typeDefs :: TypeDefMap
+  , localCxt :: Map Name KindOrType
+  -- ^ local variables. invariant: the Name comes from a @LocalName k@, and
+  -- the tag @k@ should say whether the value is a kind or a type.
+  -- We detect violations of this in 'lookupLocal' (thus we key this map
+  -- by the underlying 'Name', rather than use a dependent map)
+  , globalCxt :: Map GVarName Type
+  -- ^ global variables (i.e. IDs of top-level definitions)
+  }
+  deriving stock (Show)
 
 -- | A shorthand for the constraints needed when kindchecking
 type KindM e m =
