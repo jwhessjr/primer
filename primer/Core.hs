@@ -30,7 +30,6 @@ import Meta (
   TyConName,
   getID,
   qualifyName,
-  _type,
  )
 import Optics (
   AffineTraversal',

@@ -43,7 +43,6 @@ import Core (
   Type' (..),
   TypeMeta,
   qualifyName,
-  _exprMetaLens,
  )
 import CoreUtils (
   alphaEqTy,
@@ -70,7 +69,6 @@ import KindError (
     UnknownTypeConstructor
   ),
  )
-import Meta (_type)
 import Module (
   Module (
     moduleName
@@ -87,7 +85,6 @@ import Optics (
   IxFold,
   IxTraversal',
   JoinKinds,
-  Lens',
   Optic',
   WithIx,
   equality,
@@ -96,7 +93,6 @@ import Optics (
   itraversed,
   reindexed,
   selfIndex,
-  set,
   to,
   traverseOf,
   (%),
@@ -321,8 +317,8 @@ synth = \case
     -- Check e against the annotation
     e' <- check t'' e
     -- Annotate the Ann with the same type as e
-    pure $ annSynth2 t'' i Ann e' t'
-  EmptyHole i -> pure $ annSynth0 (TEmptyHole ()) i EmptyHole
+    pure (t'', Ann i e' t')
+  EmptyHole i -> pure (TEmptyHole (), EmptyHole i)
   -- We assume that constructor names are unique
   -- See Note [Synthesisable constructors] in Core.hs
   -- When synthesising a hole, we first check that the expression inside it
@@ -339,14 +335,7 @@ synth = \case
   -- See https://github.com/hackworthltd/primer/issues/7
   Hole i e -> do
     (_, e') <- synth e
-    pure $ annSynth1 (TEmptyHole ()) i Hole e'
-  where
-    -- We could combine these with some type class shenanigans, but it doesn't
-    -- seem worth it. The general scheme is
-    -- annSynthN t i c x1 ... xn = (t,c (annotate (TCSynthed t) i) x1 ... xn)
-    annSynth0 t i x = (t, x $ annotate () i)
-    annSynth1 t i c = annSynth0 t i . flip c
-    annSynth2 t i c = annSynth1 t i . flip c
+    pure (TEmptyHole (), Hole i e')
 
 -- | Similar to synth, but for checking rather than synthesis.
 check :: TypeM e m => Type -> Expr -> m Expr
@@ -356,7 +345,7 @@ check t = \case
     let default_ = do
           (t', e') <- synth e
           if consistentTypes t t'
-            then pure (set _typecache () e')
+            then pure e'
             else case sh of
               NoSmartHoles -> throwError' (InconsistentTypes t t')
               SmartHoles -> Hole <$> meta' () <*> pure e'
@@ -422,7 +411,3 @@ typeTtoType = identity
 
 checkKind' :: TypeM e m => Kind -> Type' (Meta a) -> m TypeT
 checkKind' k t = modifyError' KindError (checkKind k t)
-
--- | A lens for the type annotation of an 'Expr' or 'ExprT'
-_typecache :: Lens' (Expr' (Meta a) b) a
-_typecache = _exprMetaLens % _type

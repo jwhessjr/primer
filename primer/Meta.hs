@@ -9,7 +9,6 @@ module Meta (
   TyConName,
   GVarName,
   Meta (Meta),
-  _type,
 ) where
 
 import Foreword
@@ -20,7 +19,6 @@ import Data.Generics.Uniplate.Data ()
 import Data.Generics.Uniplate.Zipper (Zipper, hole, replaceHole)
 import Name (Name)
 import Optics (
-  Lens,
   Lens',
   equality',
   lens,
@@ -41,11 +39,6 @@ newtype ID = ID Int
 
 data Meta a = Meta ID a
   deriving stock (Generic, Eq, Show, Read, Data, Functor)
-
--- | This lens is called 'type' because 'a' is most commonly a Type, but it will
--- work for any 'a'.
-_type :: Lens (Meta a) (Meta b) a b
-_type = position @2
 
 newtype ModuleName = ModuleName {unModuleName :: NonEmpty Name}
   deriving stock (Eq, Ord, Show, Read, Data, Generic)
