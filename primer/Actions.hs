@@ -1,7 +1,6 @@
 module Actions (
   Action (..),
   Movement (..),
-  QualifiedText,
 ) where
 
 import Foreword
@@ -13,8 +12,6 @@ import Movement (Movement (..))
 -- This module does not depend on much, but takes a long time
 -- to build because of
 -- https://gitlab.haskell.org/ghc/ghc/-/issues/5642
-
-type QualifiedText = (NonEmpty Text, Text)
 
 -- | Core actions.
 --  These describe edits to the core AST.
