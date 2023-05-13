@@ -53,10 +53,6 @@ substTySimul sub
       TForall _ m k s -> do
         (m', s') <- subUnderBinder m s
         pure $ TForall () m' k s'
-      TLet _ m s b -> do
-        s' <- go s
-        (m', b') <- subUnderBinder m b
-        pure $ TLet () m' s' b'
 
 -- | Simple and inefficient capture-avoiding substitution.
 -- @substTy n a t@  is @t[a/n]@

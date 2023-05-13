@@ -21,7 +21,7 @@ import Primer.Core.DSL.Meta (meta')
 import Primer.Core.Meta (ID, Meta (Meta), TyVarName, unLocalName)
 import Primer.Core.Type (
   Kind (KFun, KHole, KType),
-  Type' (TApp, TCon, TEmptyHole, TForall, TFun, THole, TLet, TVar),
+  Type' (TApp, TCon, TEmptyHole, TForall, TFun, THole, TVar),
  )
 import Primer.Name (NameCounter)
 import Primer.TypeDef (typeDefKind)
@@ -123,7 +123,6 @@ synthKind = \case
   TForall m n k t -> do
     t' <- local (extendLocalCxtTy (n, k)) $ checkKind KType t
     pure (KType, TForall (annotate KType m) n k t')
-  TLet{} -> throwError' TLetUnsupported
 
 checkKind :: KindM e m => Kind -> Type' (Meta a) -> m TypeT
 checkKind k (THole m t) = do

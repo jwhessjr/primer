@@ -51,7 +51,7 @@ import Primer.Core.Meta (
   getID,
  )
 import Primer.Core.Type (
-  Type' (TForall, TLet),
+  Type' (TForall),
   TypeMeta,
  )
 
@@ -155,21 +155,17 @@ foldAbove f z = go (target z) (up z)
       Just z' -> let cur = target z' in f (FA{prior = p, current = cur}) <> go cur (up z')
 
 -- Get the names bound by this layer of an type for a given child.
-getBoundHereUpTy :: Eq a => FoldAbove (Type' a) -> S.Set TyVarName
+getBoundHereUpTy :: FoldAbove (Type' a) -> S.Set TyVarName
 getBoundHereUpTy e = getBoundHereTy (current e) (Just $ prior e)
 
-getBoundHereTy :: Eq a => Type' a -> Maybe (Type' a) -> S.Set TyVarName
+getBoundHereTy :: Type' a -> Maybe (Type' a) -> S.Set TyVarName
 getBoundHereTy t prev = S.fromList $ either identity (\(LetTypeBind n _) -> n) <$> getBoundHereTy' t prev
 
 data LetTypeBinding' a = LetTypeBind TyVarName (Type' a)
   deriving stock (Eq, Show)
 type LetTypeBinding = LetTypeBinding' TypeMeta
 
-getBoundHereTy' :: Eq a => Type' a -> Maybe (Type' a) -> [Either TyVarName (LetTypeBinding' a)]
-getBoundHereTy' t prev = case t of
+getBoundHereTy' :: Type' a -> Maybe (Type' a) -> [Either TyVarName (LetTypeBinding' a)]
+getBoundHereTy' t _ = case t of
   TForall _ v _ _ -> [Left v]
-  TLet _ v rhs b ->
-    if maybe True (== b) prev
-      then [Right $ LetTypeBind v rhs]
-      else mempty
   _ -> mempty
