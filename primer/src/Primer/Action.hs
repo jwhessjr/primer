@@ -123,10 +123,10 @@ applyActionsToTypeSig ::
   (Name, ASTDef) ->
   [Action] ->
   m (Either ActionError ([Module], TypeZ))
-applyActionsToTypeSig smartHoles imports (mod, mods) (defName, def) actions =
+applyActionsToTypeSig smartHoles _imports (mod, mods) (defName, def) actions =
   runReaderT
     go
-    (buildTypingContextFromModules (mod : mods <> imports) smartHoles)
+    (buildTypingContextFromModules (mod : mods) smartHoles)
     & runExceptT
   where
     go :: ActionM m => m ([Module], TypeZ)
@@ -142,7 +142,7 @@ applyActionsToTypeSig smartHoles imports (mod, mods) (defName, def) actions =
       -- We make sure that the updated type is present in the global context.
       -- Here we just check the whole of the mutable prog, excluding imports.
       -- (for efficiency, we need not check the type definitions, but we do not implement this optimisation)
-      checkEverything smartHoles (CheckEverything{trusted = imports, toCheck = mod' : mods})
+      checkEverything smartHoles (CheckEverything{trusted = [], toCheck = mod' : mods})
         >>= \checkedMods -> pure (checkedMods, zt)
     -- Actions expect that all ASTs have a top-level expression of some sort.
     -- Signatures don't have this: they're just a type.

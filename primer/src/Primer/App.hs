@@ -158,9 +158,7 @@ import Primer.Zipper (
 
 -- | The full program state.
 data Prog = Prog
-  { progImports :: [Module]
-  -- ^ Some immutable imported modules
-  , progModules :: [Module]
+  { progModules :: [Module]
   -- ^ The editable "home" modules
   , progSelection :: Maybe Selection
   , progSmartHoles :: SmartHoles
@@ -171,9 +169,6 @@ data Prog = Prog
   -- onto the 'redoLog'.
   }
   deriving stock (Eq, Show, Read)
-
-_progImports :: Setter' Prog [Module]
-_progImports = sets $ \f p -> p {progImports = f $ progImports p}
 
 _progModules :: Setter' Prog [Module]
 _progModules = sets $ \f p -> p {progModules = f $ progModules p}
@@ -190,17 +185,13 @@ push :: [ProgAction] -> Log -> Log
 push as l = Log $ as : unlog l
 
 progAllModules :: Prog -> [Module]
-progAllModules p = progModules p <> progImports p
+progAllModules p = progModules p
 
 progAllTypeDefs :: Prog -> Map TyConName (Editable, TypeDef ())
-progAllTypeDefs p =
-  foldMap' (fmap (Editable,) . moduleTypesQualified) (progModules p)
-    <> foldMap' (fmap (NonEditable,) . moduleTypesQualified) (progImports p)
+progAllTypeDefs p = foldMap' (fmap (Editable,) . moduleTypesQualified) (progModules p)
 
 progAllDefs :: Prog -> Map GVarName (Editable, Def)
-progAllDefs p =
-  foldMap' (fmap (Editable,) . moduleDefsQualified) (progModules p)
-    <> foldMap' (fmap (NonEditable,) . moduleDefsQualified) (progImports p)
+progAllDefs p = foldMap' (fmap (Editable,) . moduleDefsQualified) (progModules p)
 
 -- Note [Modules]
 -- The invariant is that the @progImports@ modules are never edited, but
@@ -363,7 +354,7 @@ applyProgAction prog mdefName = \case
           )
   SigAction actions -> editModuleOfCross mdefName prog $ \ms@(curMod, _) defName def -> do
     let smartHoles = progSmartHoles prog
-    res <- applyActionsToTypeSig smartHoles (progImports prog) ms (defName, def) actions
+    res <- applyActionsToTypeSig smartHoles [] ms (defName, def) actions
     case res of
       Left err -> throwError $ ActionError err
       Right (mod', zt) -> do
@@ -390,17 +381,15 @@ lookupEditableModule :: MonadError ProgError m => ModuleName -> Prog -> m Module
 lookupEditableModule n p =
   lookupModule' n p >>= \case
     MLEditable m -> pure m
-    MLImported _ -> throwError $ ModuleReadonly n
 
 -- | Describes return type of successfully looking a module up in the program.
 -- We get the module and also whether it is imported or not.
-data ModuleLookup = MLEditable Module | MLImported Module
+data ModuleLookup = MLEditable Module
 
 lookupModule' :: MonadError ProgError m => ModuleName -> Prog -> m ModuleLookup
-lookupModule' n p = case (find ((n ==) . moduleName) (progModules p), find ((n ==) . moduleName) (progImports p)) of
-  (Just m, _) -> pure $ MLEditable m
-  (Nothing, Just m) -> pure $ MLImported m
-  (Nothing, Nothing) -> throwError $ ModuleNotFound n
+lookupModule' n p = case find ((n ==) . moduleName) (progModules p) of
+  Just m -> pure $ MLEditable m
+  Nothing -> throwError $ ModuleNotFound n
 
 editModule ::
   MonadError ProgError m =>
@@ -659,7 +648,7 @@ copyPasteSig p (fromDefName, fromTyId) toDefName setup = do
     -- which will pick up any problems. It is better to do it in one batch,
     -- in case the intermediate state after 'setup' causes more problems
     -- than the final state does.
-    doneSetup <- applyActionsToTypeSig smartHoles (progImports p) (mod, otherModules) (toDefBaseName, oldDef) setup
+    doneSetup <- applyActionsToTypeSig smartHoles [] (mod, otherModules) (toDefBaseName, oldDef) setup
     tgt <- case doneSetup of
       Left err -> throwError $ ActionError err
       Right (_, tgt) -> pure $ focusOnlyType tgt
@@ -740,7 +729,7 @@ tcWholeProg p = do
     checkEverything
       (progSmartHoles p)
       CheckEverything
-        { trusted = progImports p
+        { trusted = []
         , toCheck = progModules p
         }
   let p' = p{progModules = mods'}
@@ -774,9 +763,7 @@ tcWholeProgWithImports ::
   ) =>
   Prog ->
   m Prog
-tcWholeProgWithImports p = do
-  imports <- checkEverything (progSmartHoles p) CheckEverything{trusted = mempty, toCheck = progImports p}
-  tcWholeProg $ p & _progImports .~ imports
+tcWholeProgWithImports = tcWholeProg
 
 copyPasteBody :: MonadEdit m ProgError => Prog -> (GVarName, ID) -> GVarName -> [Action] -> m Prog
 copyPasteBody p (fromDefName, fromId) toDefName setup = do

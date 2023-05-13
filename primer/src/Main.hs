@@ -244,8 +244,7 @@ prog = do
                 , moduleDefs = Map.fromList [ ( "a" , DefAST $ ASTDef e t)]
                 }
   pure $ Prog
-        { progImports = []
-        , progModules = [m]
+        { progModules = [m]
         , progSelection = Nothing
         , progSmartHoles = SmartHoles
         , progLog = Log { unlog = [] }

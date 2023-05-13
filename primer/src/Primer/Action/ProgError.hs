@@ -18,6 +18,4 @@ data ProgError
     --   a descriptive ADT, rather than a string.
     CopyPasteError Text
   | ModuleNotFound ModuleName
-  | -- | Cannot edit an imported module
-    ModuleReadonly ModuleName
   deriving stock (Eq, Show, Read)
