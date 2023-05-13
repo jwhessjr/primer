@@ -16,7 +16,6 @@ module App (
   progAllModules,
   progAllDefs,
   tcWholeProg,
-  tcWholeProgWithImports,
   ProgAction (..),
   ProgError (..),
   handleMutationRequest,
@@ -650,16 +649,6 @@ tcWholeProg p = do
             , selectedNode = updatedNode
             }
   pure $ p'{progSelection = newSel}
-
--- | Do a full check of a 'Prog', both the imports and the local modules
-tcWholeProgWithImports ::
-  ( MonadFresh ID m
-  , MonadFresh NameCounter m
-  , MonadNestedError TypeError e (ReaderT Cxt m)
-  ) =>
-  Prog ->
-  m Prog
-tcWholeProgWithImports = tcWholeProg
 
 copyPasteBody :: MonadEdit m ProgError => Prog -> (GVarName, ID) -> GVarName -> [Action] -> m Prog
 copyPasteBody p (fromDefName, fromId) toDefName setup = do

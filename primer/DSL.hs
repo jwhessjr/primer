@@ -6,7 +6,6 @@ module DSL (
   tEmptyHole,
   tcon,
   tfun,
-  create,
   create',
   S,
 ) where
