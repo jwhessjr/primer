@@ -284,29 +284,7 @@ tasty_undo_redo = withTests 500 $
       (r, logs) -> testNoSevereLogs logs >> case r of
         (Left _, _) -> failure
         (Right _, a') -> pure a'
-    runRandomAction a = do
-      let act = Avail
-      {-
-      act <- forAll $ Gen.frequency $ second pure <$> [
-        (2,AddTm)
-        ,(1,AddTy)
-        ,(if null $ unlog $ progLog $ appProg a then 0 else 1,Un) -- TODO: expose a "log-is-null" helper from App?
-        ,(5,Avail)
-                                    ]
--}
-      case act of
-        AddTm -> do
-          let n' = local (extendCxtByModules $ progModules $ appProg a) freshNameForCxt
-          n <- forAllT $ Gen.choice [Just . unName <$> n', pure Nothing]
-          m <- forAllT $ Gen.element $ fmap moduleName $ progModules $ appProg a
-          runEditAppMLogs (handleMutationRequest $ Edit [CreateDef m n]) a
-        AddTy -> do
-          m <- forAllT $ Gen.element $ fmap moduleName $ progModules $ appProg a
-          let n' = local (extendCxtByModules $ progModules $ appProg a) freshNameForCxt
-          n <- qualifyName m <$> forAllT n'
-          runEditAppMLogs (handleMutationRequest $ Edit [AddTypeDef n $ ASTTypeDef [] [] []]) a
-        Un -> runEditAppMLogs (handleMutationRequest Undo) a
-        Avail -> fromMaybe a <$> runRandomAvailableAction a
+    runRandomAction a = fromMaybe a <$> runRandomAvailableAction a
 
 iterateNM :: Monad m => Int -> a -> (a -> m a) -> m a
 iterateNM n a f
