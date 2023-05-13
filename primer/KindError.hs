@@ -2,14 +2,11 @@ module KindError (KindError (..)) where
 
 import Foreword
 
-import Meta (TyConName, TyVarName)
-import Name (Name)
+import Meta (TyConName)
 import Type (Kind)
 
 data KindError
-  = UnknownTypeVariable TyVarName
-  | TyVarWrongSort Name -- term var instead of type var
-  | UnknownTypeConstructor TyConName
+  = UnknownTypeConstructor TyConName
   | InconsistentKinds Kind Kind
   | KindDoesNotMatchArrow Kind
   | -- | We currently cannot typecheck a let inside a type,

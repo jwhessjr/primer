@@ -73,9 +73,7 @@ import KindError (
     InconsistentKinds,
     KindDoesNotMatchArrow,
     TLetUnsupported,
-    TyVarWrongSort,
-    UnknownTypeConstructor,
-    UnknownTypeVariable
+    UnknownTypeConstructor
   ),
  )
 import Meta (_type)
