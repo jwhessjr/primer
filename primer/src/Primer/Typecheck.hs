@@ -134,7 +134,6 @@ import Primer.Module (
 import Primer.Name (Name, NameCounter)
 import Primer.Subst (substTy)
 import Primer.TypeDef (
-  ASTTypeDef (astTypeDefConstructors),
   TypeDefMap,
   ValCon (valConArgs, valConName),
   typeDefAST,
@@ -270,10 +269,6 @@ checkTypeDefs tds = do
   -- unique. We need to be able to work out the type of @TCon "C"@ without any
   -- extra information.
   let atds = Map.mapMaybe typeDefAST tds
-  let allAtds = Map.mapMaybe typeDefAST existingTypes <> atds
-  assert
-    (distinct $ concatMap (map valConName . astTypeDefConstructors) allAtds)
-    "Duplicate-ly-named constructor (perhaps in different typedefs)"
   -- Note that these checks only apply to non-primitives:
   -- duplicate type names are checked elsewhere, kinds are correct by construction, and there are no constructors.
   local (extendTypeDefCxt tds) $ traverseWithKey_ checkTypeDef atds
@@ -297,9 +292,9 @@ checkTypeDefs tds = do
     -- - type names clashing with constructor names (possibly in different
     --   types)
 
-    checkTypeDef tc td = do
+    checkTypeDef tc _td = do
       let params = []
-      let cons = astTypeDefConstructors td
+      let cons = []
       assert
         ( (1 ==) . S.size $
             S.fromList $

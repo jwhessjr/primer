@@ -21,32 +21,23 @@ import Data.Functor.Compose (Compose (Compose, getCompose))
 import Data.Map qualified as M
 import Data.Map qualified as Map
 import Data.Set qualified as S
-import Data.Tuple.Extra (fst3)
 import Optics (Lens', view, (%))
 import Primer.Core (Expr', GlobalName (baseName, qualifiedModule), ModuleName, TypeCache, _exprMetaLens)
 import Primer.Core.Meta (Meta, TyConName, ValConName, _type)
 import Primer.Core.Transform (decomposeTAppCon)
 import Primer.Core.Type (Kind, Type' (TEmptyHole, THole))
-import Primer.Core.Type.Utils (forgetTypeMetadata)
 import Primer.Name (Name, NameCounter)
-import Primer.Subst (substTySimul)
 import Primer.TypeDef (
-  ASTTypeDef (astTypeDefConstructors),
+  ASTTypeDef,
   TypeDef (TypeDefAST),
   TypeDefMap,
-  ValCon (valConArgs, valConName),
-  typeDefAST,
+  ValCon,
  )
 import Primer.Typecheck.Cxt (Cxt, globalCxt, typeDefs)
 
 -- We assume that constructor names are unique, returning the first one we find
 lookupConstructor :: TypeDefMap -> ValConName -> Maybe (ValCon (), TyConName, ASTTypeDef ())
-lookupConstructor tyDefs c =
-  let allCons = do
-        (tc, TypeDefAST td) <- M.assocs tyDefs
-        vc <- astTypeDefConstructors td
-        pure (vc, tc, td)
-   in find ((== c) . valConName . fst3) allCons
+lookupConstructor _tyDefs _c = Nothing
 
 data TypeDefError
   = TDIHoleType -- a type hole
@@ -104,14 +95,8 @@ instantiateValCons' ::
   Either TypeDefError (TyConName, ASTTypeDef (), [(ValConName, forall m. MonadFresh NameCounter m => [m (Type' ())])])
 instantiateValCons' tyDefs t =
   getTypeDefInfo' tyDefs t
-    >>= \(TypeDefInfo params tc def) -> case def of
-      TypeDefAST tda -> do
-        let defparams = []
-            f :: ValCon () -> (ValConName, forall m. MonadFresh NameCounter m => [m (Type' ())])
-            -- eta expand to deal with shallow subsumption
-            {- HLINT ignore instantiateValCons' "Avoid lambda" -}
-            f c = (valConName c, map (\a -> substTySimul (M.fromList $ zip defparams params) (forgetTypeMetadata a)) $ valConArgs c)
-        pure (tc, tda, map f $ astTypeDefConstructors tda)
+    >>= \(TypeDefInfo _params tc def) -> case def of
+      TypeDefAST tda -> pure (tc, tda, [])
 
 -- | A lens for the type annotation of an 'Expr' or 'ExprT'
 _typecache :: Lens' (Expr' (Meta a) b) a
@@ -128,12 +113,8 @@ getGlobalNames = do
   topLevel <- asks $ S.fromList . map f . M.keys . globalCxt
   let ctors =
         Map.foldMapWithKey
-          ( \t def ->
-              S.fromList $
-                (f t :) $
-                  map (f . valConName) $
-                    maybe [] astTypeDefConstructors $
-                      typeDefAST def
+          ( \t _def ->
+              S.fromList [f t]
           )
           tyDefs
   pure $ S.union topLevel ctors

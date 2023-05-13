@@ -227,10 +227,7 @@ prog = do
                 , moduleTypes =
                     Map.fromList
                       [ ( "a6"
-                        , TypeDefAST
-                            ASTTypeDef
-                              { astTypeDefConstructors = []
-                              }
+                        , TypeDefAST ASTTypeDef {}
                         )]
                 , moduleDefs = Map.fromList [ ( "a" , DefAST $ ASTDef e t)]
                 }

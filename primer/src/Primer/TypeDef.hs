@@ -7,7 +7,6 @@ module Primer.TypeDef (
   typeDefAST,
   typeDefKind,
   ASTTypeDef (..),
-  _astTypeDefConstructors,
   valConType,
   _typedefFields,
   forgetTypeDefMetadata,
@@ -16,7 +15,7 @@ module Primer.TypeDef (
 import Foreword
 
 import Data.Data (Data)
-import Optics (Traversal, over, traversed, (%), traversalVL, Lens, lens)
+import Optics (Traversal, traversalVL, Lens, lens)
 import Primer.Core.Meta (
   TyConName,
   ValConName,
@@ -45,12 +44,7 @@ type TypeDefMap = Map TyConName (TypeDef ())
 -- The kind of the type is TYPE{\-a-\} -> (TYPE -> TYPE){\-b-\} -> TYPE{\-always returns a type-\}
 -- The type of the constructor is C :: forall a:TYPE. forall b:(TYPE->TYPE). b a -> Nat -> T a b
 data ASTTypeDef b = ASTTypeDef
-  { astTypeDefConstructors :: [ValCon b]
-  }
   deriving stock (Eq, Show, Read, Data)
-
-_astTypeDefConstructors :: Lens (ASTTypeDef b) (ASTTypeDef b') [ValCon b] [ValCon b']
-_astTypeDefConstructors = lens astTypeDefConstructors $ \d cs -> d {astTypeDefConstructors = cs}
 
 data ValCon b = ValCon
   { valConName :: ValConName
@@ -75,7 +69,7 @@ typeDefKind _ =  KType
 
 -- | A traversal over the contstructor fields in an typedef.
 _typedefFields :: Traversal (TypeDef b) (TypeDef c) (Type' b) (Type' c)
-_typedefFields = _TypeDefAST % _astTypeDefConstructors % traversed % _valConArgs % traversed
+_typedefFields = traversalVL $ \_ _ -> pure $ TypeDefAST ASTTypeDef
 
 forgetTypeDefMetadata :: TypeDef b -> TypeDef ()
-forgetTypeDefMetadata = over _typedefFields forgetTypeMetadata
+forgetTypeDefMetadata = const $ TypeDefAST ASTTypeDef
