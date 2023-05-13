@@ -24,9 +24,6 @@ cradle:
     - path: "primer/./DSL.hs"
       component: "primer:exe:primer-test"
 
-    - path: "primer/./Transform.hs"
-      component: "primer:exe:primer-test"
-
     - path: "primer/./CoreUtils.hs"
       component: "primer:exe:primer-test"
 
@@ -39,9 +36,6 @@ cradle:
     - path: "primer/./Module.hs"
       component: "primer:exe:primer-test"
 
-    - path: "primer/./Name.hs"
-      component: "primer:exe:primer-test"
-
     - path: "primer/./Typecheck.hs"
       component: "primer:exe:primer-test"
 
@@ -51,35 +45,17 @@ cradle:
     - path: "primer/./Zipper.hs"
       component: "primer:exe:primer-test"
 
-    - path: "primer/./NestedError.hs"
-      component: "primer:exe:primer-test"
-
     - path: "primer/./Actions.hs"
       component: "primer:exe:primer-test"
 
     - path: "primer/./Errors.hs"
       component: "primer:exe:primer-test"
 
-    - path: "primer/./Movement.hs"
-      component: "primer:exe:primer-test"
-
     - path: "primer/./ProgAction.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/./ProgError.hs"
       component: "primer:exe:primer-test"
 
     - path: "primer/./Meta.hs"
       component: "primer:exe:primer-test"
 
     - path: "primer/./Type.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/./KindError.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/./TypeError.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/./TestM.hs"
       component: "primer:exe:primer-test"
