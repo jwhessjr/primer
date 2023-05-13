@@ -1,16 +1,11 @@
 module Primer.Log (
   ConvertLogMessage (..),
-  logDebug,
-  logEmergency,
-  logWarning,
   PureLogT,
   runPureLogT,
   PureLog,
   runPureLog,
   DiscardLogT,
-  runDiscardLogT,
   DiscardLog,
-  runDiscardLog,
 ) where
 
 import Foreword
@@ -21,30 +16,14 @@ import Control.Monad.Log (
   LoggingT,
   MonadLog,
   PureLoggingT,
-  WithSeverity (..),
-  discardLogging,
   logMessage,
   runLoggingT,
   runPureLoggingT,
- )
-import Control.Monad.Log qualified as Log (
-  logDebug,
-  logEmergency,
-  logWarning,
  )
 import Control.Monad.Trans (MonadTrans)
 
 class ConvertLogMessage source target where
   convert :: source -> target
-
-logDebug :: (ConvertLogMessage source target, MonadLog (WithSeverity target) m) => source -> m ()
-logDebug = Log.logDebug . convert
-
-logEmergency :: (ConvertLogMessage source target, MonadLog (WithSeverity target) m) => source -> m ()
-logEmergency = Log.logEmergency . convert
-
-logWarning :: (ConvertLogMessage source target, MonadLog (WithSeverity target) m) => source -> m ()
-logWarning = Log.logWarning . convert
 
 -- | Convenient for discarding logging.
 instance ConvertLogMessage a () where
@@ -96,10 +75,4 @@ newtype DiscardLogT l m a = DiscardLogs (DiscardLoggingT l m a)
 instance MonadTrans (DiscardLogT l) where
   lift = DiscardLogs . lift
 
-runDiscardLogT :: DiscardLogT l m a -> m a
-runDiscardLogT (DiscardLogs m) = discardLogging m
-
 type DiscardLog l = DiscardLogT l Identity
-
-runDiscardLog :: DiscardLog l a -> a
-runDiscardLog = runIdentity . runDiscardLogT

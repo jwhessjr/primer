@@ -29,7 +29,6 @@ executable primer-test
     Primer.Log
     Primer.Module
     Primer.Name
-    Primer.Pretty
     Primer.Subst
     Primer.Typecheck
     Primer.TypeDef
