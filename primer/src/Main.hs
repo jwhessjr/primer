@@ -21,7 +21,6 @@ import Primer.App (
   App,
   EditAppM,
   Editable (..),
-  Level (..),
   NodeType (..),
   Prog (..),
   ProgError (ActionError, DefAlreadyExists),
@@ -29,7 +28,6 @@ import Primer.App (
   appProg,
   handleEditRequest,
   progAllDefs,
-  progAllTypeDefs,
   progModules,
   runEditAppM, handleMutationRequest, MutationRequest (Undo), Log (..), tcWholeProgWithImports, mkApp,
  )
@@ -171,14 +169,14 @@ pickPos p = ((\(defName, (editable, def)) -> (defName, editable,) <$> pickLoc de
 -- - picked a node with no actions available
 -- - picked an action with no options available
 -- - entered a free-choice option and had name-clashing issues
-runRandomAvailableAction :: Level -> App -> PropertyT WT (Maybe App)
-runRandomAvailableAction l a = do
+runRandomAvailableAction :: App -> PropertyT WT (Maybe App)
+runRandomAvailableAction a = do
       (defName,defMut,defLoc) <- maybe discard forAll (pickPos $ appProg a)
       let defMap = fmap snd $ progAllDefs $ appProg a
       let (loc,acts) = case defLoc of
             Left _ -> (Nothing,Available.forDef defMap defMut defName)
-            Right (d,SigNode, i) -> (Just (SigNode, i), Available.forSig l defMut (astDefType d) i)
-            Right (d,BodyNode, i) -> (Just (BodyNode, i), Available.forBody (snd <$> progAllTypeDefs (appProg a)) l defMut (astDefExpr d) i)
+            Right (d,SigNode, i) -> (Just (SigNode, i), Available.forSig defMut (astDefType d) i)
+            Right (d,BodyNode, i) -> (Just (BodyNode, i), Available.forBody defMut (astDefExpr d) i)
       case acts of
         [] -> label "no offered actions" >> pure Nothing
         acts' -> do
@@ -262,7 +260,6 @@ tasty_undo_redo :: Property
 tasty_undo_redo = withTests 500 $
   withDiscards 2000 $
     propertyWT [] $ do
-      let l = Expert
       -- We only test SmartHoles mode (which is the only supported user-facing
       -- mode - NoSmartHoles is only used for internal sanity testing etc)
       Right p' <- runExceptT @TypeError $ tcWholeProgWithImports =<< prog
@@ -270,7 +267,7 @@ tasty_undo_redo = withTests 500 $
       nc <- lift $ isolateWT fresh
       let a = mkApp i nc p'
       let n = 4
-      a' <- iterateNM n a $ \a' -> runRandomAction l a'
+      a' <- iterateNM n a $ \a' -> runRandomAction a'
       if null $ unlog $ progLog $ appProg a' -- TODO: expose a "log-is-null" helper from App?
         -- It is possible for the random actions to undo everything!
         then success
@@ -287,7 +284,7 @@ tasty_undo_redo = withTests 500 $
       (r, logs) -> testNoSevereLogs logs >> case r of
         (Left _, _) -> failure
         (Right _, a') -> pure a'
-    runRandomAction l a = do
+    runRandomAction a = do
       let act = Avail
       {-
       act <- forAll $ Gen.frequency $ second pure <$> [
@@ -309,7 +306,7 @@ tasty_undo_redo = withTests 500 $
           n <- qualifyName m <$> forAllT n'
           runEditAppMLogs (handleMutationRequest $ Edit [AddTypeDef n $ ASTTypeDef [] [] []]) a
         Un -> runEditAppMLogs (handleMutationRequest Undo) a
-        Avail -> fromMaybe a <$> runRandomAvailableAction l a
+        Avail -> fromMaybe a <$> runRandomAvailableAction a
 
 iterateNM :: Monad m => Int -> a -> (a -> m a) -> m a
 iterateNM n a f

@@ -16,16 +16,8 @@ module Primer.Action.Available (
 import Foreword
 
 import Data.Map qualified as Map
-import Data.Set qualified as Set
-import Optics (
-  to,
-  (%),
-  (^..),
-  _Just,
- )
 import Primer.App.Base (
   Editable (..),
-  Level (..),
  )
 import Primer.Core (
   Expr,
@@ -34,25 +26,11 @@ import Primer.Core (
   ID,
   Type,
   Type' (..),
-  unLocalName,
-  _exprMetaLens,
-  _synthed,
-  _type,
  )
-import Primer.Core.Utils (freeVars)
 import Primer.Def (
   DefMap,
  )
 import Primer.Def.Utils (globalInUse)
-import Primer.TypeDef (
-  TypeDef (TypeDefAST),
-  TypeDefMap,
- )
-import Primer.Typecheck (
-  TypeDefError (TDIHoleType),
-  TypeDefInfo (TypeDefInfo),
-  getTypeDefInfo',
- )
 import Primer.Zipper (
   SomeNode (..),
   findNodeWithParent,
@@ -92,106 +70,39 @@ forDef defs Editable defName =
         [NoInput DeleteDef]
 
 forBody ::
-  TypeDefMap ->
-  Level ->
   Editable ->
   Expr ->
   ID ->
   [Action]
-forBody _ _ NonEditable _ _ = mempty
-forBody tydefs l Editable expr id = case findNodeWithParent id expr of
+forBody NonEditable _ _ = mempty
+forBody Editable expr id = case findNodeWithParent id expr of
   Nothing -> mempty
-  Just (ExprNode e, p) ->
-    let raiseAction = case p of
+  Just (ExprNode _, p) -> case p of
           Nothing -> [] -- at root already, cannot raise
           Just (ExprNode (Hole _ _)) -> [] -- in a NE hole, don't offer raise (as hole will probably just be recreated)
           _ -> [NoInput Raise]
-     in forExpr tydefs l e <> raiseAction
   Just (TypeNode t, p) ->
     let raiseAction = case p of
           Just (ExprNode _) -> [] -- at the root of an annotation, so cannot raise
           _ -> [NoInput Raise]
-     in forType l t <> raiseAction
-  Just (CaseBindNode _, _) ->
-    []
+     in forType t <> raiseAction
+  Just (CaseBindNode _, _) -> []
 
 forSig ::
-  Level ->
   Editable ->
   Type ->
   ID ->
   [Action]
-forSig _ NonEditable _ _ = mempty
-forSig l Editable ty id = case findType id ty of
+forSig NonEditable _ _ = mempty
+forSig Editable ty id = case findType id ty of
   Nothing -> mempty
-  Just t ->
-    forType l t
+  Just t -> forType t
 
-forExpr :: TypeDefMap -> Level -> Expr -> [Action]
-forExpr tydefs l expr =
-  universalActions <> synOnly <> case expr of
-    EmptyHole{} ->
-      annotate
-    Hole{} ->
-      delete
-        <> annotate
-    Ann{} ->
-      delete
-    Lam{} ->
-      delete
-        <> annotate
-    LAM{} ->
-      delete
-        <> annotate
-    Let _ v e _ ->
-      delete
-        <> annotate
-        <> munless (unLocalName v `Set.member` freeVars e) []
-    Letrec{} ->
-      delete
-        <> annotate
-    _ ->
-      delete
-        <> annotate
-  where
-    universalActions = case l of
-      Beginner ->
-        [
-        ]
-      Intermediate ->
-        [
-        ]
-      Expert ->
-        [
-        ]
-    -- We assume that the input program is type-checked, in order to
-    -- filter some actions by Syn/Chk
-    synOnly =
-      expr ^.. _exprMetaLens % _type % _Just % _synthed % to (getTypeDefInfo' tydefs) >>= \case
-        Left TDIHoleType{} -> []
-        Right (TypeDefInfo _ _ TypeDefAST{}) -> []
-        _ -> []
-    annotate = mwhen (l == Expert) []
-    delete = []
-
-forType :: Level -> Type -> [Action]
-forType l type_ =
-  universalActions <> case type_ of
+forType :: Type -> [Action]
+forType type_ =
+  [NoInput MakeFun] <> case type_ of
     TEmptyHole{} -> []
-    TForall{} ->
-      delete
-    TFun{} ->
-      delete
-    _ ->
-      delete
-  where
-    universalActions =
-      [NoInput MakeFun]
-        <> mwhen
-          (l == Expert)
-          [
-          ]
-    delete = [NoInput DeleteType]
+    _ -> [NoInput DeleteType]
 
 -- | An input for an 'InputAction'.
 data Option = Option
