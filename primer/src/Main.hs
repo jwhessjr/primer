@@ -220,8 +220,8 @@ prog :: MonadFresh ID m => m Prog
 prog = do
   let modName =  ModuleName { unModuleName = "M" :| [ "0" ] }
       a = qualifyName modName "a6"
-  e <- lam "x" (case_ emptyHole [] `ann` tEmptyHole) `ann` (tcon a `tfun` tcon a)
-  t <- tcon a `tfun` tcon a
+  e <- emptyHole `ann` tEmptyHole
+  t <- tcon a
   let m = Module
                 { moduleName = modName
                 , moduleTypes =
