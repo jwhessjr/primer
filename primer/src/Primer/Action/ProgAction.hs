@@ -23,29 +23,12 @@ data ProgAction
     MoveToDef GVarName
   | -- | Rename the definition with the given (base) Name
     RenameDef GVarName Text
-  | -- | Create a new definition
-    CreateDef ModuleName (Maybe Text)
   | -- | Delete a new definition
     DeleteDef GVarName
-  | -- | Add a new type definition
-    AddTypeDef TyConName (ASTTypeDef ())
-  | -- | Rename the type definition with the given name, and its type constructor
-    RenameType TyConName Text
-  | -- | Rename the value constructor with the given name, in the given type
-    RenameCon TyConName ValConName Text
-  | -- | Rename the type parameter with the given name, in the given type
-    RenameTypeParam TyConName TyVarName Text
-  | -- | Add a value constructor at the given position, in the given type
-    AddCon TyConName Int Text
-  | -- | Change the type of the field at the given index of the given constructor
-    SetConFieldType TyConName ValConName Int (Type' ())
-  | -- | Add a new field, at the given index, to the given constructor
-    AddConField TyConName ValConName Int (Type' ())
   | -- | Execute a sequence of actions on the body of the definition
     BodyAction [Action]
   | -- | Execute a sequence of actions on the type annotation of the definition
     SigAction [Action]
-  | SetSmartHoles SmartHoles
   | -- | CopyPaste (d,i) as
     --   remembers the tree in def d, node i
     --   runs actions as (in the currently selected def), which should end up in a hole
@@ -59,6 +42,4 @@ data ProgAction
     --   At the start of the actions, the cursor starts at the root of the definition's type/expression
     CopyPasteSig (GVarName, ID) [Action]
   | CopyPasteBody (GVarName, ID) [Action]
-  | -- | Renames an editable module (will return an error if asked to rename an imported module)
-    RenameModule ModuleName (NonEmpty Text)
   deriving stock (Eq, Show, Read)

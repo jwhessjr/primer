@@ -14,7 +14,7 @@ import Optics (toListOf)
 import Primer.Action (
   ActionError (CaseBindsClash, NameCapture),
   toProgActionInput,
-  toProgActionNoInput, ProgAction (AddTypeDef,CreateDef),
+  toProgActionNoInput,
  )
 import Primer.Action.Available qualified as Available
 import Primer.App (
