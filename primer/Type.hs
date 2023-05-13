@@ -11,17 +11,17 @@ import Foreword
 
 import Data.Data (Data)
 import Data.Generics.Product
-import Optics (
-  Lens',
-  Traversal,
-  (%),
- )
 import Meta (
   HasID (..),
   HasMetadata (_metadata),
   Meta,
   TyConName,
   Value,
+ )
+import Optics (
+  Lens',
+  Traversal,
+  (%),
  )
 
 -- | Core types.

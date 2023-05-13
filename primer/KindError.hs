@@ -3,8 +3,8 @@ module KindError (KindError (..)) where
 import Foreword
 
 import Meta (TyConName, TyVarName)
-import Type (Kind)
 import Name (Name)
+import Type (Kind)
 
 data KindError
   = UnknownTypeVariable TyVarName

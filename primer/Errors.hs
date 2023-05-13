@@ -10,8 +10,8 @@ module Errors (ActionError (..)) where
 import Foreword
 
 import Actions (Action)
-import Movement (Movement)
 import Core (ID)
+import Movement (Movement)
 import TypeError (TypeError)
 
 -- | Errors that may arise when applying an action
@@ -34,4 +34,5 @@ data ActionError
     NameCapture
   | NoNodeSelection
   deriving stock (Eq, Show, Read, Generic)
+
 -- cannot remove generic here as is used in MonadNestedError

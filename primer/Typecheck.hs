@@ -44,13 +44,75 @@ module Typecheck (
 import Foreword
 
 import Control.Arrow ((&&&))
-import Fresh (MonadFresh (..))
-import NestedError (MonadNestedError (..), modifyError')
-import Data.Functor.Compose (Compose (Compose, getCompose))
+import Core (
+  Bind' (..),
+  CaseBranch' (..),
+  Expr,
+  Expr' (..),
+  ExprMeta,
+  GVarName,
+  GlobalName (baseName, qualifiedModule),
+  ID,
+  Kind (..),
+  LVarName,
+  Meta (..),
+  ModuleName,
+  Type' (..),
+  TypeCache (..),
+  TypeCacheBoth (..),
+  TypeMeta,
+  ValConName,
+  bindName,
+  qualifyName,
+  unLocalName,
+  _bindMeta,
+  _exprMeta,
+  _exprMetaLens,
+  _exprTypeMeta,
+  _typeMeta,
+ )
+import CoreUtils (
+  alphaEqTy,
+  forgetTypeMetadata,
+  freshLocalName',
+  noHoles,
+ )
+import DSL (S, branch, create', emptyHole, meta, meta')
 import Data.Foldable (foldMap')
+import Data.Functor.Compose (Compose (Compose, getCompose))
 import Data.Map qualified as M
 import Data.Map.Strict qualified as Map
 import Data.Set qualified as S
+import Def (
+  ASTDef (..),
+  Def (..),
+  DefMap,
+  defType,
+  _DefAST,
+  _astDefType,
+ )
+import Fresh (MonadFresh (..))
+import KindError (
+  KindError (
+    InconsistentKinds,
+    KindDoesNotMatchArrow,
+    TLetUnsupported,
+    TyVarWrongSort,
+    UnknownTypeConstructor,
+    UnknownTypeVariable
+  ),
+ )
+import Meta (TyConName, _type)
+import Module (
+  Module (
+    moduleName
+  ),
+  moduleDefsQualified,
+  moduleTypesQualified,
+  _moduleDefs,
+ )
+import Name (Name, NameCounter)
+import NestedError (MonadNestedError (..), modifyError')
 import Optics (
   A_Traversal,
   AppendIndices,
@@ -73,75 +135,13 @@ import Optics (
   (%),
  )
 import Optics.Traversal (traversed)
-import Core (
-  Bind' (..),
-  CaseBranch' (..),
-  Expr,
-  Expr' (..),
-  ExprMeta,
-  GlobalName (baseName, qualifiedModule),
-  GVarName,
-  ID,
-  Kind (..),
-  LVarName,
-  ModuleName,
-  Meta (..),
-  Type' (..),
-  TypeCache (..),
-  TypeCacheBoth (..),
-  TypeMeta,
-  ValConName,
-  bindName,
-  qualifyName,
-  unLocalName,
-  _bindMeta,
-  _exprMeta,
-  _exprMetaLens,
-  _exprTypeMeta,
-  _typeMeta,
- )
-import DSL (S, branch, create', emptyHole, meta, meta')
-import Meta (TyConName, _type)
-import CoreUtils (
-  alphaEqTy,
-  forgetTypeMetadata,
-  freshLocalName',
-  noHoles,
- )
-import Def (
-  ASTDef (..),
-  _astDefType,
-  Def (..),
-  _DefAST,
-  DefMap,
-  defType,
- )
-import Module (
-  Module (
-    moduleName
-  ),
-  _moduleDefs,
-  moduleDefsQualified,
-  moduleTypesQualified,
- )
-import Name (Name, NameCounter)
 import TypeDef (
   ASTTypeDef,
   TypeDef (TypeDefAST),
   TypeDefMap,
-  typeDefKind
+  typeDefKind,
  )
 import TypeError (TypeError (..))
-import KindError (
-  KindError (
-    InconsistentKinds,
-    KindDoesNotMatchArrow,
-    TLetUnsupported,
-    TyVarWrongSort,
-    UnknownTypeConstructor,
-    UnknownTypeVariable
-  ),
- )
 
 type Type = Type' ()
 
@@ -598,12 +598,12 @@ data TypeDefInfo a = TypeDefInfo [Type' a] TyConName (TypeDef ()) -- instantiate
 getTypeDefInfo' :: TypeDefMap -> Type' a -> Either TypeDefError (TypeDefInfo a)
 getTypeDefInfo' _ (TEmptyHole _) = Left TDIHoleType
 getTypeDefInfo' tydefs (TCon _ tycon) =
-      case M.lookup tycon tydefs of
-        Nothing -> Left $ TDIUnknown tycon
-        Just tydef
-          -- this check would be redundant if we were sure that the input type
-          -- were of kind KType, alternatively we should do kind checking here
-          | otherwise -> Right $ TypeDefInfo [] tycon tydef
+  case M.lookup tycon tydefs of
+    Nothing -> Left $ TDIUnknown tycon
+    Just tydef
+      -- this check would be redundant if we were sure that the input type
+      -- were of kind KType, alternatively we should do kind checking here
+      | otherwise -> Right $ TypeDefInfo [] tycon tydef
 getTypeDefInfo' _ _ = Left TDINotADT
 
 -- | Takes a particular instance of a parameterised type (e.g. @List Nat@), and

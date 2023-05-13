@@ -32,7 +32,7 @@ data ASTTypeDef b = ASTTypeDef
   deriving stock (Eq, Show, Read, Data)
 
 typeDefKind :: TypeDef b -> Kind
-typeDefKind _ =  KType
+typeDefKind _ = KType
 
 forgetTypeDefMetadata :: TypeDef b -> TypeDef ()
 forgetTypeDefMetadata = const $ TypeDefAST ASTTypeDef

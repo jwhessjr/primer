@@ -26,14 +26,6 @@ import Data.Aeson (Value)
 import Data.Data (Data)
 import Data.Generics.Product
 import Data.Generics.Uniplate.Data ()
-import Optics (
-  AffineTraversal',
-  Lens,
-  Lens',
-  Traversal,
-  atraversalVL,
-  (%),
- )
 import Meta (
   GVarName,
   GlobalName (GlobalName, baseName, qualifiedModule),
@@ -54,6 +46,14 @@ import Meta (
   getID,
   qualifyName,
   _type,
+ )
+import Optics (
+  AffineTraversal',
+  Lens,
+  Lens',
+  Traversal,
+  atraversalVL,
+  (%),
  )
 import Type (
   Kind (..),

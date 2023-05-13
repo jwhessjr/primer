@@ -16,10 +16,26 @@ module CoreUtils (
 
 import Foreword
 
-import Fresh (MonadFresh, fresh)
+import Core (
+  CaseBranch' (..),
+  Expr' (..),
+  GVarName,
+  HasID (_id),
+  ID,
+  LVarName,
+  LocalName (LocalName),
+  TyVarName,
+  Type' (..),
+  bindName,
+  _exprMeta,
+  _exprTypeMeta,
+  _typeMeta,
+ )
 import Data.Data (Data)
 import Data.Generics.Uniplate.Data (universe)
 import Data.Set qualified as S
+import Fresh (MonadFresh, fresh)
+import Name (Name, NameCounter, freshName)
 import Optics (
   Fold,
   Traversal,
@@ -33,22 +49,6 @@ import Optics (
   traverseOf,
   (%),
  )
-import Core (
-  CaseBranch' (..),
-  Expr' (..),
-  GVarName,
-  HasID (_id),
-  ID,
-  LocalName (LocalName),
-  LVarName,
-  TyVarName,
-  Type' (..),
-  bindName,
-  _exprMeta,
-  _exprTypeMeta,
-  _typeMeta,
- )
-import Name (Name, NameCounter, freshName)
 
 -- | Helper, wrapping 'freshName'
 freshLocalName' :: MonadFresh NameCounter m => S.Set Name -> m (LocalName k)
@@ -99,12 +99,13 @@ alphaEqTy = go
   where
     go (TEmptyHole _) (TEmptyHole _) = True
     go (TCon _ n) (TCon _ m) = n == m
-    go  (TFun _ a b) (TFun _ c d) = go a c && go b d
+    go (TFun _ a b) (TFun _ c d) = go a c && go b d
     go _ _ = False
 
 -- | Traverse the 'ID's in a 'Type''.
 typeIDs :: HasID a => Traversal' (Type' a) ID
 typeIDs = _typeMeta % _id
+
 -- | Regenerate all IDs, not changing any other metadata
 regenerateExprIDs :: (HasID a, HasID b, MonadFresh ID m) => Expr' a b -> m (Expr' a b)
 regenerateExprIDs = regenerateExprIDs' (set _id) (set _id)

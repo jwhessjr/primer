@@ -15,8 +15,6 @@ module Available (
 
 import Foreword
 
-import Data.Data (Data)
-import Data.Map qualified as Map
 import Core (
   Expr,
   Expr' (..),
@@ -25,6 +23,8 @@ import Core (
   Type,
   Type' (..),
  )
+import Data.Data (Data)
+import Data.Map qualified as Map
 import Def (
   DefMap,
  )
@@ -81,11 +81,11 @@ forDef ::
   [Action]
 forDef _ NonEditable _ = mempty
 forDef defs Editable defName =
-    [Input RenameDef]
-      <> mwhen
-        -- ensure the definition is not in use, otherwise the action will not succeed
-        (not $ globalInUse defName $ Map.delete defName defs)
-        [NoInput DeleteDef]
+  [Input RenameDef]
+    <> mwhen
+      -- ensure the definition is not in use, otherwise the action will not succeed
+      (not $ globalInUse defName $ Map.delete defName defs)
+      [NoInput DeleteDef]
 
 forBody ::
   Editable ->
@@ -96,9 +96,9 @@ forBody NonEditable _ _ = mempty
 forBody Editable expr id = case findNodeWithParent id expr of
   Nothing -> mempty
   Just (ExprNode _, p) -> case p of
-          Nothing -> [] -- at root already, cannot raise
-          Just (ExprNode (Hole _ _)) -> [] -- in a NE hole, don't offer raise (as hole will probably just be recreated)
-          _ -> [NoInput Raise]
+    Nothing -> [] -- at root already, cannot raise
+    Just (ExprNode (Hole _ _)) -> [] -- in a NE hole, don't offer raise (as hole will probably just be recreated)
+    _ -> [NoInput Raise]
   Just (TypeNode t, p) ->
     let raiseAction = case p of
           Just (ExprNode _) -> [] -- at the root of an annotation, so cannot raise

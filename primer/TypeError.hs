@@ -3,10 +3,10 @@ module TypeError (TypeError (..)) where
 import Foreword
 
 import Core (Expr)
-import Meta (TmVarRef, TyConName, ValConName)
-import Type (Type')
-import Name (Name)
 import KindError (KindError)
+import Meta (TmVarRef, TyConName, ValConName)
+import Name (Name)
+import Type (Type')
 
 data TypeError
   = InternalError Text

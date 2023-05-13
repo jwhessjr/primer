@@ -4,9 +4,6 @@ module Transform (
 
 import Foreword
 
-import Data.Data (Data)
-import Data.Generics.Uniplate.Data (descendM)
-import Optics (Field2 (_2), getting, noneOf, to, (%))
 import Core (
   CaseBranch' (..),
   Expr' (..),
@@ -16,6 +13,9 @@ import Core (
   typesInExpr,
  )
 import CoreUtils (_freeVars, _freeVarsTy)
+import Data.Data (Data)
+import Data.Generics.Uniplate.Data (descendM)
+import Optics (Field2 (_2), getting, noneOf, to, (%))
 
 -- AST transformations.
 -- This module contains global transformations on expressions and types, in

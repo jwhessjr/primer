@@ -8,11 +8,11 @@ module Name (
 
 import Foreword
 
-import Fresh (MonadFresh, fresh)
 import Data.Char qualified as C
 import Data.Data (Data)
 import Data.Set qualified as S
 import Data.String (String)
+import Fresh (MonadFresh, fresh)
 import Numeric.Natural (Natural)
 
 -- | This module contains the type of names in the Core AST.

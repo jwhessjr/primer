@@ -7,8 +7,8 @@ module TestM (
 
 import Foreword
 
-import Fresh
 import Core (ID (..))
+import Fresh
 import Name (NameCounter)
 
 -- This monad is responsible for generating fresh IDs and names in tests.

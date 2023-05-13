@@ -12,13 +12,9 @@ module Action (
 
 import Foreword hiding (mod)
 
-import Fresh (MonadFresh)
-import Data.List (findIndex)
 import Actions (Action (..), Movement (..))
-import Available qualified as Available
 import Available (NodeType (..))
-import Errors (ActionError (..))
-import ProgAction (ProgAction (..))
+import Available qualified as Available
 import Core (
   Expr,
   Expr' (..),
@@ -29,19 +25,23 @@ import Core (
   getID,
  )
 import Core qualified as C
+import CoreUtils (forgetTypeMetadata)
 import DSL (
   ann,
   emptyHole,
   tEmptyHole,
   tfun,
  )
-import CoreUtils (forgetTypeMetadata)
+import Data.List (findIndex)
 import Def (
   ASTDef (..),
   Def (..),
  )
+import Errors (ActionError (..))
+import Fresh (MonadFresh)
 import Module (Module, insertDef)
 import Name (Name, NameCounter)
+import ProgAction (ProgAction (..))
 import Typecheck (
   CheckEverythingRequest (CheckEverything, toCheck, trusted),
   SmartHoles,
@@ -163,7 +163,7 @@ refocus Refocus{pre, post} = do
         Hole _ e' -> candidateIDsExpr e'
         Ann _ e' _ -> candidateIDsExpr e'
         _ -> []
-    candidateIDsType = (:[]) . getID
+    candidateIDsType = (: []) . getID
 
 -- | Apply a sequence of actions to the body of a definition, producing a new Expr or an error if
 -- any of the actions failed to apply.
@@ -312,7 +312,7 @@ toProgActionInput ::
   Available.InputAction ->
   Either ActionError [ProgAction]
 toProgActionInput defName opt = \case
- Available.RenameDef -> pure [RenameDef defName $ Available.option opt]
+  Available.RenameDef -> pure [RenameDef defName $ Available.option opt]
 
 toProg' :: [Action] -> GVarName -> (NodeType, ID) -> [ProgAction]
 toProg' actions defName (nt, id) =

@@ -11,7 +11,6 @@ module Def (
 
 import Foreword
 
-import Data.Data (Data)
 import Core (
   Expr,
   GVarName,
@@ -19,7 +18,8 @@ import Core (
   Type',
  )
 import CoreUtils (forgetTypeMetadata)
-import Optics (Lens', lens, iso, Iso')
+import Data.Data (Data)
+import Optics (Iso', Lens', iso, lens)
 
 data Def
   = DefAST ASTDef

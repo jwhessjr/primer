@@ -11,8 +11,6 @@ module Module (
 
 import Foreword
 
-import Data.Data (Data)
-import Data.Map (delete, insert, mapKeys, member)
 import Core (
   GVarName,
   GlobalName (baseName),
@@ -21,13 +19,15 @@ import Core (
   TypeMeta,
   qualifyName,
  )
+import Data.Data (Data)
+import Data.Map (delete, insert, mapKeys, member)
 import Def (
   Def (..),
   DefMap,
  )
 import Name (Name)
-import TypeDef (TypeDef (..), TypeDefMap, forgetTypeDefMetadata)
 import Optics (Lens', lens)
+import TypeDef (TypeDef (..), TypeDefMap, forgetTypeDefMetadata)
 
 data Module = Module
   { moduleName :: ModuleName
@@ -37,7 +37,7 @@ data Module = Module
   deriving stock (Eq, Show, Read, Data)
 
 _moduleDefs :: Lens' Module (Map Name Def)
-_moduleDefs = lens moduleDefs (\m d -> m {moduleDefs = d})
+_moduleDefs = lens moduleDefs (\m d -> m{moduleDefs = d})
 
 qualifyTyConName :: Module -> Name -> TyConName
 qualifyTyConName m = qualifyName (moduleName m)

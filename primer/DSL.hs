@@ -16,7 +16,6 @@ module DSL (
 
 import Foreword
 
-import Fresh (MonadFresh, fresh)
 import Core (
   Bind' (..),
   CaseBranch,
@@ -24,14 +23,15 @@ import Core (
   Expr,
   Expr' (..),
   ID,
-  Meta (..),
   LVarName,
+  Meta (..),
   TyConName,
   Type,
   Type' (..),
   TypeCache,
   ValConName,
  )
+import Fresh (MonadFresh, fresh)
 
 newtype S a = S {unS :: State ID a}
   deriving newtype (Functor, Applicative, Monad)

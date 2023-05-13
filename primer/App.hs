@@ -30,31 +30,6 @@ module App (
 
 import Foreword hiding (mod)
 
-import Fresh (MonadFresh (..))
-import NestedError (MonadNestedError)
-import Data.Data (Data)
-import Data.Foldable (foldMap')
-import Data.Generics.Uniplate.Zipper (
-  fromZipper,
- )
-import Data.Map.Strict qualified as Map
-import Optics (
-  ReversibleOptic (re),
-  Setter',
-  lens,
-  over,
-  set,
-  sets,
-  traverseOf,
-  traversed,
-  view,
-  (%),
-  (.~),
-  (?~),
-  (^.),
-  _Left,
-  _Right, Getter, to,
- )
 import Action (
   Action,
   ActionError (..),
@@ -62,7 +37,6 @@ import Action (
   applyActionsToBody,
   applyActionsToTypeSig,
  )
-import ProgError (ProgError (..))
 import Available (
   Editable (..),
   Level (..),
@@ -84,26 +58,54 @@ import Core (
   _exprMetaLens,
   _typeMetaLens,
  )
-import Transform (renameVar)
 import CoreUtils (regenerateExprIDs, regenerateTypeIDs)
+import Data.Data (Data)
+import Data.Foldable (foldMap')
+import Data.Generics.Uniplate.Zipper (
+  fromZipper,
+ )
+import Data.Map.Strict qualified as Map
 import Def (
   ASTDef (..),
-  _astDefExpr,
   Def (..),
-  _DefAST,
   DefMap,
   defAST,
+  _DefAST,
+  _astDefExpr,
  )
 import DefUtils (globalInUse)
+import Fresh (MonadFresh (..))
 import Module (
   Module (moduleDefs, moduleName),
-  _moduleDefs,
   deleteDef,
   insertDef,
   moduleDefsQualified,
   qualifyDefName,
+  _moduleDefs,
  )
 import Name (Name, NameCounter, unsafeMkName)
+import NestedError (MonadNestedError)
+import Optics (
+  Getter,
+  ReversibleOptic (re),
+  Setter',
+  lens,
+  over,
+  set,
+  sets,
+  to,
+  traverseOf,
+  traversed,
+  view,
+  (%),
+  (.~),
+  (?~),
+  (^.),
+  _Left,
+  _Right,
+ )
+import ProgError (ProgError (..))
+import Transform (renameVar)
 import Typecheck (
   CheckEverythingRequest (CheckEverything, toCheck, trusted),
   Cxt,
@@ -142,7 +144,7 @@ data Prog = Prog
   deriving stock (Eq, Show, Read)
 
 _progSelection :: Setter' Prog (Maybe Selection)
-_progSelection = sets $ \f p -> p {progSelection = f $ progSelection p}
+_progSelection = sets $ \f p -> p{progSelection = f $ progSelection p}
 
 -- | Push a compound action onto the given 'Log', returning the new
 -- 'Log'.
@@ -203,7 +205,7 @@ data NodeSelection = NodeSelection
   deriving stock (Eq, Show, Read, Data)
 
 _meta :: Setter' NodeSelection (Either ExprMeta TypeMeta)
-_meta = sets $ \f ns -> ns {meta = f $ meta ns}
+_meta = sets $ \f ns -> ns{meta = f $ meta ns}
 
 instance HasID NodeSelection where
   _id =
@@ -491,7 +493,7 @@ data App = App
   deriving stock (Eq, Show, Read)
 
 _currentState :: Setter' App AppState
-_currentState = sets $ \f a -> a {currentState = f $ currentState a}
+_currentState = sets $ \f a -> a{currentState = f $ currentState a}
 
 -- Internal app state. Note that this type is not exported, as we want
 -- to guarantee that the counters are kept in sync with the 'Prog',
@@ -505,13 +507,13 @@ data AppState = AppState
   deriving stock (Eq, Show, Read)
 
 _idCounter :: Setter' AppState ID
-_idCounter = sets $ \f as -> as {idCounter = f $ idCounter as}
+_idCounter = sets $ \f as -> as{idCounter = f $ idCounter as}
 
 _nameCounter :: Setter' AppState NameCounter
-_nameCounter = sets $ \f as -> as {nameCounter = f $ nameCounter as}
+_nameCounter = sets $ \f as -> as{nameCounter = f $ nameCounter as}
 
 _prog :: Setter' AppState Prog
-_prog = sets $ \f as -> as {prog = f $ prog as}
+_prog = sets $ \f as -> as{prog = f $ prog as}
 
 -- | Construct an 'App' from an 'ID' and a 'Prog'.
 --

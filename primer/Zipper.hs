@@ -45,6 +45,21 @@ module Zipper (
 
 import Foreword
 
+import Core (
+  Bind,
+  Bind' (..),
+  CaseBranch',
+  Expr,
+  Expr',
+  ExprMeta,
+  HasID (..),
+  ID,
+  Type,
+  Type' (),
+  TypeMeta,
+  getID,
+  typesInExpr,
+ )
 import Data.Data (Data)
 import Data.Generics.Product (position)
 import Data.Generics.Uniplate.Data ()
@@ -77,21 +92,6 @@ import Optics (
  )
 import Optics.Lens (Lens', equality', lens)
 import Optics.Traversal (traverseOf)
-import Core (
-  Bind,
-  Bind' (..),
-  CaseBranch',
-  Expr,
-  Expr',
-  ExprMeta,
-  HasID (..),
-  ID,
-  Type,
-  Type' (),
-  TypeMeta,
-  getID,
-  typesInExpr,
- )
 
 type TypeZip' b = Zipper (Type' b) (Type' b)
 
@@ -217,8 +217,7 @@ data CaseBindZ' a b = CaseBindZ
   }
 
 _caseBindZFocus :: Lens' (CaseBindZ' a b) (Bind' a)
-_caseBindZFocus = lens caseBindZFocus (\cb f -> cb {caseBindZFocus = f})
-
+_caseBindZFocus = lens caseBindZFocus (\cb f -> cb{caseBindZFocus = f})
 
 type CaseBindZ = CaseBindZ' ExprMeta TypeMeta
 

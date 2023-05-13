@@ -27,6 +27,7 @@ import Data.Data (Data)
 import Data.Generics.Product
 import Data.Generics.Uniplate.Data ()
 import Data.Generics.Uniplate.Zipper (Zipper, hole, replaceHole)
+import Name (Name)
 import Optics (
   Lens,
   Lens',
@@ -35,7 +36,6 @@ import Optics (
   set,
   view,
  )
-import Name (Name)
 
 -- | An identifier for an expression. Every node of the AST has an ID.
 --
