@@ -13,10 +13,8 @@ import Data.Data (Data)
 import Data.Generics.Product
 import Meta (
   HasID (..),
-  HasMetadata (_metadata),
   Meta,
   TyConName,
-  Value,
  )
 import Optics (
   Lens',
@@ -57,6 +55,3 @@ data Kind = KType
 
 instance HasID a => HasID (Type' a) where
   _id = position @1 % _id
-
-instance HasMetadata (Type' TypeMeta) where
-  _metadata = position @1 % typed @(Maybe Value)

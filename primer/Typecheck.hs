@@ -170,7 +170,7 @@ checkKind _ t = do
 -- | Extend the metadata of an 'Expr' or 'Type'
 -- (usually with a 'TypeCache' or 'Kind')
 annotate :: b -> Meta a -> Meta b
-annotate t (Meta i _ v) = Meta i t v
+annotate t (Meta i _) = Meta i t
 
 -- | Typechecking takes as input an Expr with 'Maybe Type' annotations and
 -- produces an Expr with 'Type' annotations - i.e. every node in the output is

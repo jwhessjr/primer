@@ -1,7 +1,6 @@
 module Meta (
   HasID (..),
   getID,
-  HasMetadata (_metadata),
   ID (ID),
   ModuleName (ModuleName, unModuleName),
   GlobalNameKind (..),
@@ -9,14 +8,12 @@ module Meta (
   qualifyName,
   TyConName,
   GVarName,
-  Value,
   Meta (Meta),
   _type,
 ) where
 
 import Foreword
 
-import Data.Aeson (Value)
 import Data.Data (Data)
 import Data.Generics.Product
 import Data.Generics.Uniplate.Data ()
@@ -42,7 +39,7 @@ newtype ID = ID Int
   deriving stock (Eq, Data)
   deriving newtype (Show, Read, Num, Ord, Enum, Bounded)
 
-data Meta a = Meta ID a (Maybe Value)
+data Meta a = Meta ID a
   deriving stock (Generic, Eq, Show, Read, Data, Functor)
 
 -- | This lens is called 'type' because 'a' is most commonly a Type, but it will
@@ -103,11 +100,3 @@ instance HasID a => HasID (Zipper a a) where
 -- | Get the ID of the given expression or type
 getID :: HasID a => a -> ID
 getID = view _id
-
--- | A class for types which have metadata.
--- This exists for the same reasons that 'HasID' does
-class HasMetadata a where
-  _metadata :: Lens' a (Maybe Value)
-
-instance HasMetadata (Meta a) where
-  _metadata = position @3

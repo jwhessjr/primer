@@ -16,7 +16,6 @@ module Core (
 
 import Foreword
 
-import Data.Aeson (Value)
 import Data.Data (Data)
 import Data.Generics.Product
 import Data.Generics.Uniplate.Data ()
@@ -25,12 +24,10 @@ import Meta (
   GlobalName (GlobalName, baseName, qualifiedModule),
   GlobalNameKind (..),
   HasID (..),
-  HasMetadata (_metadata),
   ID (ID),
   Meta (Meta),
   ModuleName (ModuleName, unModuleName),
   TyConName,
-  Value,
   getID,
   qualifyName,
   _type,
@@ -206,6 +203,3 @@ typesInExpr = atraversalVL $ \point f -> \case
 
 instance HasID a => HasID (Expr' a b) where
   _id = position @1 % _id
-
-instance HasMetadata (Expr' ExprMeta b) where
-  _metadata = position @1 % typed @(Maybe Value)

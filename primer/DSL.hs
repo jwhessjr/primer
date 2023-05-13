@@ -48,7 +48,7 @@ meta :: MonadFresh ID m => m (Meta (Maybe a))
 meta = meta' Nothing
 
 meta' :: MonadFresh ID m => a -> m (Meta a)
-meta' a = Meta <$> fresh <*> pure a <*> pure Nothing
+meta' a = Meta <$> fresh <*> pure a
 
 tEmptyHole :: MonadFresh ID m => m Type
 tEmptyHole = TEmptyHole <$> meta
