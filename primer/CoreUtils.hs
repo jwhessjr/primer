@@ -1,14 +1,10 @@
 module CoreUtils (
-  freshLocalName',
   exprIDs,
   typeIDs,
   regenerateTypeIDs,
   forgetTypeMetadata,
   regenerateExprIDs,
   noHoles,
-  _freeTmVars,
-  _freeTyVars,
-  _freeVars,
   _freeVarsTy,
   freeGlobalVars,
   alphaEqTy,
@@ -21,8 +17,6 @@ import Core (
   GVarName,
   HasID (_id),
   ID,
-  LVarName,
-  LocalName (LocalName),
   TyVarName,
   Type' (..),
   _exprMeta,
@@ -31,26 +25,16 @@ import Core (
  )
 import Data.Data (Data)
 import Data.Generics.Uniplate.Data (universe)
-import Data.Set qualified as S
 import Fresh (MonadFresh, fresh)
-import Name (Name, NameCounter, freshName)
 import Optics (
-  Fold,
   Traversal,
   Traversal',
   adjoin,
-  getting,
   set,
-  summing,
-  to,
   traversalVL,
   traverseOf,
   (%),
  )
-
--- | Helper, wrapping 'freshName'
-freshLocalName' :: MonadFresh NameCounter m => S.Set Name -> m (LocalName k)
-freshLocalName' = fmap LocalName . freshName
 
 -- | Regenerate all IDs, not changing any other metadata
 regenerateTypeIDs :: (HasID a, MonadFresh ID m) => Type' a -> m (Type' a)
@@ -112,30 +96,6 @@ regenerateExprIDs' :: MonadFresh ID m => (ID -> a -> a') -> (ID -> b -> b') -> E
 regenerateExprIDs' se st =
   traverseOf _exprMeta (\a -> flip se a <$> fresh)
     >=> traverseOf _exprTypeMeta (\a -> flip st a <$> fresh)
-
--- We can't offer a traversal, as we can't enforce replacing term vars with
--- terms and type vars with types. Use _freeTmVars and _freeTyVars for
--- traversals.
-_freeVars :: Fold (Expr' a b) (Either (a, LVarName) (b, TyVarName))
-_freeVars = getting _freeTmVars % to Left `summing` getting _freeTyVars % to Right
-
-_freeTmVars :: Traversal (Expr' a b) (Expr' a b) (a, LVarName) (Expr' a b)
-_freeTmVars = traversalVL $ go mempty
-  where
-    go :: Applicative f => Set LVarName -> ((a, LVarName) -> f (Expr' a b)) -> Expr' a b -> f (Expr' a b)
-    go bound f = \case
-      Hole m e -> Hole m <$> go bound f e
-      t@EmptyHole{} -> pure t
-      Ann m e ty -> Ann m <$> go bound f e <*> pure ty
-
-_freeTyVars :: Traversal (Expr' a b) (Expr' a b) (b, TyVarName) (Type' b)
-_freeTyVars = traversalVL $ go mempty
-  where
-    go :: Applicative f => Set TyVarName -> ((b, TyVarName) -> f (Type' b)) -> Expr' a b -> f (Expr' a b)
-    go bound f = \case
-      Hole m e -> Hole m <$> go bound f e
-      t@EmptyHole{} -> pure t
-      Ann m e ty -> Ann m <$> go bound f e <*> traverseFreeVarsTy bound f ty
 
 freeGlobalVars :: Expr' a b -> Set GVarName
 freeGlobalVars _ = mempty
