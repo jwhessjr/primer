@@ -17,7 +17,6 @@ import Available qualified as Available
 import Core (
   Expr,
   Expr' (..),
-  ID,
   Type,
   getID,
  )
@@ -65,7 +64,7 @@ import Zipper (
 -- | A shorthand for the constraints needed when applying actions
 type ActionM m =
   ( Monad m
-  , MonadFresh ID m -- can generate fresh IDs
+  , MonadFresh Int m -- can generate fresh IDs
   , MonadError ActionError m -- can raise errors
   , MonadReader TC.Cxt m -- has access to a typing context
   )
@@ -77,7 +76,7 @@ type ActionM m =
 -- return a whole set of modules as well as the one definition we wanted to
 -- change.
 applyActionsToTypeSig ::
-  (MonadFresh ID m) =>
+  (MonadFresh Int m) =>
   Module ->
   -- | This must be one of the definitions in the @Module@, with its correct name
   (Text, ASTDef) ->
@@ -149,7 +148,7 @@ refocus Refocus{pre, post} = do
 -- any of the actions failed to apply.
 -- After applying the actions, we check the new Expr against the type sig of the definition.
 applyActionsToBody ::
-  MonadFresh ID m =>
+  MonadFresh Int m =>
   Module ->
   ASTDef ->
   [Action] ->
@@ -208,7 +207,7 @@ applyAction' a = case a of
       InType zt -> InType <$> f zt
       _ -> throwError $ CustomFailure a s
 
-setCursor :: ActionM m => ID -> ExprZ -> m Loc
+setCursor :: ActionM m => Int -> ExprZ -> m Loc
 setCursor i e = case focusOn i (unfocusExpr e) of
   Just e' -> pure e'
   Nothing -> throwError $ IDNotFound i
@@ -219,7 +218,7 @@ constructArrowL zt = flip replace zt <$> tfun (pure (target zt)) tEmptyHole
 -- | Convert a high-level 'Available.NoInputAction' to a concrete sequence of 'ProgAction's.
 toProgActionNoInput ::
   Text ->
-  Maybe (NodeType, ID) ->
+  Maybe (NodeType, Int) ->
   Available.NoInputAction ->
   Either ActionError [ProgAction]
 toProgActionNoInput defName mNodeSel = \case
@@ -244,7 +243,7 @@ toProgActionInput ::
 toProgActionInput defName opt = \case
   Available.RenameDef -> pure [RenameDef defName $ Available.option opt]
 
-toProg' :: [Action] -> Text -> (NodeType, ID) -> [ProgAction]
+toProg' :: [Action] -> Text -> (NodeType, Int) -> [ProgAction]
 toProg' actions defName (nt, id) =
   [ MoveToDef defName
   , (SetCursor id : actions) & case nt of

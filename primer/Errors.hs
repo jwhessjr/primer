@@ -10,7 +10,6 @@ module Errors (ActionError (..)) where
 import Foreword
 
 import Actions (Action)
-import Core (ID)
 import Movement (Movement)
 import TypeError (TypeError)
 
@@ -24,8 +23,8 @@ data ActionError
       Text
       -- ^ the error message
   | InternalFailure Text
-  | IDNotFound ID
-  | MovementFailed (ID, Movement)
+  | IDNotFound Int
+  | MovementFailed (Int, Movement)
   | TypeError TypeError
   | -- | Both actual and potential, eg renaming the lambda x to y in any of
     -- λx.y     the binder captures the existing y

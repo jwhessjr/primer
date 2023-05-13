@@ -16,7 +16,6 @@ import Foreword
 import Core (
   Expr,
   Expr' (..),
-  ID,
   Type,
   Type' (..),
  )
@@ -66,7 +65,7 @@ forDef defs defName =
 
 forBody ::
   Expr ->
-  ID ->
+  Int ->
   [Action]
 forBody expr id = case findNodeWithParent id expr of
   Nothing -> mempty
@@ -82,7 +81,7 @@ forBody expr id = case findNodeWithParent id expr of
 
 forSig ::
   Type ->
-  ID ->
+  Int ->
   [Action]
 forSig ty id = case findType id ty of
   Nothing -> mempty

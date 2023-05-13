@@ -13,7 +13,6 @@ import Data.Data (Data)
 import Data.Generics.Product
 import Meta (
   HasID (..),
-  ID,
  )
 import Optics (
   Lens',
@@ -29,7 +28,7 @@ type Type = Type' TypeMeta
 
 -- | Type metadata. Each type is optionally annotated with a kind.
 -- Currently we don't fill these in during typechecking.
-type TypeMeta = ID
+type TypeMeta = Int
 
 -- | NB: Be careful with equality -- it is on-the-nose, rather than up-to-alpha: see Subst:alphaEqTy
 data Type' a

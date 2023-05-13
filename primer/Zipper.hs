@@ -40,7 +40,6 @@ import Core (
   Expr',
   ExprMeta,
   HasID (..),
-  ID,
   Type,
   Type' (),
   TypeMeta,
@@ -116,7 +115,7 @@ replace = over asZipper . replaceHole
 -- | Focus on the node with the given 'ID', if it exists in the type
 focusOnTy ::
   (Data b, HasID b) =>
-  ID ->
+  Int ->
   Type' b ->
   Maybe (Zipper (Type' b) (Type' b))
 focusOnTy i = focusOnTy' i . focus
@@ -124,7 +123,7 @@ focusOnTy i = focusOnTy' i . focus
 -- | Focus on the node with the given 'ID', if it exists in the focussed type
 focusOnTy' ::
   (Data b, HasID b) =>
-  ID ->
+  Int ->
   Zipper (Type' b) (Type' b) ->
   Maybe (Zipper (Type' b) (Type' b))
 focusOnTy' i = fmap snd . search matchesID
@@ -238,11 +237,11 @@ unfocus :: Loc -> Expr
 unfocus = unfocusExpr . unfocusLoc
 
 -- | Focus on the node with the given 'ID', if it exists in the expression
-focusOn :: (Data a, Data b, HasID a, HasID b) => ID -> Expr' a b -> Maybe (Loc' a b)
+focusOn :: (Data a, Data b, HasID a, HasID b) => Int -> Expr' a b -> Maybe (Loc' a b)
 focusOn i = focusOn' i . focus
 
 -- | Focus on the node with the given 'ID', if it exists in the focussed expression
-focusOn' :: (Data a, Data b, HasID a, HasID b) => ID -> ExprZ' a b -> Maybe (Loc' a b)
+focusOn' :: (Data a, Data b, HasID a, HasID b) => Int -> ExprZ' a b -> Maybe (Loc' a b)
 focusOn' i = fmap snd . search matchesID
   where
     matchesID z
@@ -256,7 +255,7 @@ focusOn' i = fmap snd . search matchesID
 
 -- | Find a node in the AST by its ID, and also return its parent
 findNodeWithParent ::
-  ID ->
+  Int ->
   Expr ->
   Maybe (SomeNode, Maybe SomeNode)
 findNodeWithParent id x = do
@@ -273,7 +272,7 @@ findNodeWithParent id x = do
       )
 
 -- | Find a sub-type in a larger type by its ID.
-findType :: ID -> Type -> Maybe Type
+findType :: Int -> Type -> Maybe Type
 findType id ty = target <$> focusOnTy id ty
 
 -- | An AST node tagged with its "sort" - i.e. if it's a type or expression or binding etc.

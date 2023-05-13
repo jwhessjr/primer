@@ -15,16 +15,15 @@ import Foreword
 import Core (
   Expr,
   Expr' (..),
-  ID,
   Type,
   Type' (..),
  )
 import Fresh (MonadFresh, fresh)
 
-newtype S a = S {unS :: State ID a}
+newtype S a = S {unS :: State Int a}
   deriving newtype (Functor, Applicative, Monad)
 
-instance MonadFresh ID S where
+instance MonadFresh Int S where
   fresh = S $ do
     i <- get
     put (i + 1)
@@ -32,20 +31,20 @@ instance MonadFresh ID S where
 
 -- | Evaluate a DSL expression with a starting ID of 0, producing an
 -- @a@ and the next available fresh 'ID'.
-create :: S a -> (a, ID)
+create :: S a -> (a, Int)
 create = flip runState 0 . unS
 
-tEmptyHole :: MonadFresh ID m => m Type
+tEmptyHole :: MonadFresh Int m => m Type
 tEmptyHole = TEmptyHole <$> fresh
 
-tcon :: MonadFresh ID m => Text -> m Type
+tcon :: MonadFresh Int m => Text -> m Type
 tcon t = TCon <$> fresh <*> pure t
 
-tfun :: MonadFresh ID m => m Type -> m Type -> m Type
+tfun :: MonadFresh Int m => m Type -> m Type -> m Type
 tfun a b = TFun <$> fresh <*> a <*> b
 
-emptyHole :: MonadFresh ID m => m Expr
+emptyHole :: MonadFresh Int m => m Expr
 emptyHole = EmptyHole <$> fresh
 
-ann :: MonadFresh ID m => m Expr -> m Type -> m Expr
+ann :: MonadFresh Int m => m Expr -> m Type -> m Expr
 ann e t = Ann <$> fresh <*> e <*> t

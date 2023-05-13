@@ -34,7 +34,6 @@ import Foreword
 import Core (
   Expr,
   Expr' (..),
-  ID,
   Kind (..),
   Type' (..),
   TypeMeta,
@@ -109,7 +108,7 @@ data Cxt = Cxt
 type KindM e m =
   ( Monad m
   , MonadReader Cxt m -- has access to a typing context, and SmartHoles option
-  , MonadFresh ID m -- can generate fresh IDs
+  , MonadFresh Int m -- can generate fresh IDs
   -- can generate fresh names (needed for "smart holes" and polymorphism)
   , MonadNestedError KindError e m -- can throw kind errors
   )
@@ -117,7 +116,7 @@ type KindM e m =
 type TypeT = Type' TypeMeta
 
 -- Synthesise a kind for the given type
-synthKind :: KindM e m => Type' ID -> m (Kind, TypeT)
+synthKind :: KindM e m => Type' Int -> m (Kind, TypeT)
 synthKind = \case
   TEmptyHole m -> pure (KType, TEmptyHole m)
   TCon m c -> do
@@ -130,7 +129,7 @@ synthKind = \case
     b' <- checkKind KType b
     pure (KType, TFun m a' b')
 
-checkKind :: KindM e m => Kind -> Type' ID -> m TypeT
+checkKind :: KindM e m => Kind -> Type' Int -> m TypeT
 checkKind _ t = do
   (_, t') <- synthKind t
   pure t'
@@ -169,7 +168,7 @@ buildTypingContextFromModules modules =
 type TypeM e m =
   ( Monad m
   , MonadReader Cxt m -- has access to a typing context, and SmartHoles option
-  , MonadFresh ID m -- can generate fresh IDs
+  , MonadFresh Int m -- can generate fresh IDs
   -- can generate fresh names (needed for "smart holes" and polymorphism)
   , MonadNestedError TypeError e m -- can throw type errors
   )
@@ -203,7 +202,7 @@ data CheckEverythingRequest = CheckEverything { toCheck :: Module}
 -- environment with the updated type)
 checkEverything ::
   forall e m.
-  (MonadFresh ID m, MonadNestedError TypeError e (ReaderT Cxt m)) =>
+  (MonadFresh Int m, MonadNestedError TypeError e (ReaderT Cxt m)) =>
   CheckEverythingRequest ->
   m Module
 checkEverything CheckEverything{toCheck} =
@@ -364,5 +363,5 @@ exprTtoExpr = identity
 typeTtoType :: TypeT -> Type' TypeMeta
 typeTtoType = identity
 
-checkKind' :: TypeM e m => Kind -> Type' ID -> m TypeT
+checkKind' :: TypeM e m => Kind -> Type' Int -> m TypeT
 checkKind' k t = modifyError' KindError (checkKind k t)

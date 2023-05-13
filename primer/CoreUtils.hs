@@ -12,7 +12,6 @@ import Foreword
 import Core (
   Expr' (..),
   HasID (_id),
-  ID,
   Type' (..),
   _exprMeta,
   _exprTypeMeta,
@@ -56,12 +55,12 @@ alphaEqTy = go
     go _ _ = False
 
 -- | Traverse the 'ID's in a 'Type''.
-typeIDs :: HasID a => Traversal' (Type' a) ID
+typeIDs :: HasID a => Traversal' (Type' a) Int
 typeIDs = _typeMeta % _id
 
 freeGlobalVars :: Expr' a b -> Set Text
 freeGlobalVars _ = mempty
 
 -- | Traverse the 'ID's in an 'Expr''.
-exprIDs :: (HasID a, HasID b) => Traversal' (Expr' a b) ID
+exprIDs :: (HasID a, HasID b) => Traversal' (Expr' a b) Int
 exprIDs = (_exprMeta % _id) `adjoin` (_exprTypeMeta % _id)

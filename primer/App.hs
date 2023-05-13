@@ -25,7 +25,6 @@ import Available (
  )
 import Core (
   HasID (_id),
-  ID (..),
   _exprMetaLens,
   _typeMetaLens,
  )
@@ -94,7 +93,7 @@ data Selection = Selection
 -- We have the following invariant: @nodeType = SigNode ==> isRight meta@
 data NodeSelection = NodeSelection
   { nodeType :: NodeType
-  , meta :: ID
+  , meta :: Int
   }
   deriving stock (Eq, Show, Read, Data)
 
@@ -209,7 +208,7 @@ type MonadEditApp l e m = (MonadEdit m e, MonadState App m)
 -- operations which do not themselves update the 'App' contained in a
 -- 'State' monad. (Typically interaction with the @State@ monad would
 -- be handled by a caller.
-type MonadEdit m e = (MonadFresh ID m, MonadError e m)
+type MonadEdit m e = (MonadFresh Int m, MonadError e m)
 
 -- | A shorthand for the constraints we need when performing read-only
 -- operations on the application.
@@ -243,12 +242,12 @@ newtype QueryAppM a = QueryAppM (ReaderT App (Except ProgError) a)
 -- Building an 'App' can be tricky, so we don't export the
 -- constructor. See 'mkApp' and 'mkAppSafe'.
 data App = App
-  { idCounter :: ID
+  { idCounter :: Int
   , prog :: Prog
   }
   deriving stock (Eq, Show, Read)
 
-_idCounter :: Setter' App ID
+_idCounter :: Setter' App Int
 _idCounter = sets $ \f as -> as{idCounter = f $ idCounter as}
 
 _prog :: Setter' App Prog
@@ -292,12 +291,12 @@ _prog = sets $ \f as -> as{prog = f $ prog as}
 -- future. See:
 --
 -- https://github.com/hackworthltd/primer/issues/510
-mkApp :: ID -> Prog -> App
+mkApp :: Int -> Prog -> App
 mkApp = App
 
 -- | Given an 'App', return the next 'ID' that should be used to
 -- create a new node.
-appIdCounter :: App -> ID
+appIdCounter :: App -> Int
 appIdCounter = idCounter
 
 -- | Given an 'App', return its 'Prog'.
@@ -305,7 +304,7 @@ appProg :: App -> Prog
 appProg = prog
 
 -- | Support for generating fresh IDs
-instance Monad m => MonadFresh ID (EditAppM m e) where
+instance Monad m => MonadFresh Int (EditAppM m e) where
   fresh = do
     id_ <- gets appIdCounter
     modify (\s -> s & _idCounter .~ id_ + 1)

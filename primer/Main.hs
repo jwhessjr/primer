@@ -21,9 +21,6 @@ import App (
   runEditAppM,
  )
 import Available qualified as Available
-import Core (
-  ID,
- )
 import CoreUtils (
   exprIDs,
   typeIDs,
@@ -145,7 +142,7 @@ data Provenance
 
 -- gives def name and perhaps a node inside it (if Nothing, then has selected the definition itself)
 -- If the outer Maybe is Nothing, then there were no definitions at all!
-pickPos :: Prog -> Maybe (Gen (Text, Either Def (ASTDef, NodeType, ID)))
+pickPos :: Prog -> Maybe (Gen (Text, Either Def (ASTDef, NodeType, Int)))
 pickPos p = ((\(defName, def) -> (defName,) <$> pickLoc def) =<<) <$> pickDef
   where
     pickDef = case Map.toList $ progAllDefs p of
@@ -209,7 +206,7 @@ runRandomAvailableAction a = do
 runEditAppMLogs :: EditAppM Identity ProgError a -> App -> (Either ProgError a, App)
 runEditAppMLogs m a' = runIdentity $ runEditAppM m a'
 
-prog :: MonadFresh ID m => m Prog
+prog :: MonadFresh Int m => m Prog
 prog = do
   let a = "a6"
   e <- emptyHole `ann` tEmptyHole

@@ -5,7 +5,6 @@ module Actions (
 
 import Foreword
 
-import Meta (ID)
 import Movement (Movement (..))
 
 -- We split this module to increase parallelism in our build.
@@ -18,7 +17,7 @@ import Movement (Movement (..))
 --  Some of them take Text arguments rather than Name because they represent
 --  untrusted input from the frontend.
 data Action
-  = SetCursor ID
+  = SetCursor Int
   | Delete
   | ConstructArrowL
   deriving stock (Eq, Show, Read)

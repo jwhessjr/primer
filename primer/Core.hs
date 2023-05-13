@@ -21,7 +21,6 @@ import Data.Generics.Product
 import Data.Generics.Uniplate.Data ()
 import Meta (
   HasID (..),
-  ID (ID),
   getID,
  )
 import Optics (
@@ -68,7 +67,7 @@ data TypeCacheBoth = TCBoth {tcChkedAt :: Type' (), tcSynthed :: Type' ()}
 -- They're optional (i.e. in a 'Maybe') because when
 -- modifying the AST in an action we aren't necessarily sure of the type of the
 -- nodes we're inserting.
-type ExprMeta = ID
+type ExprMeta = Int
 
 -- | The core AST.
 --  This is the canonical representation of Primer programs.  It is similar to
