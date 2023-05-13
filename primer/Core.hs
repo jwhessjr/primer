@@ -20,13 +20,8 @@ import Data.Data (Data)
 import Data.Generics.Product
 import Data.Generics.Uniplate.Data ()
 import Meta (
-  GlobalName,
-  GlobalNameKind (..),
   HasID (..),
   ID (ID),
-  Meta,
-  ModuleName (ModuleName, unModuleName),
-  TyConName,
   getID,
  )
 import Optics (

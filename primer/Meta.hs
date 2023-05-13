@@ -3,10 +3,6 @@ module Meta (
   getID,
   ID (ID),
   ModuleName (ModuleName, unModuleName),
-  GlobalNameKind (..),
-  GlobalName,
-  TyConName,
-  Meta,
 ) where
 
 import Foreword
@@ -33,24 +29,8 @@ newtype ID = ID Int
   deriving stock (Eq, Data)
   deriving newtype (Show, Read, Num, Ord, Enum, Bounded)
 
-type Meta = ID
-
 newtype ModuleName = ModuleName {unModuleName :: NonEmpty Text}
   deriving stock (Eq, Ord, Show, Read, Data, Generic)
-
--- | Tags for 'GlobalName'
-data GlobalNameKind
-  = ATyCon
-  | ADefName
-
-type GlobalName (k :: GlobalNameKind) = Text
-
-type TyConName = Text
-
--- | A reference to a variable.
-data TmVarRef
-  = GlobalVarRefText
-  deriving stock (Eq, Show, Read, Data, Generic)
 
 -- | A class for types which have an ID.
 -- This makes it easier to change the underlying metadata representation without
