@@ -81,7 +81,6 @@ import Primer.Core (
   Expr' (..),
   ExprMeta,
   GVarName,
-  GlobalName (baseName, qualifiedModule),
   ID,
   Kind (..),
   LVarName,
@@ -105,7 +104,6 @@ import Primer.Core.Utils (
   alphaEqTy,
   forgetTypeMetadata,
   freshLocalName',
-  generateTypeIDs,
   noHoles,
  )
 import Primer.Def (
@@ -127,8 +125,6 @@ import Primer.Module (
 import Primer.Name (Name, NameCounter)
 import Primer.TypeDef (
   TypeDefMap,
-  ValCon (valConArgs, valConName),
-  typeDefAST,
  )
 import Primer.Typecheck.Cxt (Cxt (Cxt, globalCxt, localCxt, smartHoles, typeDefs))
 import Primer.Typecheck.Kindcheck (
@@ -204,9 +200,6 @@ extendGlobalCxt globals cxt = cxt{globalCxt = Map.fromList globals <> globalCxt 
 extendTypeDefCxt :: TypeDefMap -> Cxt -> Cxt
 extendTypeDefCxt typedefs cxt = cxt{typeDefs = typedefs <> typeDefs cxt}
 
-noSmartHoles :: Cxt -> Cxt
-noSmartHoles cxt = cxt{smartHoles = NoSmartHoles}
-
 -- An empty typing context
 initialCxt :: SmartHoles -> Cxt
 initialCxt sh =
@@ -256,63 +249,6 @@ checkTypeDefs tds = do
   -- (This is not quite true, see
   -- https://github.com/hackworthltd/primer/issues/3)
   assert (Map.disjoint existingTypes tds) "Duplicate-ly-named TypeDefs"
-  -- Note that constructors are synthesisable, so their names must be globally
-  -- unique. We need to be able to work out the type of @TCon "C"@ without any
-  -- extra information.
-  let atds = Map.mapMaybe typeDefAST tds
-  -- Note that these checks only apply to non-primitives:
-  -- duplicate type names are checked elsewhere, kinds are correct by construction, and there are no constructors.
-  local (extendTypeDefCxt tds) $ traverseWithKey_ checkTypeDef atds
-  where
-    traverseWithKey_ :: Applicative f => (k -> v -> f ()) -> Map k v -> f ()
-    traverseWithKey_ f = void . Map.traverseWithKey f
-    -- In the core, we have many different namespaces, so the only name-clash
-    -- checking we must do is
-    -- - between two constructors (possibly of different types)
-    -- - between two type names
-    -- However, we forbid much more than this for UI and pedagogy purposes. We
-    -- actually check
-    -- - In one typedef
-    --   - parameters are distinct
-    --   - type name is not shadowed by a parameter
-    --   - parameters and constructors do not clash
-    -- - Globally
-    --   - all types have distinct names
-    --   - all constructors have distinct names
-    -- But note that we allow
-    -- - type names clashing with constructor names (possibly in different
-    --   types)
-
-    checkTypeDef tc _td = do
-      let params = []
-      let cons = []
-      assert
-        ( (1 ==) . S.size $
-            S.fromList $
-              qualifiedModule tc : fmap (qualifiedModule . valConName) cons
-        )
-        "Module name of type and all constructors must be the same"
-      assert
-        (distinct $ map (unLocalName . fst) params <> map (baseName . valConName) cons)
-        "Duplicate names in one tydef: between parameter-names and constructor-names"
-      assert
-        (notElem (baseName tc) $ map (unLocalName . fst) params)
-        "Duplicate names in one tydef: between type-def-name and parameter-names"
-      local (noSmartHoles . extendLocalCxtTys params) $
-        mapM_ (checkKind' KType <=< fakeMeta) $
-          concatMap valConArgs cons
-    -- We need metadata to use checkKind, but we don't care about the output,
-    -- just a yes/no answer. In this case it is fine to put nonsense in the
-    -- metadata as it won't be inspected.
-    fakeMeta = generateTypeIDs
-
-distinct :: Ord a => [a] -> Bool
-distinct = go mempty
-  where
-    go _ [] = True
-    go seen (x : xs)
-      | x `S.member` seen = False
-      | otherwise = go (S.insert x seen) xs
 
 data CheckEverythingRequest = CheckEverything
   { trusted :: [Module]
