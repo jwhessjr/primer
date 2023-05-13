@@ -26,7 +26,6 @@ executable primer-test
     Primer.Core.Utils
     Primer.Def
     Primer.Def.Utils
-    Primer.Log
     Primer.Module
     Primer.Name
     Primer.Subst
@@ -55,7 +54,6 @@ executable primer-test
     Primer.Gen.Core.Raw
     Primer.Gen.Core.Typed
     Primer.Test.TestM
-    Primer.Test.Util
 
   default-language:   GHC2021
   default-extensions:

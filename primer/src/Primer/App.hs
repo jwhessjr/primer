@@ -31,7 +31,6 @@ module Primer.App (
 import Foreword hiding (mod)
 
 import Control.Monad.Fresh (MonadFresh (..))
-import Control.Monad.Log (MonadLog, WithSeverity)
 import Control.Monad.NestedError (MonadNestedError)
 import Data.Data (Data)
 import Data.Generics.Uniplate.Zipper (
@@ -454,7 +453,7 @@ replay = mapM_ handleEditRequest
 --
 -- Note we do not want @MonadFresh Name m@, as @fresh :: m Name@ has
 -- no way of avoiding user-specified names. Instead, use 'freshName'.
-type MonadEditApp l e m = (MonadLog (WithSeverity l) m, MonadEdit m e, MonadState App m)
+type MonadEditApp l e m = (MonadEdit m e, MonadState App m)
 
 -- | A shorthand for constraints needed when doing low-level mutation
 -- operations which do not themselves update the 'App' contained in a
@@ -472,7 +471,7 @@ type MonadEdit m e = (MonadFresh ID m, MonadFresh NameCounter m, MonadError e m)
 -- state. This is important to ensure that we can reliably replay the
 -- log without having ID mismatches.
 newtype EditAppM m e a = EditAppM (StateT App (ExceptT e m) a)
-  deriving newtype (Functor, Applicative, Monad, MonadState App, MonadError e, MonadLog l)
+  deriving newtype (Functor, Applicative, Monad, MonadState App, MonadError e)
 
 -- | Run an 'EditAppM' action, returning a result and an updated
 -- 'App'.

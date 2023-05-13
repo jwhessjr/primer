@@ -2,7 +2,6 @@ module Main (main) where
 
 import Foreword
 
-import Control.Monad.Log (WithSeverity)
 import Data.List.Extra (partition)
 import Data.Map qualified as Map
 import Data.Text qualified as T
@@ -44,12 +43,10 @@ import Primer.Def (
  )
 import Primer.Gen.Core.Raw (genName)
 import Primer.Gen.Core.Typed (WT, forAllT, propertyWT, isolateWT)
-import Primer.Log (PureLog, runPureLog)
 import Primer.Module (
   Module (..),
  )
 import Primer.Name (Name (unName))
-import Primer.Test.Util (testNoSevereLogs)
 import Primer.Typecheck (
   SmartHoles (SmartHoles), TypeError,
  )
@@ -190,20 +187,18 @@ runRandomAvailableAction a = do
               actionSucceedsOrCapture StudentProvided (handleEditRequest progActs) a
   where
     runEditAppMLogs ::
-      HasCallStack =>
-      EditAppM (PureLog (WithSeverity ())) ProgError a ->
+      EditAppM Identity ProgError a ->
       App ->
       PropertyT WT (Either ProgError a, App)
-    runEditAppMLogs m a' = case runPureLog $ runEditAppM m a' of
-      (r, logs) -> testNoSevereLogs logs >> pure r
-    actionSucceeds :: HasCallStack => EditAppM (PureLog (WithSeverity ())) ProgError a -> App -> PropertyT WT App
+    runEditAppMLogs m a' = pure $ runIdentity $ runEditAppM m a'
+    actionSucceeds :: HasCallStack => EditAppM Identity ProgError a -> App -> PropertyT WT App
     actionSucceeds m a' =
       runEditAppMLogs m a' >>= \case
         (Left _, _) -> failure
         (Right _, a'') -> pure a''
     -- If we submit our own name rather than an offered one, then
     -- we should expect that name capture/clashing may happen
-    actionSucceedsOrCapture :: HasCallStack => Provenance -> EditAppM (PureLog (WithSeverity ())) ProgError a -> App -> PropertyT WT (Maybe App)
+    actionSucceedsOrCapture :: HasCallStack => Provenance -> EditAppM Identity ProgError a -> App -> PropertyT WT (Maybe App)
     actionSucceedsOrCapture p m a' = do
       a'' <- runEditAppMLogs m a'
       case (p, a'') of
@@ -269,11 +264,10 @@ tasty_undo_redo = withTests 500 $
     -- TODO: dry
     runEditAppMLogs ::
       HasCallStack =>
-      EditAppM (PureLog (WithSeverity ())) ProgError a ->
+      EditAppM Identity ProgError a ->
       App ->
       PropertyT WT App
-    runEditAppMLogs m a = case runPureLog $ runEditAppM m a of
-      (r, logs) -> testNoSevereLogs logs >> case r of
+    runEditAppMLogs m a = case runIdentity $ runEditAppM m a of
         (Left _, _) -> failure
         (Right _, a') -> pure a'
     runRandomAction a = fromMaybe a <$> runRandomAvailableAction a
