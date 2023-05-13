@@ -11,17 +11,16 @@ module ProgAction (ProgAction (..)) where
 import Foreword
 
 import Actions (Action)
-import Meta (GVarName)
 
 -- | High level actions
 -- These actions move around the whole program or modify definitions
 data ProgAction
   = -- | Move the cursor to the definition with the given Name
-    MoveToDef GVarName
+    MoveToDef Text
   | -- | Rename the definition with the given (base) Name
-    RenameDef GVarName Text
+    RenameDef Text Text
   | -- | Delete a new definition
-    DeleteDef GVarName
+    DeleteDef Text
   | -- | Execute a sequence of actions on the body of the definition
     BodyAction [Action]
   | -- | Execute a sequence of actions on the type annotation of the definition

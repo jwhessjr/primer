@@ -8,7 +8,6 @@ module Module (
 import Foreword
 
 import Core (
-  GVarName,
   TypeMeta,
  )
 import Data.Data (Data)
@@ -33,5 +32,5 @@ _moduleDefs = lens moduleDefs (\m d -> m{moduleDefs = d})
 insertDef :: Module -> Text -> Def -> Module
 insertDef m n d = m{moduleDefs = insert n d $ moduleDefs m}
 
-deleteDef :: Module -> GVarName -> Module
+deleteDef :: Module -> Text -> Module
 deleteDef m d = m{moduleDefs = delete d (moduleDefs m)}

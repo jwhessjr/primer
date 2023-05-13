@@ -9,9 +9,6 @@ module TypeDef (
 import Foreword
 
 import Data.Data (Data)
-import Meta (
-  TyConName,
- )
 import Type (
   Kind (KType),
  )
@@ -21,7 +18,7 @@ data TypeDef b
   deriving stock (Eq, Show, Read, Data)
 
 -- | A mapping of global names to 'TypeDef's.
-type TypeDefMap = Map TyConName (TypeDef ())
+type TypeDefMap = Map Text (TypeDef ())
 
 -- | Definition of an algebraic data type
 --

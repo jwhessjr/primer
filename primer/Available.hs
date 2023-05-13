@@ -16,7 +16,6 @@ import Foreword
 import Core (
   Expr,
   Expr' (..),
-  GVarName,
   ID,
   Type,
   Type' (..),
@@ -56,7 +55,7 @@ data InputAction
 
 forDef ::
   DefMap ->
-  GVarName ->
+  Text ->
   [Action]
 forDef defs defName =
   [Input RenameDef]

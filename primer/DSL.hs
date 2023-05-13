@@ -16,7 +16,6 @@ import Core (
   Expr,
   Expr' (..),
   ID,
-  TyConName,
   Type,
   Type' (..),
  )
@@ -39,7 +38,7 @@ create = flip runState 0 . unS
 tEmptyHole :: MonadFresh ID m => m Type
 tEmptyHole = TEmptyHole <$> fresh
 
-tcon :: MonadFresh ID m => TyConName -> m Type
+tcon :: MonadFresh ID m => Text -> m Type
 tcon t = TCon <$> fresh <*> pure t
 
 tfun :: MonadFresh ID m => m Type -> m Type -> m Type

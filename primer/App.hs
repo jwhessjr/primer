@@ -24,7 +24,6 @@ import Available (
   NodeType (..),
  )
 import Core (
-  GVarName,
   HasID (_id),
   ID (..),
   _exprMetaLens,
@@ -68,7 +67,7 @@ data Prog = Prog
 _progSelection :: Setter' Prog (Maybe Selection)
 _progSelection = sets $ \f p -> p{progSelection = f $ progSelection p}
 
-progAllDefs :: Prog -> Map GVarName Def
+progAllDefs :: Prog -> Map Text Def
 progAllDefs = moduleDefs . progModule
 
 -- Note [Modules]
@@ -85,7 +84,7 @@ progAllDefs = moduleDefs . progModule
 -- | Describes what interface element the user has selected.
 -- A definition in the left hand nav bar, and possibly a node in that definition.
 data Selection = Selection
-  { selectedDef :: GVarName
+  { selectedDef :: Text
   -- ^ the ID of some ASTDef
   , selectedNode :: Maybe NodeSelection
   }
@@ -110,7 +109,7 @@ handleEditRequest actions = do
   modify (\s -> s & _prog .~ prog)
   pure prog
   where
-    go :: (Prog, Maybe GVarName) -> ProgAction -> m (Prog, Maybe GVarName)
+    go :: (Prog, Maybe Text) -> ProgAction -> m (Prog, Maybe Text)
     go (prog, mdef) a =
       applyProgAction prog mdef a <&> \prog' ->
         (prog', selectedDef <$> progSelection prog')
@@ -118,7 +117,7 @@ handleEditRequest actions = do
 -- | Handle a 'ProgAction'
 -- The 'GVarName' argument is the currently-selected definition, which is
 -- provided for convenience: it is the same as the one in the progSelection.
-applyProgAction :: MonadEdit m ProgError => Prog -> Maybe GVarName -> ProgAction -> m Prog
+applyProgAction :: MonadEdit m ProgError => Prog -> Maybe Text -> ProgAction -> m Prog
 applyProgAction prog mdefName = \case
   MoveToDef d -> do
     let m = progModule prog
@@ -188,7 +187,7 @@ editModule p f = do
 
 editModuleOf ::
   MonadError ProgError m =>
-  Maybe GVarName ->
+  Maybe Text ->
   Prog ->
   (Module -> Text -> ASTDef -> m (Module, Maybe Selection)) ->
   m Prog

@@ -17,7 +17,6 @@ import Available qualified as Available
 import Core (
   Expr,
   Expr' (..),
-  GVarName,
   ID,
   Type,
   getID,
@@ -219,7 +218,7 @@ constructArrowL zt = flip replace zt <$> tfun (pure (target zt)) tEmptyHole
 
 -- | Convert a high-level 'Available.NoInputAction' to a concrete sequence of 'ProgAction's.
 toProgActionNoInput ::
-  GVarName ->
+  Text ->
   Maybe (NodeType, ID) ->
   Available.NoInputAction ->
   Either ActionError [ProgAction]
@@ -238,14 +237,14 @@ toProgActionNoInput defName mNodeSel = \case
 -- | Convert a high-level 'Available.InputAction', and associated 'Available.Option',
 -- to a concrete sequence of 'ProgAction's.
 toProgActionInput ::
-  GVarName ->
+  Text ->
   Available.Option ->
   Available.InputAction ->
   Either ActionError [ProgAction]
 toProgActionInput defName opt = \case
   Available.RenameDef -> pure [RenameDef defName $ Available.option opt]
 
-toProg' :: [Action] -> GVarName -> (NodeType, ID) -> [ProgAction]
+toProg' :: [Action] -> Text -> (NodeType, ID) -> [ProgAction]
 toProg' actions defName (nt, id) =
   [ MoveToDef defName
   , (SetCursor id : actions) & case nt of

@@ -34,7 +34,6 @@ import Foreword
 import Core (
   Expr,
   Expr' (..),
-  GVarName,
   ID,
   Kind (..),
   Type' (..),
@@ -102,7 +101,7 @@ data Cxt = Cxt
   -- the tag @k@ should say whether the value is a kind or a type.
   -- We detect violations of this in 'lookupLocal' (thus we key this map
   -- by the underlying 'Name', rather than use a dependent map)
-  , globalCxt :: Map GVarName Type
+  , globalCxt :: Map Text Type
   -- ^ global variables (i.e. IDs of top-level definitions)
   }
   deriving stock (Show)
@@ -140,7 +139,7 @@ checkKind _ t = do
 assert :: MonadNestedError TypeError e m => Bool -> Text -> m ()
 assert b s = unless b $ throwError' (InternalError s)
 
-extendGlobalCxt :: [(GVarName, Type)] -> Cxt -> Cxt
+extendGlobalCxt :: [(Text, Type)] -> Cxt -> Cxt
 extendGlobalCxt globals cxt = cxt{globalCxt = Map.fromList globals <> globalCxt cxt}
 
 extendTypeDefCxt :: TypeDefMap -> Cxt -> Cxt
@@ -242,7 +241,7 @@ checkEverything CheckEverything{toCheck} =
     traverseDefs' o = o % (_moduleDefs % itraversed)
     traverseDefs :: IxTraversal' Text Module Def
     traverseDefs = traverseDefs' equality
-    foldDefTypesWithName :: IxFold GVarName Module Type
+    foldDefTypesWithName :: IxFold Text Module Type
     foldDefTypesWithName = traverseDefs % to defType % to forgetTypeMetadata
 
 {- HLINT ignore synth "Avoid lambda using `infix`" -}

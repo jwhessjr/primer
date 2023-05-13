@@ -2,11 +2,10 @@ module KindError (KindError (..)) where
 
 import Foreword
 
-import Meta (TyConName)
 import Type (Kind)
 
 data KindError
-  = UnknownTypeConstructor TyConName
+  = UnknownTypeConstructor Text
   | InconsistentKinds Kind Kind
   | KindDoesNotMatchArrow Kind
   | -- | We currently cannot typecheck a let inside a type,

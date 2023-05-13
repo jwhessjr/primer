@@ -13,7 +13,6 @@ import Foreword
 
 import Core (
   Expr,
-  GVarName,
   Type,
   Type',
  )
@@ -33,7 +32,7 @@ defType = \case
   DefAST d -> forgetTypeMetadata $ astDefType d
 
 -- | A mapping of global names to 'Def's.
-type DefMap = Map GVarName Def
+type DefMap = Map Text Def
 
 -- | A top-level definition, built from an 'Expr'
 data ASTDef = ASTDef

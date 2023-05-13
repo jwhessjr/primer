@@ -6,7 +6,6 @@ module Meta (
   GlobalNameKind (..),
   GlobalName,
   TyConName,
-  GVarName,
   Meta,
 ) where
 
@@ -46,12 +45,11 @@ data GlobalNameKind
 
 type GlobalName (k :: GlobalNameKind) = Text
 
-type TyConName = GlobalName 'ATyCon
-type GVarName = GlobalName 'ADefName
+type TyConName = Text
 
 -- | A reference to a variable.
 data TmVarRef
-  = GlobalVarRef GVarName
+  = GlobalVarRefText
   deriving stock (Eq, Show, Read, Data, Generic)
 
 -- | A class for types which have an ID.

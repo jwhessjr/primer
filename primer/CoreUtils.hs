@@ -11,7 +11,6 @@ import Foreword
 
 import Core (
   Expr' (..),
-  GVarName,
   HasID (_id),
   ID,
   Type' (..),
@@ -60,7 +59,7 @@ alphaEqTy = go
 typeIDs :: HasID a => Traversal' (Type' a) ID
 typeIDs = _typeMeta % _id
 
-freeGlobalVars :: Expr' a b -> Set GVarName
+freeGlobalVars :: Expr' a b -> Set Text
 freeGlobalVars _ = mempty
 
 -- | Traverse the 'ID's in an 'Expr''.

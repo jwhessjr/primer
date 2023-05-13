@@ -20,7 +20,6 @@ import Data.Data (Data)
 import Data.Generics.Product
 import Data.Generics.Uniplate.Data ()
 import Meta (
-  GVarName,
   GlobalName,
   GlobalNameKind (..),
   HasID (..),

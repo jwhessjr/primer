@@ -3,13 +3,13 @@ module ProgError (ProgError (..)) where
 import Foreword
 
 import Errors (ActionError)
-import Meta (GVarName, ModuleName)
+import Meta (ModuleName)
 
 data ProgError
   = NoDefSelected
-  | DefNotFound GVarName
-  | DefAlreadyExists GVarName
-  | DefInUse GVarName
+  | DefNotFound Text
+  | DefAlreadyExists Text
+  | DefInUse Text
   | ActionError ActionError
   | -- | Currently copy/paste is only exposed in the frontend via select
     --   channels, which should never go wrong. Consequently, this is an

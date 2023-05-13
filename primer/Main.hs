@@ -22,7 +22,6 @@ import App (
  )
 import Available qualified as Available
 import Core (
-  GVarName,
   ID,
  )
 import CoreUtils (
@@ -146,7 +145,7 @@ data Provenance
 
 -- gives def name and perhaps a node inside it (if Nothing, then has selected the definition itself)
 -- If the outer Maybe is Nothing, then there were no definitions at all!
-pickPos :: Prog -> Maybe (Gen (GVarName, Either Def (ASTDef, NodeType, ID)))
+pickPos :: Prog -> Maybe (Gen (Text, Either Def (ASTDef, NodeType, ID)))
 pickPos p = ((\(defName, def) -> (defName,) <$> pickLoc def) =<<) <$> pickDef
   where
     pickDef = case Map.toList $ progAllDefs p of

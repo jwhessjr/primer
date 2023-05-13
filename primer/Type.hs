@@ -14,7 +14,6 @@ import Data.Generics.Product
 import Meta (
   HasID (..),
   ID,
-  TyConName,
  )
 import Optics (
   Lens',
@@ -35,7 +34,7 @@ type TypeMeta = ID
 -- | NB: Be careful with equality -- it is on-the-nose, rather than up-to-alpha: see Subst:alphaEqTy
 data Type' a
   = TEmptyHole a
-  | TCon a TyConName
+  | TCon a Text
   | TFun a (Type' a) (Type' a)
   deriving stock (Eq, Show, Read, Data, Generic)
 
