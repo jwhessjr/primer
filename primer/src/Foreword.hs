@@ -1,10 +1,5 @@
 module Foreword (
   module Protolude,
-  module Unsafe,
-  module Catch,
-  module Foldable,
-  modifyError,
-  mwhen,
 ) where
 
 -- In general, we should defer to "Protolude"'s exports and avoid name
@@ -66,22 +61,3 @@ import Protolude hiding (
   uninterruptibleMask_,
   (%),
  )
-
--- We should remove all uses of `unsafeHead`. See:
--- https://github.com/hackworthltd/primer/issues/147
-
-import Protolude.Unsafe as Unsafe (unsafeHead)
-
-import Data.Foldable as Foldable (foldMap')
-
--- We want @exceptions@ rather than @base@'s equivalents.
-import Control.Monad.Catch as Catch
-
--- | Change the type of an error.
-modifyError :: MonadError e' m => (e -> e') -> ExceptT e m a -> m a
-modifyError f = runExceptT >=> either (throwError . f) pure
-
--- | @mwhen b x@ is `x` if `b` is 'True', otherwise it is 'mempty'.
--- It's like 'Control.Monad.when' but for Monoids rather than Applicatives.
-mwhen :: Monoid a => Bool -> a -> a
-mwhen b x = if b then x else mempty

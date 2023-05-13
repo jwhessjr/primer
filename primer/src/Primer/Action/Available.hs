@@ -127,3 +127,8 @@ data Option = Option
   { option :: Text
   }
   deriving stock (Eq, Show, Read)
+
+-- | @mwhen b x@ is `x` if `b` is 'True', otherwise it is 'mempty'.
+-- It's like 'Control.Monad.when' but for Monoids rather than Applicatives.
+mwhen :: Monoid a => Bool -> a -> a
+mwhen b x = if b then x else mempty

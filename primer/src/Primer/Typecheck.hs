@@ -43,6 +43,7 @@ import Foreword
 
 import Control.Monad.Fresh (MonadFresh (..))
 import Control.Monad.NestedError (MonadNestedError (..), modifyError')
+import Data.Foldable (foldMap')
 import Data.Map qualified as M
 import Data.Map.Strict qualified as Map
 import Data.Set qualified as S

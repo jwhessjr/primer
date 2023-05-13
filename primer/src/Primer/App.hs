@@ -33,6 +33,7 @@ import Foreword hiding (mod)
 import Control.Monad.Fresh (MonadFresh (..))
 import Control.Monad.NestedError (MonadNestedError)
 import Data.Data (Data)
+import Data.Foldable (foldMap')
 import Data.Generics.Uniplate.Zipper (
   fromZipper,
  )
@@ -752,4 +753,4 @@ lookupASTDef name = defAST <=< Map.lookup name
 
 -- | Run a computation in some context whose errors can be promoted to `ProgError`.
 liftError :: MonadError ProgError m => (e -> ProgError) -> ExceptT e m b -> m b
-liftError = modifyError
+liftError f = runExceptT >=> either (throwError . f) pure
