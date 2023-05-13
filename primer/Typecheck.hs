@@ -93,7 +93,6 @@ import Optics (
   traverseOf,
   (%),
  )
-import Optics.Traversal (traversed)
 import TypeDef (
   TypeDefMap,
   typeDefKind,
@@ -201,10 +200,7 @@ checkTypeDefs tds = do
   -- https://github.com/hackworthltd/primer/issues/3)
   assert (Map.disjoint existingTypes tds) "Duplicate-ly-named TypeDefs"
 
-data CheckEverythingRequest = CheckEverything
-  { trusted :: [Module]
-  , toCheck :: [Module]
-  }
+data CheckEverythingRequest = CheckEverything { toCheck :: Module}
 
 -- | Check a (mutually-recursive set of) module(s), in a given trusted
 -- environment of modules.
@@ -222,11 +218,11 @@ checkEverything ::
   forall e m.
   (MonadFresh ID m, MonadFresh NameCounter m, MonadNestedError TypeError e (ReaderT Cxt m)) =>
   CheckEverythingRequest ->
-  m [Module]
-checkEverything CheckEverything{trusted, toCheck} =
-  let cxt = buildTypingContextFromModules trusted
+  m Module
+checkEverything CheckEverything{toCheck} =
+  let cxt = buildTypingContextFromModules []
    in flip runReaderT cxt $ do
-        let newTypes = foldMap' moduleTypesQualified toCheck
+        let newTypes = moduleTypesQualified toCheck
         checkTypeDefs newTypes
         local (extendTypeDefCxt newTypes) $ do
           -- Kind check and update (for smartholes) all the types.
@@ -249,16 +245,15 @@ checkEverything CheckEverything{trusted, toCheck} =
     -- - be equality, giving a traveral
     -- - specify an index (using selfIndex and reindexed), giving a fold
     traverseDefs' ::
-      ( JoinKinds A_Traversal k l
-      , JoinKinds l A_Traversal l
+      ( JoinKinds k A_Traversal l
       , AppendIndices is (WithIx Name) js
       ) =>
       Optic' k is Module Module ->
-      Optic' l js [Module] Def
-    traverseDefs' o = traversed % o % (_moduleDefs % itraversed)
-    traverseDefs :: IxTraversal' Name [Module] Def
+      Optic' l js Module Def
+    traverseDefs' o = o % (_moduleDefs % itraversed)
+    traverseDefs :: IxTraversal' Name Module Def
     traverseDefs = traverseDefs' equality
-    foldDefTypesWithName :: IxFold GVarName [Module] Type
+    foldDefTypesWithName :: IxFold GVarName Module Type
     foldDefTypesWithName =
       icompose qualifyName $
         traverseDefs' (reindexed moduleName selfIndex)

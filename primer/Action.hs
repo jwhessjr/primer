@@ -40,7 +40,7 @@ import Module (Module, insertDef)
 import Name (Name, NameCounter)
 import ProgAction (ProgAction (..))
 import Typecheck (
-  CheckEverythingRequest (CheckEverything, toCheck, trusted),
+  CheckEverythingRequest (CheckEverything, toCheck),
   buildTypingContextFromModules,
   check,
   checkEverything,
@@ -84,20 +84,18 @@ type ActionM m =
 -- change.
 applyActionsToTypeSig ::
   (MonadFresh ID m, MonadFresh NameCounter m) =>
-  [Module] ->
-  -- | The @Module@ we are focused on, and all the other editable modules
-  (Module, [Module]) ->
+  Module ->
   -- | This must be one of the definitions in the @Module@, with its correct name
   (Name, ASTDef) ->
   [Action] ->
-  m (Either ActionError ([Module], TypeZ))
-applyActionsToTypeSig _imports (mod, mods) (defName, def) actions =
+  m (Either ActionError (Module, TypeZ))
+applyActionsToTypeSig mod (defName, def) actions =
   runReaderT
     go
-    (buildTypingContextFromModules (mod : mods))
+    (buildTypingContextFromModules [mod])
     & runExceptT
   where
-    go :: ActionM m => m ([Module], TypeZ)
+    go :: ActionM m => m (Module, TypeZ)
     go = do
       zt <- withWrappedType (astDefType def) (\zt -> foldlM (flip applyActionAndSynth) (InType zt) actions)
       let t = target (top zt)
@@ -110,8 +108,8 @@ applyActionsToTypeSig _imports (mod, mods) (defName, def) actions =
       -- We make sure that the updated type is present in the global context.
       -- Here we just check the whole of the mutable prog, excluding imports.
       -- (for efficiency, we need not check the type definitions, but we do not implement this optimisation)
-      checkEverything (CheckEverything{trusted = [], toCheck = mod' : mods})
-        >>= \checkedMods -> pure (checkedMods, zt)
+      checkEverything (CheckEverything{toCheck = mod'})
+        >>= \checkedMod -> pure (checkedMod, zt)
     -- Actions expect that all ASTs have a top-level expression of some sort.
     -- Signatures don't have this: they're just a type.
     -- We fake it by wrapping the type in a top-level annotation node, then unwrapping afterwards.
@@ -158,13 +156,13 @@ refocus Refocus{pre, post} = do
 -- After applying the actions, we check the new Expr against the type sig of the definition.
 applyActionsToBody ::
   (MonadFresh ID m, MonadFresh NameCounter m) =>
-  [Module] ->
+  Module ->
   ASTDef ->
   [Action] ->
   m (Either ActionError (ASTDef, Loc))
-applyActionsToBody modules def actions =
+applyActionsToBody mod def actions =
   go
-    & flip runReaderT (buildTypingContextFromModules modules)
+    & flip runReaderT (buildTypingContextFromModules [mod])
     & runExceptT
   where
     go :: ActionM m => m (ASTDef, Loc)

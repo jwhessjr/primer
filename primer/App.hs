@@ -40,7 +40,6 @@ import Core (
  )
 import CoreUtils (regenerateExprIDs, regenerateTypeIDs)
 import Data.Data (Data)
-import Data.Foldable (foldMap')
 import Data.Generics.Uniplate.Zipper (
   fromZipper,
  )
@@ -76,7 +75,7 @@ import Optics (
  )
 import ProgError (ProgError (..))
 import Typecheck (
-  CheckEverythingRequest (CheckEverything, toCheck, trusted),
+  CheckEverythingRequest (CheckEverything, toCheck),
   Cxt,
   TypeError,
   checkEverything,
@@ -99,7 +98,7 @@ import Zipper (
 
 -- | The full program state.
 data Prog = Prog
-  { progModules :: [Module]
+  { progModule :: Module
   -- ^ The editable "home" modules
   , progSelection :: Maybe Selection
   }
@@ -109,7 +108,7 @@ _progSelection :: Setter' Prog (Maybe Selection)
 _progSelection = sets $ \f p -> p{progSelection = f $ progSelection p}
 
 progAllDefs :: Prog -> Map GVarName Def
-progAllDefs p = foldMap' moduleDefsQualified (progModules p)
+progAllDefs = moduleDefsQualified . progModule
 
 -- Note [Modules]
 -- The invariant is that the @progImports@ modules are never edited, but
@@ -152,7 +151,7 @@ instance HasID NodeSelection where
 
 -- This only looks in the editable modules, not in any imports
 focusNode :: MonadError ProgError m => Prog -> GVarName -> ID -> m (Either (Either ExprZ TypeZ) TypeZip)
-focusNode prog = focusNodeDefs $ foldMap' moduleDefsQualified $ progModules prog
+focusNode prog = focusNodeDefs $ moduleDefsQualified $ progModule prog
 
 focusNodeImports :: MonadError ProgError m => Prog -> GVarName -> ID -> m (Either (Either ExprZ TypeZ) TypeZip)
 focusNodeImports prog = focusNodeDefs $ progAllDefs prog
@@ -189,15 +188,15 @@ applyProgAction prog mdefName = \case
     case Map.lookup d $ moduleDefsQualified m of
       Nothing -> throwError $ DefNotFound d
       Just _ -> pure $ prog & _progSelection ?~ Selection d Nothing
-  DeleteDef d -> editModuleCross (qualifiedModule d) prog $ \(m, ms) ->
+  DeleteDef d -> editModule (qualifiedModule d) prog $ \m ->
     case deleteDef m d of
       Nothing -> throwError $ DefNotFound d
       Just mod' -> do
-        when (globalInUse d $ foldMap' moduleDefs $ mod' : ms) $
+        when (globalInUse d $ moduleDefs mod') $
           throwError $
             DefInUse d
-        pure (mod' : ms, Nothing)
-  RenameDef d nameStr -> editModuleOfCross (Just d) prog $ \(m, ms) defName def -> do
+        pure (mod', Nothing)
+  RenameDef d nameStr -> editModuleOf (Just d) prog $ \m defName def -> do
     let defs = moduleDefs m
         newNameBase = unsafeMkName nameStr
         newName = qualifyName (moduleName m) newNameBase
@@ -205,9 +204,9 @@ applyProgAction prog mdefName = \case
       then throwError $ DefAlreadyExists newName
       else do
         let m' = m{moduleDefs = Map.insert newNameBase (DefAST def) $ Map.delete defName defs}
-        pure (m' : ms, Just $ Selection newName Nothing)
+        pure (m', Just $ Selection newName Nothing)
   BodyAction actions -> editModuleOf mdefName prog $ \m defName def -> do
-    res <- applyActionsToBody (progModules prog) def actions
+    res <- applyActionsToBody (progModule prog) def actions
     case res of
       Left err -> throwError $ ActionError err
       Right (def', z) -> do
@@ -222,8 +221,8 @@ applyProgAction prog mdefName = \case
                     , meta
                     }
           )
-  SigAction actions -> editModuleOfCross mdefName prog $ \ms@(curMod, _) defName def -> do
-    res <- applyActionsToTypeSig [] ms (defName, def) actions
+  SigAction actions -> editModuleOf mdefName prog $ \curMod defName def -> do
+    res <- applyActionsToTypeSig curMod (defName, def) actions
     case res of
       Left err -> throwError $ ActionError err
       Right (mod', zt) -> do
@@ -247,9 +246,9 @@ applyProgAction prog mdefName = \case
     Just i -> copyPasteBody prog fromIds i setup
 
 lookupModule :: MonadError ProgError m => ModuleName -> Prog -> m Module
-lookupModule n p = case find ((n ==) . moduleName) (progModules p) of
-  Just m -> pure m
-  Nothing -> throwError $ ModuleNotFound n
+lookupModule n p = if n == moduleName (progModule p)
+  then pure $ progModule p
+  else throwError $ ModuleNotFound n
 
 editModule ::
   MonadError ProgError m =>
@@ -262,24 +261,7 @@ editModule n p f = do
   (m', s) <- f m
   pure $
     p
-      { progModules = m' : filter ((/= n) . moduleName) (progModules p)
-      , progSelection = s
-      }
-
--- A variant of 'editModule' for actions which can affect multiple modules
-editModuleCross ::
-  MonadError ProgError m =>
-  ModuleName ->
-  Prog ->
-  ((Module, [Module]) -> m ([Module], Maybe Selection)) ->
-  m Prog
-editModuleCross n p f = do
-  m <- lookupModule n p
-  let otherModules = filter ((/= n) . moduleName) (progModules p)
-  (m', s) <- f (m, otherModules)
-  pure $
-    p
-      { progModules = m'
+      { progModule = m'
       , progSelection = s
       }
 
@@ -294,20 +276,6 @@ editModuleOf mdefName prog f = case mdefName of
   Just defname -> editModule (qualifiedModule defname) prog $ \m ->
     case Map.lookup (baseName defname) (moduleDefs m) of
       Just (DefAST def) -> f m (baseName defname) def
-      _ -> throwError $ DefNotFound defname
-
--- A variant of 'editModuleOf' for actions which can affect multiple modules
-editModuleOfCross ::
-  MonadError ProgError m =>
-  Maybe GVarName ->
-  Prog ->
-  ((Module, [Module]) -> Name -> ASTDef -> m ([Module], Maybe Selection)) ->
-  m Prog
-editModuleOfCross mdefName prog f = case mdefName of
-  Nothing -> throwError NoDefSelected
-  Just defname -> editModuleCross (qualifiedModule defname) prog $ \ms@(m, _) ->
-    case Map.lookup (baseName defname) (moduleDefs m) of
-      Just (DefAST def) -> f ms (baseName defname) def
       _ -> throwError $ DefNotFound defname
 
 -- | A shorthand for the constraints we need when performing mutation
@@ -447,14 +415,13 @@ copyPasteSig p (fromDefName, fromTyId) toDefName setup = do
     Left (Right zt) -> pure $ Left zt
     Right zt -> pure $ Right zt
   finalProg <- editModuleOf (Just toDefName) p $ \mod toDefBaseName oldDef -> do
-    let otherModules = filter ((/= moduleName mod) . moduleName) (progModules p)
     -- We intentionally throw away any changes in doneSetup other than via 'tgt'
     -- as these could be in other definitions referencing this one, due to
     -- types changing. However, we are going to do a full tc pass anyway,
     -- which will pick up any problems. It is better to do it in one batch,
     -- in case the intermediate state after 'setup' causes more problems
     -- than the final state does.
-    doneSetup <- applyActionsToTypeSig [] (mod, otherModules) (toDefBaseName, oldDef) setup
+    doneSetup <- applyActionsToTypeSig mod (toDefBaseName, oldDef) setup
     tgt <- case doneSetup of
       Left err -> throwError $ ActionError err
       Right (_, tgt) -> pure $ focusOnlyType tgt
@@ -480,13 +447,8 @@ tcWholeProg ::
   Prog ->
   m Prog
 tcWholeProg p = do
-  mods' <-
-    checkEverything
-      CheckEverything
-        { trusted = []
-        , toCheck = progModules p
-        }
-  let p' = p{progModules = mods'}
+  mod' <- checkEverything CheckEverything { toCheck = progModule p}
+  let p' = p{progModule = mod'}
   -- We need to update the metadata cached in the selection
   let oldSel = progSelection p
   newSel <- case oldSel of
@@ -520,7 +482,7 @@ copyPasteBody p (fromDefName, fromId) toDefName setup = do
   finalProg <- editModuleOf (Just toDefName) p $ \mod toDefBaseName oldDef -> do
     -- The Loc zipper captures all the changes, they are only reflected in the
     -- returned Def, which we thus ignore
-    doneSetup <- applyActionsToBody (progModules p) oldDef setup
+    doneSetup <- applyActionsToBody (progModule p) oldDef setup
     tgt <- case doneSetup of
       Left err -> throwError $ ActionError err
       Right (_, tgt) -> pure tgt

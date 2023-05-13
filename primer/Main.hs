@@ -17,7 +17,7 @@ import App (
   handleEditRequest,
   mkApp,
   progAllDefs,
-  progModules,
+  progModule,
   runEditAppM,
  )
 import Available qualified as Available
@@ -233,7 +233,7 @@ prog = do
           }
   pure $
     Prog
-      { progModules = [m]
+      { progModule = m
       , progSelection = Nothing
       }
 
