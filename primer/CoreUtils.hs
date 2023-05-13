@@ -5,7 +5,6 @@ module CoreUtils (
   forgetTypeMetadata,
   regenerateExprIDs,
   noHoles,
-  _freeVarsTy,
   freeGlobalVars,
   alphaEqTy,
 ) where
@@ -17,7 +16,6 @@ import Core (
   GVarName,
   HasID (_id),
   ID,
-  TyVarName,
   Type' (..),
   _exprMeta,
   _exprTypeMeta,
@@ -27,11 +25,9 @@ import Data.Data (Data)
 import Data.Generics.Uniplate.Data (universe)
 import Fresh (MonadFresh, fresh)
 import Optics (
-  Traversal,
   Traversal',
   adjoin,
   set,
-  traversalVL,
   traverseOf,
   (%),
  )
@@ -54,19 +50,6 @@ noHoles :: Data a => Type' a -> Bool
 noHoles t = flip all (universe t) $ \case
   TEmptyHole{} -> False
   _ -> True
-
-_freeVarsTy :: Traversal (Type' a) (Type' a) (a, TyVarName) (Type' a)
-_freeVarsTy = traversalVL $ traverseFreeVarsTy mempty
-
--- Helper for _freeVarsTy and _freeTyVars
--- Takes a set of considered-to-be-bound variables
-traverseFreeVarsTy :: Applicative f => Set TyVarName -> ((a, TyVarName) -> f (Type' a)) -> Type' a -> f (Type' a)
-traverseFreeVarsTy = go
-  where
-    go bound f = \case
-      t@TEmptyHole{} -> pure t
-      t@TCon{} -> pure t
-      TFun m s t -> TFun m <$> go bound f s <*> go bound f t
 
 -- Check two types for alpha equality
 --

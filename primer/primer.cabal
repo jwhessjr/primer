@@ -21,7 +21,6 @@ executable primer-test
     App
     Core
     DSL
-    Transform
     CoreUtils
     Def
     DefUtils

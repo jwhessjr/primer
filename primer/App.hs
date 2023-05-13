@@ -50,7 +50,6 @@ import Core (
   HasID (_id),
   ID (..),
   ModuleName,
-  TmVarRef (GlobalVarRef),
   Type' (..),
   TypeMeta,
   getID,
@@ -70,8 +69,6 @@ import Def (
   Def (..),
   DefMap,
   defAST,
-  _DefAST,
-  _astDefExpr,
  )
 import DefUtils (globalInUse)
 import Fresh (MonadFresh (..))
@@ -81,7 +78,6 @@ import Module (
   insertDef,
   moduleDefsQualified,
   qualifyDefName,
-  _moduleDefs,
  )
 import Name (Name, NameCounter, unsafeMkName)
 import NestedError (MonadNestedError)
@@ -94,8 +90,6 @@ import Optics (
   set,
   sets,
   to,
-  traverseOf,
-  traversed,
   view,
   (%),
   (.~),
@@ -105,7 +99,6 @@ import Optics (
   _Right,
  )
 import ProgError (ProgError (..))
-import Transform (renameVar)
 import Typecheck (
   CheckEverythingRequest (CheckEverything, toCheck, trusted),
   Cxt,
@@ -288,13 +281,7 @@ applyProgAction prog mdefName = \case
       then throwError $ DefAlreadyExists newName
       else do
         let m' = m{moduleDefs = Map.insert newNameBase (DefAST def) $ Map.delete defName defs}
-        renamedModules <-
-          maybe (throwError $ ActionError NameCapture) pure $
-            traverseOf
-              (traversed % _moduleDefs % traversed % _DefAST % _astDefExpr)
-              (renameVar (GlobalVarRef d) (GlobalVarRef newName))
-              (m' : ms)
-        pure (renamedModules, Just $ Selection newName Nothing)
+        pure (m' : ms, Just $ Selection newName Nothing)
   BodyAction actions -> editModuleOf mdefName prog $ \m defName def -> do
     let smartHoles = progSmartHoles prog
     res <- applyActionsToBody smartHoles (progAllModules prog) def actions
