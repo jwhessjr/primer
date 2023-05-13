@@ -1,9 +1,7 @@
 module Primer.Core.Utils (
-  freshLocalName,
   freshLocalName',
   exprIDs,
   typeIDs,
-  generateTypeIDs,
   regenerateTypeIDs,
   forgetTypeMetadata,
   regenerateExprIDs,
@@ -12,7 +10,6 @@ module Primer.Core.Utils (
   _freeTyVars,
   _freeVars,
   _freeVarsTy,
-  freeVarsTy,
   freeGlobalVars,
   alphaEqTy,
 ) where
@@ -48,12 +45,10 @@ import Primer.Core (
   _exprMeta,
   _exprTypeMeta,
  )
-import Primer.Core.Fresh (freshLocalName, freshLocalName')
+import Primer.Core.Fresh (freshLocalName')
 import Primer.Core.Type.Utils (
   alphaEqTy,
   forgetTypeMetadata,
-  freeVarsTy,
-  generateTypeIDs,
   noHoles,
   regenerateTypeIDs,
   traverseFreeVarsTy,

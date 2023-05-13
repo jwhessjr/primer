@@ -6,8 +6,6 @@ module Primer.Typecheck.Utils (
   getTypeDefInfo',
   instantiateValCons,
   instantiateValCons',
-  lookupConstructor,
-  typeOf,
   _typecache,
   getGlobalNames,
   getGlobalBaseNames,
@@ -21,10 +19,10 @@ import Data.Functor.Compose (Compose (Compose, getCompose))
 import Data.Map qualified as M
 import Data.Map qualified as Map
 import Data.Set qualified as S
-import Optics (Lens', view, (%))
-import Primer.Core (Expr', GlobalName (baseName, qualifiedModule), ModuleName, TypeCache, _exprMetaLens)
+import Optics (Lens', (%))
+import Primer.Core (Expr', GlobalName (baseName, qualifiedModule), ModuleName, _exprMetaLens)
 import Primer.Core.Meta (Meta, TyConName, ValConName, _type)
-import Primer.Core.Type (Kind, Type' (TCon, TEmptyHole))
+import Primer.Core.Type (Type' (TCon, TEmptyHole))
 import Primer.Name (Name, NameCounter)
 import Primer.TypeDef (
   ASTTypeDef,
@@ -32,10 +30,6 @@ import Primer.TypeDef (
   TypeDefMap,
  )
 import Primer.Typecheck.Cxt (Cxt, globalCxt, typeDefs)
-
--- We assume that constructor names are unique, returning the first one we find
-lookupConstructor :: TypeDefMap -> ValConName -> Maybe a
-lookupConstructor _tyDefs _c = Nothing
 
 data TypeDefError
   = TDIHoleType -- a type hole
@@ -96,10 +90,6 @@ instantiateValCons' tyDefs t =
 -- | A lens for the type annotation of an 'Expr' or 'ExprT'
 _typecache :: Lens' (Expr' (Meta a) b) a
 _typecache = _exprMetaLens % _type
-
--- | Get the type of an 'ExprT'
-typeOf :: Expr' (Meta TypeCache) (Meta Kind) -> TypeCache
-typeOf = view _typecache
 
 -- Helper to create fresh names
 getGlobalNames :: MonadReader Cxt m => m (S.Set (ModuleName, Name))

@@ -28,7 +28,6 @@ executable primer-test
     Primer.Def.Utils
     Primer.Module
     Primer.Name
-    Primer.Subst
     Primer.Typecheck
     Primer.TypeDef
     Primer.Zipper

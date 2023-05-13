@@ -19,12 +19,8 @@ module Primer.Zipper.Type (
   search,
   FoldAbove,
   FoldAbove' (FA, current, prior),
-  foldAbove,
   LetTypeBinding' (LetTypeBind),
   LetTypeBinding,
-  getBoundHereTy',
-  getBoundHereTy,
-  getBoundHereUpTy,
 ) where
 
 import Foreword
@@ -37,7 +33,6 @@ import Data.Generics.Uniplate.Zipper (
   zipper,
  )
 import Data.Generics.Uniplate.Zipper qualified as Z
-import Data.Set qualified as S
 import Optics (
   over,
   view,
@@ -140,30 +135,6 @@ farthest f = go where go a = maybe a go (f a)
 data FoldAbove' a b = FA {prior :: a, current :: b}
 type FoldAbove a = FoldAbove' a a
 
--- | Focus on everything 'up', in order, map each to a monoid, and accumulate.
--- This does not focus on the current target.
--- We keep track of which child we just came up from, as that can be important
--- in applications: e.g. finding enclosing binders, where @let x=e1 in e2@ has
--- two children, but only binds a variable in one of them.
--- NB: 'foldAbove' + 'foldBelow' does not encompass the whole term: it misses
--- siblings.
-foldAbove :: (IsZipper za a, Monoid m) => (FoldAbove a -> m) -> za -> m
-foldAbove f z = go (target z) (up z)
-  where
-    go p c = case c of
-      Nothing -> mempty
-      Just z' -> let cur = target z' in f (FA{prior = p, current = cur}) <> go cur (up z')
-
--- Get the names bound by this layer of an type for a given child.
-getBoundHereUpTy :: FoldAbove (Type' a) -> S.Set TyVarName
-getBoundHereUpTy e = getBoundHereTy (current e) (Just $ prior e)
-
-getBoundHereTy :: Type' a -> Maybe (Type' a) -> S.Set TyVarName
-getBoundHereTy t prev = S.fromList $ either identity (\(LetTypeBind n _) -> n) <$> getBoundHereTy' t prev
-
 data LetTypeBinding' a = LetTypeBind TyVarName (Type' a)
   deriving stock (Eq, Show)
 type LetTypeBinding = LetTypeBinding' TypeMeta
-
-getBoundHereTy' :: Type' a -> Maybe (Type' a) -> [Either TyVarName (LetTypeBinding' a)]
-getBoundHereTy' _ _ = mempty

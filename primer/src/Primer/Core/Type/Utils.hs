@@ -1,12 +1,10 @@
 module Primer.Core.Type.Utils (
   typeIDs,
-  generateTypeIDs,
   regenerateTypeIDs,
   forgetTypeMetadata,
   noHoles,
   _freeVarsTy,
   traverseFreeVarsTy,
-  freeVarsTy,
   alphaEqTy,
 ) where
 
@@ -15,26 +13,21 @@ import Foreword
 import Control.Monad.Fresh (MonadFresh, fresh)
 import Data.Data (Data)
 import Data.Generics.Uniplate.Data (universe)
-import Data.Set.Optics (setOf)
 import Optics (
   Traversal,
   Traversal',
-  getting,
   set,
   traversalVL,
   traverseOf,
   (%),
-  _2,
  )
 
 import Primer.Core.Meta (
   HasID (_id),
   ID,
   TyVarName,
-  trivialMeta,
  )
 import Primer.Core.Type (
-  Type,
   Type' (..),
   _typeMeta,
  )
@@ -45,10 +38,6 @@ regenerateTypeIDs = regenerateTypeIDs' (set _id)
 
 regenerateTypeIDs' :: MonadFresh ID m => (ID -> a -> b) -> Type' a -> m (Type' b)
 regenerateTypeIDs' s = traverseOf _typeMeta (\a -> flip s a <$> fresh)
-
--- | Adds 'ID's and trivial metadata
-generateTypeIDs :: MonadFresh ID m => Type' () -> m Type
-generateTypeIDs = regenerateTypeIDs' $ const . trivialMeta
 
 -- | Replace all 'ID's in a Type with unit.
 -- Technically this replaces all annotations, regardless of what they are.
@@ -61,9 +50,6 @@ noHoles :: Data a => Type' a -> Bool
 noHoles t = flip all (universe t) $ \case
   TEmptyHole{} -> False
   _ -> True
-
-freeVarsTy :: Type' a -> Set TyVarName
-freeVarsTy = setOf (getting _freeVarsTy % _2)
 
 _freeVarsTy :: Traversal (Type' a) (Type' a) (a, TyVarName) (Type' a)
 _freeVarsTy = traversalVL $ traverseFreeVarsTy mempty

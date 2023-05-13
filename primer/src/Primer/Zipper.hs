@@ -37,20 +37,12 @@ module Primer.Zipper (
   FoldAbove,
   current,
   prior,
-  foldAbove,
-  foldAboveTypeZ,
   unfocusExpr,
   unfocusLoc,
   locToEither,
   LetBinding' (..),
   LetBinding,
-  letBindingName,
   LetTypeBinding' (..),
-  getBoundHere',
-  getBoundHere,
-  getBoundHereUp,
-  getBoundHereTy,
-  getBoundHereUpTy,
   SomeNode (..),
   findNodeWithParent,
   findType,
@@ -67,7 +59,6 @@ import Data.Generics.Uniplate.Zipper (
   zipper,
  )
 import Data.List as List (delete)
-import Data.Set qualified as S
 import Optics (
   AffineTraversal',
   Field3 (_3),
@@ -90,22 +81,19 @@ import Optics.Lens (Lens', lens)
 import Primer.Core (
   Bind,
   Bind' (..),
-  CaseBranch' (CaseBranch),
+  CaseBranch',
   Expr,
-  Expr' (Case, Lam),
+  Expr',
   ExprMeta,
   HasID (..),
   ID,
   LVarName,
-  LocalName (unLocalName),
   Type,
   Type' (),
   TypeMeta,
-  bindName,
   getID,
   typesInExpr,
  )
-import Primer.Name (Name)
 import Primer.Zipper.Type (
   FoldAbove,
   FoldAbove' (..),
@@ -116,9 +104,6 @@ import Primer.Zipper.Type (
   farthest,
   focus,
   focusOnTy,
-  foldAbove,
-  getBoundHereTy,
-  getBoundHereUpTy,
   left,
   replace,
   right,
@@ -321,56 +306,12 @@ focusOn' i = fmap snd . search matchesID
               inCaseBinds = findInCaseBinds i z
            in inType <|> inCaseBinds
 
-foldAboveTypeZ ::
-  (Data a, Data b, Monoid m) =>
-  (FoldAbove (Type' b) -> m) ->
-  (FoldAbove' (Type' b) (Expr' a b) -> m) ->
-  (FoldAbove (Expr' a b) -> m) ->
-  TypeZ' a b ->
-  m
-foldAboveTypeZ inTy border inExpr tz =
-  let tyz = focusOnlyType tz
-      wholeTy = fromZipper tyz
-      exz = unfocusType tz
-   in foldAbove inTy tyz
-        <> border FA{prior = wholeTy, current = target exz}
-        <> foldAbove inExpr exz
-
--- Get the names bound by this layer of an expression for a given child.
-getBoundHereUp :: (Eq a, Eq b) => FoldAbove (Expr' a b) -> S.Set Name
-getBoundHereUp e = getBoundHere (current e) (Just $ prior e)
-
--- Get the names bound by this layer of an expression (both term and type names)
--- The second arg is the child we just came out of, if traversing up (and thus
--- need to extract binders based on which case branch etc), and Nothing if
--- traversing down (and want to get all binders regardless of branch).
-getBoundHere :: (Eq a, Eq b) => Expr' a b -> Maybe (Expr' a b) -> S.Set Name
-getBoundHere e prev = S.fromList $ either identity letBindingName <$> getBoundHere' e prev
-
 data LetBinding' a b
   = LetBind LVarName (Expr' a b)
   | LetrecBind LVarName (Expr' a b) (Type' b)
   | LetTyBind (LetTypeBinding' b)
   deriving stock (Eq, Show)
 type LetBinding = LetBinding' ExprMeta TypeMeta
-
-letBindingName :: LetBinding' a b -> Name
-letBindingName = \case
-  LetBind n _ -> unLocalName n
-  LetrecBind n _ _ -> unLocalName n
-  LetTyBind (LetTypeBind n _) -> unLocalName n
-
-getBoundHere' :: (Eq a, Eq b) => Expr' a b -> Maybe (Expr' a b) -> [Either Name (LetBinding' a b)]
-getBoundHere' e prev = case e of
-  Lam _ v _ -> anon v
-  Case _ _ bs ->
-    let binderss = map (\(CaseBranch _ ns rhs) -> (rhs, map (unLocalName . bindName) ns)) bs
-     in case prev of
-          Nothing -> concatMap (fmap Left . snd) binderss
-          Just p -> concatMap (\(b, binders) -> if b == p then Left <$> binders else mempty) binderss
-  _ -> mempty
-  where
-    anon x = [Left $ unLocalName x]
 
 -- | Find a node in the AST by its ID, and also return its parent
 findNodeWithParent ::

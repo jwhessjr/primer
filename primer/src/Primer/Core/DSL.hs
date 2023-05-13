@@ -3,8 +3,6 @@
 module Primer.Core.DSL (
   emptyHole,
   ann,
-  lam,
-  case_,
   branch,
   tEmptyHole,
   tcon,
@@ -43,12 +41,6 @@ emptyHole = EmptyHole <$> meta
 
 ann :: MonadFresh ID m => m Expr -> m Type -> m Expr
 ann e t = Ann <$> meta <*> e <*> t
-
-lam :: MonadFresh ID m => LVarName -> m Expr -> m Expr
-lam v e = Lam <$> meta <*> pure v <*> e
-
-case_ :: MonadFresh ID m => m Expr -> [m CaseBranch] -> m Expr
-case_ e brs = Case <$> meta <*> e <*> sequence brs
 
 branch :: MonadFresh ID m => ValConName -> [(LVarName, Maybe TypeCache)] -> m Expr -> m CaseBranch
 branch c vs e = CaseBranch c <$> mapM binding vs <*> e

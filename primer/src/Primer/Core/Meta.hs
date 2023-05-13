@@ -17,7 +17,6 @@ module Primer.Core.Meta (
   TyVarName,
   Value,
   Meta (Meta),
-  trivialMeta,
   _type,
 ) where
 
@@ -56,9 +55,6 @@ data Meta a = Meta ID a (Maybe Value)
 -- work for any 'a'.
 _type :: Lens (Meta a) (Meta b) a b
 _type = position @2
-
-trivialMeta :: ID -> Meta (Maybe a)
-trivialMeta id = Meta id Nothing Nothing
 
 newtype ModuleName = ModuleName {unModuleName :: NonEmpty Name}
   deriving stock (Eq, Ord, Show, Read, Data, Generic)

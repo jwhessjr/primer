@@ -23,23 +23,16 @@ module Primer.Typecheck (
   buildTypingContextFromModules',
   TypeError (..),
   KindError (..),
-  typeOf,
   TypeDefInfo (..),
   TypeDefError (..),
   getTypeDefInfo',
-  lookupConstructor,
   instantiateValCons,
   instantiateValCons',
   exprTtoExpr,
   typeTtoType,
   getGlobalNames,
   getGlobalBaseNames,
-  lookupGlobal,
-  lookupVar,
-  consistentKinds,
   consistentTypes,
-  extendLocalCxtTy,
-  extendLocalCxtTys,
   extendLocalCxt,
   extendLocalCxts,
   extendGlobalCxt,
@@ -85,7 +78,6 @@ import Primer.Core (
   Kind (..),
   LVarName,
   Meta (..),
-  TmVarRef (..),
   Type' (..),
   TypeCache (..),
   TypeCacheBoth (..),
@@ -134,9 +126,6 @@ import Primer.Typecheck.Kindcheck (
   TypeT,
   annotate,
   checkKind,
-  consistentKinds,
-  extendLocalCxtTy,
-  extendLocalCxtTys,
   synthKind,
  )
 import Primer.Typecheck.SmartHoles (SmartHoles (..))
@@ -149,8 +138,6 @@ import Primer.Typecheck.Utils (
   getTypeDefInfo',
   instantiateValCons,
   instantiateValCons',
-  lookupConstructor,
-  typeOf,
   _typecache,
  )
 
@@ -168,25 +155,6 @@ type ExprT = Expr' (Meta TypeCache) (Meta Kind)
 
 assert :: MonadNestedError TypeError e m => Bool -> Text -> m ()
 assert b s = unless b $ throwError' (InternalError s)
-
-lookupLocal :: LVarName -> Cxt -> Either TypeError Type
-lookupLocal v cxt = case M.lookup (unLocalName v) $ localCxt cxt of
-  Just (T t) -> Right t
-  Just (K _) -> Left $ TmVarWrongSort (unLocalName v)
-  Nothing -> Left $ UnknownVariable $ LocalVarRef v
-
-lookupGlobal :: GVarName -> Cxt -> Maybe Type
-lookupGlobal v cxt = M.lookup v $ globalCxt cxt
-
-lookupVar :: TmVarRef -> Cxt -> Either TypeError Type
-lookupVar v cxt = case v of
-  LocalVarRef name -> lookupLocal name cxt
-  GlobalVarRef name ->
-    ( \case
-        Just t -> Right t
-        Nothing -> Left $ UnknownVariable v
-    )
-      (lookupGlobal name cxt)
 
 extendLocalCxt :: (LVarName, Type) -> Cxt -> Cxt
 extendLocalCxt (name, ty) cxt = cxt{localCxt = Map.insert (unLocalName name) (T ty) (localCxt cxt)}

@@ -53,7 +53,6 @@ import Primer.Core.Meta (
   Value,
   getID,
   qualifyName,
-  trivialMeta,
   _type,
  )
 import Primer.Core.Type (
