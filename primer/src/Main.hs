@@ -10,7 +10,6 @@ import Data.Map qualified as Map
 import Data.Text qualified as T
 import Hedgehog
 import Hedgehog.Gen qualified as Gen
-import Hedgehog.Range qualified as Range
 import Optics (toListOf)
 import Primer.Action (
   ActionError (CaseBindsClash, NameCapture),
@@ -192,23 +191,9 @@ runRandomAvailableAction l a = do
                   toProgActionNoInput defName loc act'
               Just <$> actionSucceeds (handleEditRequest progActs) a
             Available.Input act' -> do
-              Available.Options{Available.opts, Available.free} <-
-                maybe (annotate "id not found" >> failure) pure $
-                  Available.options
-                    act'
-              let opts' = [Gen.element $ (Offered,) <$> opts | not (null opts)]
-              let opts'' =
-                    opts' <> case free of
-                      Available.FreeNone -> []
-                      Available.FreeVarName -> [(StudentProvided,) . flip Available.Option Nothing <$> (unName <$> genName)]
-                      Available.FreeInt -> [(StudentProvided,) . flip Available.Option Nothing <$> (show <$> Gen.integral (Range.linear @Integer 0 1_000_000_000))]
-                      Available.FreeChar -> [(StudentProvided,) . flip Available.Option Nothing . T.singleton <$> Gen.unicode]
-              case opts'' of
-                [] -> pure Nothing
-                options -> do
-                  opt <- forAllT $ Gen.choice options
-                  progActs <- either (const failure) pure $ toProgActionInput defName (snd opt) act'
-                  actionSucceedsOrCapture (fst opt) (handleEditRequest progActs) a
+              n <- forAllT $ unName <$> genName
+              progActs <- either (const failure) pure $ toProgActionInput defName (Available.Option n) act'
+              actionSucceedsOrCapture StudentProvided (handleEditRequest progActs) a
   where
     runEditAppMLogs ::
       HasCallStack =>

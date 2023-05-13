@@ -835,14 +835,8 @@ toProgActionInput ::
   Available.Option ->
   Available.InputAction ->
   Either ActionError [ProgAction]
-toProgActionInput defName opt0 = \case
- Available.RenameDef -> do
-    opt <- optNoCxt
-    pure [RenameDef defName opt]
-  where
-    optNoCxt = case opt0.context of
-      Just _ -> Left $ NeedGlobal opt0
-      Nothing -> pure opt0.option
+toProgActionInput defName opt = \case
+ Available.RenameDef -> pure [RenameDef defName opt.option]
 
 toProg' :: [Action] -> GVarName -> (NodeType, ID) -> [ProgAction]
 toProg' actions defName (nt, id) =

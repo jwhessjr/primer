@@ -11,9 +11,6 @@ module Primer.Action.Available (
   forBody,
   forSig,
   Option (..),
-  FreeInput (..),
-  Options (..),
-  options,
 ) where
 
 import Foreword
@@ -199,36 +196,5 @@ forType l type_ =
 -- | An input for an 'InputAction'.
 data Option = Option
   { option :: Text
-  , context :: Maybe (NonEmpty Text)
   }
   deriving stock (Eq, Show, Read)
-
--- | The available sorts of free-form input for an 'InputAction'.
-data FreeInput
-  = -- | Free-form input is not allowed
-    FreeNone
-  | -- | A free-form string input is allowed, and represents a variable name
-    FreeVarName
-  | -- | A free-form string input is allowed, and represents a primitive integer
-    FreeInt
-  | -- | A free-form string input is allowed, and represents a primitive character
-    FreeChar
-  deriving stock (Show, Read, Bounded, Enum)
-
--- | The available inputs for an 'InputAction'.
-data Options = Options
-  { opts :: [Option]
-  , free :: FreeInput
-  }
-  deriving stock (Show, Read)
-
-options ::
-  InputAction ->
-  -- | Returns 'Nothing' if an ID was required but not passed, passed but not found in the tree,
-  -- or found but didn't correspond to the expected sort of entity (type/expr/pattern).
-  Maybe Options
-options = \case
-  RenameDef ->
-    pure $ freeVar []
-  where
-    freeVar opts = Options{opts, free = FreeVarName}
