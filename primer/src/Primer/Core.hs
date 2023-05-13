@@ -1,6 +1,3 @@
-{-# LANGUAGE ImpredicativeTypes #-}
-{-# LANGUAGE OverloadedLabels #-}
-
 -- This module defines the core AST and some functions for operating on it.
 
 module Primer.Core (

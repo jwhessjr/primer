@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedLabels #-}
-
 module Primer.TypeDef (
   TypeDef (..),
   _TypeDefAST,

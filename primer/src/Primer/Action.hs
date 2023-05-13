@@ -1,6 +1,3 @@
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-
 module Primer.Action (
   Action (..),
   ActionError (..),
@@ -319,7 +316,7 @@ toProgActionInput ::
   Available.InputAction ->
   Either ActionError [ProgAction]
 toProgActionInput defName opt = \case
- Available.RenameDef -> pure [RenameDef defName opt.option]
+ Available.RenameDef -> pure [RenameDef defName $ Available.option opt]
 
 toProg' :: [Action] -> GVarName -> (NodeType, ID) -> [ProgAction]
 toProg' actions defName (nt, id) =

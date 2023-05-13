@@ -1,12 +1,3 @@
--- ApplicativeDo: generators shrink much better if applicative (though much of
--- this module is inherently monadic)
-{-# LANGUAGE ApplicativeDo #-}
-
--- |
--- This module generates well-typed terms and types.
--- It is however, slow and the distribution is not very even.
---
--- For quickly generating non-well-typed-or-scoped terms, see "Primer.Gen.Core.Raw".
 module Primer.Gen.Core.Typed (
   WT,
   isolateWT,

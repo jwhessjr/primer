@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedLabels #-}
-
 module Primer.Def.Utils (globalInUse) where
 
 import Foreword

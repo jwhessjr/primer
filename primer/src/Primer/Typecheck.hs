@@ -1,6 +1,3 @@
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE OverloadedLabels #-}
-
 -- | Typechecking for Core expressions.
 -- This closely follows the type system of Hazelnut, but supports arbitrary
 -- types rather than just numbers.

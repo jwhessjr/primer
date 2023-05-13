@@ -1,6 +1,3 @@
-{-# LANGUAGE BlockArguments #-}
-{-# LANGUAGE NoFieldSelectors #-}
-
 -- | Compute all the possible actions which can be performed on a definition.
 -- This module is expected to be imported qualified, due to various potential name clashes.
 module Primer.Action.Available (
