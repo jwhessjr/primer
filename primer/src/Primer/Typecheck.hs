@@ -24,8 +24,6 @@ module Primer.Typecheck (
   TypeError (..),
   KindError (..),
   typeOf,
-  matchArrowType,
-  matchForallType,
   TypeDefInfo (..),
   TypeDefError (..),
   getTypeDefInfo',
@@ -89,7 +87,6 @@ import Primer.Core (
   LVarName,
   Meta (..),
   TmVarRef (..),
-  TyVarName,
   Type' (..),
   TypeCache (..),
   TypeCacheBoth (..),
@@ -107,7 +104,6 @@ import Primer.Core.DSL (S, branch, create', emptyHole, meta, meta')
 import Primer.Core.Utils (
   alphaEqTy,
   forgetTypeMetadata,
-  freshLocalName,
   freshLocalName',
   generateTypeIDs,
   noHoles,
@@ -597,14 +593,6 @@ matchArrowType (TEmptyHole _) = pure (TEmptyHole (), TEmptyHole ())
 matchArrowType (THole _ _) = pure (TEmptyHole (), TEmptyHole ())
 matchArrowType (TFun _ a b) = pure (a, b)
 matchArrowType _ = Nothing
-
--- | Checks if a type can be hole-refined to a forall, and if so returns the
--- forall'd version.
-matchForallType :: MonadFresh NameCounter m => Type -> m (Maybe (TyVarName, Kind, Type))
--- These names will never enter the program, so we don't need to avoid shadowing
-matchForallType (TEmptyHole _) = (\n -> Just (n, KHole, TEmptyHole ())) <$> freshLocalName mempty
-matchForallType (THole _ _) = (\n -> Just (n, KHole, TEmptyHole ())) <$> freshLocalName mempty
-matchForallType _ = pure Nothing
 
 -- | Two types are consistent if they are equal (up to IDs and alpha) when we
 -- also count holes as being equal to anything.
