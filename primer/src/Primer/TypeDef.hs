@@ -6,7 +6,6 @@ module Primer.TypeDef (
   TypeDefMap,
   typeDefAST,
   typeDefKind,
-  typeDefParameters,
   ASTTypeDef (..),
   _astTypeDefConstructors,
   valConType,
@@ -20,13 +19,12 @@ import Data.Data (Data)
 import Optics (Traversal, over, traversed, (%), traversalVL, Lens, lens)
 import Primer.Core.Meta (
   TyConName,
-  TyVarName,
   ValConName,
  )
 import Primer.Core.Transform (mkTAppCon)
 import Primer.Core.Type (
-  Kind (KFun, KType),
-  Type' (TForall, TFun, TVar),
+  Kind (KType),
+  Type' (TFun),
  )
 import Primer.Core.Utils (forgetTypeMetadata)
 
@@ -47,8 +45,7 @@ type TypeDefMap = Map TyConName (TypeDef ())
 -- The kind of the type is TYPE{\-a-\} -> (TYPE -> TYPE){\-b-\} -> TYPE{\-always returns a type-\}
 -- The type of the constructor is C :: forall a:TYPE. forall b:(TYPE->TYPE). b a -> Nat -> T a b
 data ASTTypeDef b = ASTTypeDef
-  { astTypeDefParameters :: [(TyVarName, Kind)] -- These names scope over the constructors
-  , astTypeDefConstructors :: [ValCon b]
+  { astTypeDefConstructors :: [ValCon b]
   }
   deriving stock (Eq, Show, Read, Data)
 
@@ -65,20 +62,16 @@ _valConArgs :: Lens (ValCon b) (ValCon b') [Type' b] [Type' b']
 _valConArgs = lens valConArgs $ \c as -> c {valConArgs = as}
 
 valConType :: TyConName -> ASTTypeDef () -> ValCon () -> Type' ()
-valConType tc td vc =
-  let ret = mkTAppCon tc (TVar () . fst <$> astTypeDefParameters td)
+valConType tc _td vc =
+  let ret = mkTAppCon tc []
       args = foldr (TFun ()) ret (forgetTypeMetadata <$> valConArgs vc)
-      foralls = foldr (\(n, k) t -> TForall () n k t) args (astTypeDefParameters td)
-   in foralls
+   in args
 
-typeDefParameters :: TypeDef b -> [Kind]
-typeDefParameters = \case
-  TypeDefAST t -> snd <$> astTypeDefParameters t
 typeDefAST :: TypeDef b -> Maybe (ASTTypeDef b)
 typeDefAST = \case
   TypeDefAST t -> Just t
 typeDefKind :: TypeDef b -> Kind
-typeDefKind = foldr KFun KType . typeDefParameters
+typeDefKind _ =  KType
 
 -- | A traversal over the contstructor fields in an typedef.
 _typedefFields :: Traversal (TypeDef b) (TypeDef c) (Type' b) (Type' c)

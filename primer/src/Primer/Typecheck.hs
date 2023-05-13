@@ -134,7 +134,7 @@ import Primer.Module (
 import Primer.Name (Name, NameCounter)
 import Primer.Subst (substTy)
 import Primer.TypeDef (
-  ASTTypeDef (astTypeDefConstructors, astTypeDefParameters),
+  ASTTypeDef (astTypeDefConstructors),
   TypeDefMap,
   ValCon (valConArgs, valConName),
   typeDefAST,
@@ -298,7 +298,7 @@ checkTypeDefs tds = do
     --   types)
 
     checkTypeDef tc td = do
-      let params = astTypeDefParameters td
+      let params = []
       let cons = astTypeDefConstructors td
       assert
         ( (1 ==) . S.size $

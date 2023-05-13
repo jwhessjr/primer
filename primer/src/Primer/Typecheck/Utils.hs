@@ -31,12 +31,11 @@ import Primer.Core.Type.Utils (forgetTypeMetadata)
 import Primer.Name (Name, NameCounter)
 import Primer.Subst (substTySimul)
 import Primer.TypeDef (
-  ASTTypeDef (astTypeDefConstructors, astTypeDefParameters),
+  ASTTypeDef (astTypeDefConstructors),
   TypeDef (TypeDefAST),
   TypeDefMap,
   ValCon (valConArgs, valConName),
   typeDefAST,
-  typeDefParameters,
  )
 import Primer.Typecheck.Cxt (Cxt, globalCxt, typeDefs)
 
@@ -69,7 +68,6 @@ getTypeDefInfo' tydefs ty =
         Just tydef
           -- this check would be redundant if we were sure that the input type
           -- were of kind KType, alternatively we should do kind checking here
-          | length (typeDefParameters tydef) /= length params -> Left TDINotSaturated
           | otherwise -> Right $ TypeDefInfo params tycon tydef
 
 -- | Takes a particular instance of a parameterised type (e.g. @List Nat@), and
@@ -108,7 +106,7 @@ instantiateValCons' tyDefs t =
   getTypeDefInfo' tyDefs t
     >>= \(TypeDefInfo params tc def) -> case def of
       TypeDefAST tda -> do
-        let defparams = map fst $ astTypeDefParameters tda
+        let defparams = []
             f :: ValCon () -> (ValConName, forall m. MonadFresh NameCounter m => [m (Type' ())])
             -- eta expand to deal with shallow subsumption
             {- HLINT ignore instantiateValCons' "Avoid lambda" -}
