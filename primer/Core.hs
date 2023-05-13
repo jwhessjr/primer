@@ -3,10 +3,6 @@
 module Core (
   Expr,
   Expr' (..),
-  Bind,
-  Bind' (..),
-  CaseBranch,
-  CaseBranch' (..),
   module Meta,
   module Type,
   TypeCache (..),
@@ -15,8 +11,6 @@ module Core (
   _exprMeta,
   _exprMetaLens,
   _exprTypeMeta,
-  bindName,
-  _bindMeta,
   typesInExpr,
 ) where
 
@@ -49,7 +43,6 @@ import Meta (
  )
 import Optics (
   AffineTraversal',
-  Lens,
   Lens',
   Traversal,
   atraversalVL,
@@ -111,7 +104,6 @@ data Expr' a b
   = Hole a (Expr' a b) -- See Note [Holes and bidirectionality]
   | EmptyHole a
   | Ann a (Expr' a b) (Type' b)
-  | Case a (Expr' a b) [CaseBranch' a b] -- See Note [Case]
   deriving stock (Eq, Show, Read, Data, Generic)
 
 -- Note [Holes and bidirectionality]
@@ -212,35 +204,6 @@ _exprMetaLens = position @1
 _exprTypeMeta :: forall a b c. Traversal (Expr' a b) (Expr' a c) b c
 _exprTypeMeta = param @0
 
-type CaseBranch = CaseBranch' ExprMeta TypeMeta
-
-data CaseBranch' a b
-  = CaseBranch
-      ValConName
-      -- ^ constructor
-      [Bind' a]
-      -- ^ constructor parameters.
-      -- Ideally this would be '[Bind' (Meta TypeCache)]' since we always know the types of branch
-      -- bindings. Unfortunately that breaks generic traversals like '_exprMeta'.
-      (Expr' a b)
-      -- ^ right hand side
-  deriving stock (Eq, Show, Read, Data, Generic)
-
--- | Variable bindings
--- These are used in case branches to represent the binding of a variable.
--- They aren't currently used in lambdas or lets, but in the future that may change.
-type Bind = Bind' ExprMeta
-
-data Bind' a = Bind a LVarName
-  deriving stock (Eq, Show, Read, Data, Generic)
-
-bindName :: Bind' a -> LVarName
-bindName (Bind _ n) = n
-
--- | A type-modifying lens for the metadata of a Bind.
-_bindMeta :: forall a b. Lens (Bind' a) (Bind' b) a b
-_bindMeta = position @1
-
 -- | Note that this does not recurse in to sub-expressions or sub-types.
 typesInExpr :: AffineTraversal' (Expr' a b) (Type' b)
 typesInExpr = atraversalVL $ \point f -> \case
@@ -250,11 +213,5 @@ typesInExpr = atraversalVL $ \point f -> \case
 instance HasID a => HasID (Expr' a b) where
   _id = position @1 % _id
 
-instance HasID a => HasID (Bind' a) where
-  _id = position @1 % _id
-
 instance HasMetadata (Expr' ExprMeta b) where
-  _metadata = position @1 % typed @(Maybe Value)
-
-instance HasMetadata (Bind' ExprMeta) where
   _metadata = position @1 % typed @(Maybe Value)

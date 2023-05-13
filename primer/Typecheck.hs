@@ -44,11 +44,8 @@ import Foreword
 
 import Control.Arrow ((&&&))
 import Core (
-  Bind' (..),
-  CaseBranch' (..),
   Expr,
   Expr' (..),
-  ExprMeta,
   GVarName,
   GlobalName (baseName, qualifiedModule),
   ID,
@@ -61,10 +58,8 @@ import Core (
   TypeCacheBoth (..),
   TypeMeta,
   ValConName,
-  bindName,
   qualifyName,
   unLocalName,
-  _bindMeta,
   _exprMeta,
   _exprMetaLens,
   _exprTypeMeta,
@@ -73,10 +68,9 @@ import Core (
 import CoreUtils (
   alphaEqTy,
   forgetTypeMetadata,
-  freshLocalName',
   noHoles,
  )
-import DSL (S, branch, create', emptyHole, meta, meta')
+import DSL (S, create', meta')
 import Data.Foldable (foldMap')
 import Data.Functor.Compose (Compose (Compose, getCompose))
 import Data.Map qualified as M
@@ -389,13 +383,6 @@ synth = \case
   Hole i e -> do
     (_, e') <- synth e
     pure $ annSynth1 (TEmptyHole ()) i Hole e'
-  e ->
-    asks smartHoles >>= \case
-      NoSmartHoles -> throwError' $ CannotSynthesiseType e
-      SmartHoles -> do
-        ann <- TEmptyHole <$> meta' (Just KType)
-        eMeta <- meta
-        synth $ Ann eMeta e ann
   where
     -- We could combine these with some type class shenanigans, but it doesn't
     -- seem worth it. The general scheme is
@@ -407,45 +394,6 @@ synth = \case
 -- | Similar to synth, but for checking rather than synthesis.
 check :: TypeM e m => Type -> Expr -> m ExprT
 check t = \case
-  Case i e brs -> do
-    (eT, e') <- synth e
-    let caseMeta = annotate (TCChkedAt t) i
-    instantiateValCons eT >>= \case
-      -- we allow 'case' on a thing of type TEmptyHole iff we have zero branches
-      Left TDIHoleType ->
-        if null brs
-          then pure $ Case caseMeta e' []
-          else
-            asks smartHoles >>= \case
-              NoSmartHoles -> throwError' CaseOfHoleNeedsEmptyBranches
-              SmartHoles -> pure $ Case caseMeta e' []
-      Left TDINotADT ->
-        asks smartHoles >>= \case
-          NoSmartHoles -> throwError' $ CannotCaseNonADT eT
-          SmartHoles -> do
-            -- NB: we wrap the scrutinee in a hole and DELETE the branches
-            scrutWrap <- Hole <$> meta' (TCSynthed (TEmptyHole ())) <*> pure e'
-            pure $ Case caseMeta scrutWrap []
-      Left (TDIUnknown ty) -> throwError' $ InternalError $ "We somehow synthesised the unknown type " <> show ty <> " for the scrutinee of a case"
-      Left TDINotSaturated ->
-        asks smartHoles >>= \case
-          NoSmartHoles -> throwError' $ CannotCaseNonSaturatedADT eT
-          SmartHoles -> do
-            -- NB: we wrap the scrutinee in a hole and DELETE the branches
-            scrutWrap <- Hole <$> meta' (TCSynthed (TEmptyHole ())) <*> pure e'
-            pure $ Case caseMeta scrutWrap []
-      Right (tc, _, expected) -> do
-        let branchNames = map (\(CaseBranch n _ _) -> n) brs
-        let conNames = map fst expected
-        sh <- asks smartHoles
-        brs' <- case (branchNames == conNames, sh) of
-          (False, NoSmartHoles) -> throwError' $ WrongCaseBranches tc branchNames
-          -- create branches with the correct name but wrong parameters,
-          -- they will be fixed up in checkBranch later
-          (False, SmartHoles) -> traverse (\c -> branch c [] emptyHole) conNames
-          (True, _) -> pure brs
-        brs'' <- zipWithM (checkBranch t) expected brs'
-        pure $ Case caseMeta e' brs''
   e -> do
     sh <- asks smartHoles
     let default_ = do
@@ -486,50 +434,6 @@ check t = \case
             Hole{} -> default_ -- Don't let the recursive call mint a hole.
             e'' -> pure e''
       _ -> default_
-
--- | Similar to check, but for the RHS of case branches
--- We assume that the branch is for this constructor
--- The passed in 'ValCon' is assumed to be a constructor of the passed in 'TypeDef'
-checkBranch ::
-  forall e m.
-  TypeM e m =>
-  Type ->
-  (ValConName, [Type' ()]) -> -- The constructor and its instantiated parameter types
-  CaseBranch' ExprMeta TypeMeta ->
-  m (CaseBranch' (Meta TypeCache) (Meta Kind))
-checkBranch t (vc, args) (CaseBranch nb patterns rhs) =
-  do
-    -- We check an invariant due to paranoia
-    assertCorrectCon
-    sh <- asks smartHoles
-    (fixedPats, fixedRHS) <- case (length args == length patterns, sh) of
-      (False, NoSmartHoles) -> throwError' CaseBranchWrongNumberPatterns
-      -- if the branch is nonsense, replace it with a sensible pattern and an empty hole
-      (False, SmartHoles) -> do
-        -- Avoid automatically generated names shadowing anything
-        globals <- getGlobalBaseNames
-        locals <- asks $ M.keysSet . localCxt
-        liftA2 (,) (mapM (createBinding (locals <> globals)) args) emptyHole
-      -- otherwise, convert all @Maybe TypeCache@ metadata to @TypeCache@
-      -- otherwise, annotate each binding with its type
-      (True, _) ->
-        let args' = zipWith (\ty bind -> (over _bindMeta (annotate (TCChkedAt ty)) bind, ty)) args patterns
-         in pure (args', rhs)
-    rhs' <- local (extendLocalCxts (map (first bindName) fixedPats)) $ check t fixedRHS
-    pure $ CaseBranch nb (map fst fixedPats) rhs'
-  where
-    createBinding :: S.Set Name -> Type' () -> m (Bind' (Meta TypeCache), Type' ())
-    createBinding namesInScope ty = do
-      -- Avoid automatically generated names shadowing anything
-      name <- freshLocalName' namesInScope
-      bind <- Bind <$> meta' (TCChkedAt ty) <*> pure name
-      pure (bind, ty)
-    assertCorrectCon =
-      assert (vc == nb) $
-        "checkBranch: expected a branch on "
-          <> show vc
-          <> " but found branch on "
-          <> show nb
 
 -- | Two types are consistent if they are equal (up to IDs and alpha) when we
 -- also count holes as being equal to anything.

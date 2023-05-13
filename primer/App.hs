@@ -115,7 +115,7 @@ import Typecheck (
  )
 import Zipper (
   ExprZ,
-  Loc' (InBind, InExpr, InType),
+  Loc' (InExpr, InType),
   TypeZ,
   TypeZip,
   focusOn,
@@ -691,7 +691,6 @@ copyPasteBody p (fromDefName, fromId) toDefName setup = do
       Left err -> throwError $ ActionError err
       Right (_, tgt) -> pure tgt
     case (src, tgt) of
-      (_, InBind _) -> throwError $ CopyPasteError "tried to paste an expression into a binder"
       (Left _, InType _) -> throwError $ CopyPasteError "tried to paste an expression into a type"
       (Right _, InExpr _) -> throwError $ CopyPasteError "tried to paste a type into an expression"
       (Right srcT, InType tgtT) -> do

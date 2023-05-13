@@ -1,5 +1,4 @@
 {-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE OverloadedLabels #-}
 
 -- | This module contains the zipper types @ExprZ@ and @TypeZ@, and functions for
 --  operating on them.
@@ -7,17 +6,9 @@ module Zipper (
   ExprZ,
   TypeZip,
   TypeZ,
-  CaseBindZ,
-  unfocusCaseBind,
-  caseBindZFocus,
-  caseBindZRhs,
-  caseBindAllBindings,
-  caseBindZUpdate,
   IsZipper (asZipper),
   Loc,
   Loc' (..),
-  BindLoc,
-  BindLoc' (..),
   focusType,
   focusLoc,
   unfocusType,
@@ -46,9 +37,6 @@ module Zipper (
 import Foreword
 
 import Core (
-  Bind,
-  Bind' (..),
-  CaseBranch',
   Expr,
   Expr',
   ExprMeta,
@@ -61,7 +49,6 @@ import Core (
   typesInExpr,
  )
 import Data.Data (Data)
-import Data.Generics.Product (position)
 import Data.Generics.Uniplate.Data ()
 import Data.Generics.Uniplate.Zipper (
   Zipper,
@@ -70,24 +57,12 @@ import Data.Generics.Uniplate.Zipper (
   zipper,
  )
 import Data.Generics.Uniplate.Zipper qualified as Z
-import Data.List as List (delete)
 import Optics (
-  AffineTraversal',
-  Field3 (_3),
-  filteredBy,
-  ifolded,
-  iheadOf,
-  iso,
-  ix,
-  only,
   over,
-  preview,
   set,
   view,
   (%),
   (.~),
-  (<%),
-  (<%>),
   (^?),
  )
 import Optics.Lens (Lens', equality', lens)
@@ -195,35 +170,6 @@ type TypeZ = TypeZ' ExprMeta TypeMeta
 instance HasID b => HasID (TypeZ' a b) where
   _id = tzpos1 % _id
 
--- | A zipper for variable bindings in case branches.
--- This type focuses on a particular binding in a particular branch.
--- It contains the focused binding, along with the the parent expression (as a zipper) and some
--- parts of the surrounding branch which are useful when renaming.
--- It also contains a function which can update the binding and the RHS of the case branch
--- simultaneously, yielding a new expression.
--- These fields are chosen to be convenient for renaming, and they may not be that useful for future
--- actions we want to perform.
-data CaseBindZ' a b = CaseBindZ
-  { caseBindZExpr :: ExprZ' a b
-  -- ^ a zipper focused on the case expression
-  , caseBindZFocus :: Bind' a
-  -- ^ the focused binding
-  , caseBindZRhs :: Expr' a b
-  -- ^ the rhs of the branch
-  , caseBindAllBindings :: [Bind' a]
-  -- ^ all other bindings in the case branch, i.e. all except the focused one
-  , caseBindZUpdate :: Bind' a -> Expr' a b -> ExprZ' a b -> ExprZ' a b
-  -- ^ a function to update the focused binding and rhs simultaneously
-  }
-
-_caseBindZFocus :: Lens' (CaseBindZ' a b) (Bind' a)
-_caseBindZFocus = lens caseBindZFocus (\cb f -> cb{caseBindZFocus = f})
-
-type CaseBindZ = CaseBindZ' ExprMeta TypeMeta
-
-instance HasID a => HasID (CaseBindZ' a b) where
-  _id = _caseBindZFocus % _id
-
 -- | A specific location in our AST.
 -- This can either be in an expression, type, or binding.
 data Loc' a b
@@ -231,8 +177,6 @@ data Loc' a b
     InExpr (ExprZ' a b)
   | -- | A type
     InType (TypeZ' a b)
-  | -- | A binding (currently just case bindings)
-    InBind (BindLoc' a b)
 
 type Loc = Loc' ExprMeta TypeMeta
 
@@ -242,26 +186,12 @@ instance (HasID a, HasID b) => HasID (Loc' a b) where
       getter = \case
         InExpr e -> view _id e
         InType l -> view _id l
-        InBind l -> view _id l
       setter l i = case l of
         InExpr e -> InExpr $ set _id i e
         InType t -> InType $ set _id i t
-        InBind t -> InBind $ set _id i t
 
 -- | A location of a binding.
 -- This only covers bindings in case branches for now.
-
-{- HLINT ignore BindLoc' "Use newtype instead of data" -}
-data BindLoc' a b
-  = BindCase (CaseBindZ' a b)
-
-blpos1 :: Lens' (BindLoc' a b) (CaseBindZ' a b)
-blpos1 = lens (\(BindCase b) -> b) (\_ b -> BindCase b)
-
-type BindLoc = BindLoc' ExprMeta TypeMeta
-
-instance HasID a => HasID (BindLoc' a b) where
-  _id = blpos1 % _id
 
 -- | Switch from an 'Expr' zipper to a 'Type' zipper, focusing on the type in
 -- the current target. This expects that the target is an @Ann@, @App@,
@@ -274,28 +204,6 @@ focusType z = do
   where
     l = _target % typesInExpr
 
--- | If the currently focused expression is a case expression, search the bindings of its branches
--- to find one matching the given ID, and return the 'Loc' for that binding.
--- If no match is found, return @Nothing@.
-findInCaseBinds :: forall a b. (Data a, Data b, Eq a, HasID a) => ID -> ExprZ' a b -> Maybe (Loc' a b)
-findInCaseBinds i z = do
-  branches <- preview branchesLens z
-  ((branchIx, bindIx), bind) <- branches & iheadOf (ifolded % binds <%> ifolded <% filteredBy (_id % only i))
-  let branchLens = branchesLens % ix branchIx
-  let rhsLens = branchLens % branchRHS
-  rhs <- preview rhsLens z
-  allBinds <- preview (branchLens % binds) z
-  let bindLens = branchLens % binds % ix bindIx
-  let update bind' rhs' = set rhsLens rhs' . set bindLens bind'
-  pure $ InBind $ BindCase $ CaseBindZ z bind rhs (delete bind allBinds) update
-  where
-    branchesLens :: AffineTraversal' (ExprZ' a b) [CaseBranch' a b]
-    branchesLens = _target % #_Case % _3
-    binds :: Lens' (CaseBranch' a b) [Bind' a]
-    binds = position @2
-    branchRHS :: Lens' (CaseBranch' a b) (Expr' a b)
-    branchRHS = position @3
-
 -- | Switch from a 'Type' zipper back to an 'Expr' zipper.
 unfocusType :: TypeZ' a b -> ExprZ' a b
 unfocusType (TypeZ zt f) = f (fromZipper zt)
@@ -307,19 +215,9 @@ focusOnlyType (TypeZ zt _) = zt
 instance Data b => IsZipper (TypeZ' a b) (Type' b) where
   asZipper = tzpos1
 
--- 'CaseBindZ' is sort of a fake zipper which can only focus on one thing: the case binding.
--- It's a bit fiddly to make it appear as a zipper like this, but it's convenient to have a
--- consistent interface for 'ExprZ', 'TypeZ' and 'CaseBindZ'.
-instance IsZipper CaseBindZ (Bind' ExprMeta) where
-  asZipper = _caseBindZFocus % iso zipper fromZipper
-
 -- | Convert an 'Expr' to a 'Loc' which focuses on the top of the expression.
 focusLoc :: Expr -> Loc
 focusLoc = InExpr . focus
-
--- Convert a 'CaseBindZ' to an 'ExprZ' by shifting focus to the parent case expression.
-unfocusCaseBind :: CaseBindZ' a b -> ExprZ' a b
-unfocusCaseBind = caseBindZExpr
 
 -- | Convert an 'Expr' zipper to an 'Expr'
 unfocusExpr :: ExprZ' a b -> Expr' a b
@@ -330,14 +228,12 @@ unfocusExpr = fromZipper
 unfocusLoc :: Loc -> ExprZ
 unfocusLoc (InExpr z) = z
 unfocusLoc (InType z) = unfocusType z
-unfocusLoc (InBind (BindCase z)) = unfocusCaseBind z
 
 -- | Convert a 'Loc' to 'Either ExprZ TypeZ'.
 -- If the 'Loc' is in a case bind, we shift focus to the parent case expression.
 -- This function is mainly to keep compatibility with code which still expects 'Either ExprZ TypeZ'
 -- as a representation of an AST location.
 locToEither :: Loc' a b -> Either (ExprZ' a b) (TypeZ' a b)
-locToEither (InBind (BindCase z)) = Left $ unfocusCaseBind z
 locToEither (InExpr z) = Left z
 locToEither (InType z) = Right z
 
@@ -347,11 +243,11 @@ unfocus :: Loc -> Expr
 unfocus = unfocusExpr . unfocusLoc
 
 -- | Focus on the node with the given 'ID', if it exists in the expression
-focusOn :: (Data a, Data b, Eq a, HasID a, HasID b) => ID -> Expr' a b -> Maybe (Loc' a b)
+focusOn :: (Data a, Data b, HasID a, HasID b) => ID -> Expr' a b -> Maybe (Loc' a b)
 focusOn i = focusOn' i . focus
 
 -- | Focus on the node with the given 'ID', if it exists in the focussed expression
-focusOn' :: (Data a, Data b, Eq a, HasID a, HasID b) => ID -> ExprZ' a b -> Maybe (Loc' a b)
+focusOn' :: (Data a, Data b, HasID a, HasID b) => ID -> ExprZ' a b -> Maybe (Loc' a b)
 focusOn' i = fmap snd . search matchesID
   where
     matchesID z
@@ -361,8 +257,7 @@ focusOn' i = fmap snd . search matchesID
       -- If the target is a case expression with bindings, search each binding for a match.
       | otherwise =
           let inType = focusType z >>= search (guarded (== i) . getID . target) <&> fst <&> InType
-              inCaseBinds = findInCaseBinds i z
-           in inType <|> inCaseBinds
+           in inType
 
 -- | Find a node in the AST by its ID, and also return its parent
 findNodeWithParent ::
@@ -381,7 +276,6 @@ findNodeWithParent id x = do
             (TypeNode . target)
             (up tz)
       )
-    InBind (BindCase bz) -> (CaseBindNode $ caseBindZFocus bz, Just . ExprNode . target . unfocusCaseBind $ bz)
 
 -- | Find a sub-type in a larger type by its ID.
 findType :: ID -> Type -> Maybe Type
@@ -391,6 +285,4 @@ findType id ty = target <$> focusOnTy id ty
 data SomeNode
   = ExprNode Expr
   | TypeNode Type
-  | -- | If/when we model all bindings with 'Bind'', we will want to generalise this.
-    CaseBindNode Bind
   deriving stock (Eq, Show, Read)

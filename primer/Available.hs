@@ -104,7 +104,6 @@ forBody Editable expr id = case findNodeWithParent id expr of
           Just (ExprNode _) -> [] -- at the root of an annotation, so cannot raise
           _ -> [NoInput Raise]
      in forType t <> raiseAction
-  Just (CaseBindNode _, _) -> []
 
 forSig ::
   Editable ->

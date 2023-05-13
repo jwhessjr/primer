@@ -17,7 +17,6 @@ module CoreUtils (
 import Foreword
 
 import Core (
-  CaseBranch' (..),
   Expr' (..),
   GVarName,
   HasID (_id),
@@ -26,7 +25,6 @@ import Core (
   LocalName (LocalName),
   TyVarName,
   Type' (..),
-  bindName,
   _exprMeta,
   _exprTypeMeta,
   _typeMeta,
@@ -129,9 +127,6 @@ _freeTmVars = traversalVL $ go mempty
       Hole m e -> Hole m <$> go bound f e
       t@EmptyHole{} -> pure t
       Ann m e ty -> Ann m <$> go bound f e <*> pure ty
-      Case m e bs -> Case m <$> go bound f e <*> traverse freeVarsBr bs
-      where
-        freeVarsBr (CaseBranch c binds e) = CaseBranch c binds <$> go (S.union bound $ S.fromList $ map bindName binds) f e
 
 _freeTyVars :: Traversal (Expr' a b) (Expr' a b) (b, TyVarName) (Type' b)
 _freeTyVars = traversalVL $ go mempty
@@ -141,9 +136,6 @@ _freeTyVars = traversalVL $ go mempty
       Hole m e -> Hole m <$> go bound f e
       t@EmptyHole{} -> pure t
       Ann m e ty -> Ann m <$> go bound f e <*> traverseFreeVarsTy bound f ty
-      Case m e bs -> Case m <$> go bound f e <*> traverse freeVarsBr bs
-      where
-        freeVarsBr (CaseBranch c binds e) = CaseBranch c binds <$> go bound f e -- case branches only bind term variables
 
 freeGlobalVars :: Expr' a b -> Set GVarName
 freeGlobalVars _ = mempty

@@ -3,7 +3,6 @@
 module DSL (
   emptyHole,
   ann,
-  branch,
   tEmptyHole,
   tcon,
   tfun,
@@ -17,19 +16,13 @@ module DSL (
 import Foreword
 
 import Core (
-  Bind' (..),
-  CaseBranch,
-  CaseBranch' (..),
   Expr,
   Expr' (..),
   ID,
-  LVarName,
   Meta (..),
   TyConName,
   Type,
   Type' (..),
-  TypeCache,
-  ValConName,
  )
 import Fresh (MonadFresh, fresh)
 
@@ -71,8 +64,3 @@ emptyHole = EmptyHole <$> meta
 
 ann :: MonadFresh ID m => m Expr -> m Type -> m Expr
 ann e t = Ann <$> meta <*> e <*> t
-
-branch :: MonadFresh ID m => ValConName -> [(LVarName, Maybe TypeCache)] -> m Expr -> m CaseBranch
-branch c vs e = CaseBranch c <$> mapM binding vs <*> e
-  where
-    binding (name, ty) = Bind <$> meta' ty <*> pure name

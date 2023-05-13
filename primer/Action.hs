@@ -50,7 +50,6 @@ import Typecheck (
  )
 import Typecheck qualified as TC
 import Zipper (
-  BindLoc' (..),
   ExprZ,
   IsZipper,
   Loc,
@@ -150,7 +149,6 @@ refocus Refocus{pre, post} = do
         TC.SmartHoles -> case pre of
           InExpr e -> candidateIDsExpr $ target e
           InType t -> candidateIDsType $ target t
-          InBind (BindCase ze) -> [getID ze]
   pure . getFirst . mconcat $ fmap (\i -> First $ focusOn i post) candidateIDs
   where
     candidateIDsExpr e =
@@ -215,17 +213,12 @@ synthZ z = do
 applyAction' :: ActionM m => Action -> Loc -> m Loc
 applyAction' a = case a of
   SetCursor i -> setCursor i . unfocusLoc
-  Move m -> \case
+  Move _ -> \case
     InExpr z -> InExpr <$> moveUp z
     InType z -> InType <$> moveUp z
-    z@(InBind _) -> case m of
-      -- If we're moving up from a binding, then shift focus to the nearest parent expression.
-      -- This is exactly what 'unfocusLoc' does if the 'Loc' is a binding.
-      Parent -> pure . InExpr $ unfocusLoc z
   Delete -> \case
     InExpr ze -> InExpr . flip replace ze <$> emptyHole
     InType zt -> InType . flip replace zt <$> tEmptyHole
-    InBind _ -> throwError $ CustomFailure Delete "Cannot delete a binding"
   ConstructArrowL -> typeAction constructArrowL "cannot construct arrow - not in type"
   where
     typeAction f s = \case
