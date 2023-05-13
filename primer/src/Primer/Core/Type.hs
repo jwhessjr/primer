@@ -53,7 +53,7 @@ _typeMetaLens :: Lens' (Type' a) a
 _typeMetaLens = position @1
 
 -- | Core kinds.
-data Kind = KHole | KType | KFun Kind Kind
+data Kind = KHole | KType
   deriving stock (Eq, Show, Read, Data, Generic)
 
 instance HasID a => HasID (Type' a) where

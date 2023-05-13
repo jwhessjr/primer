@@ -20,7 +20,7 @@ import Data.Map qualified as Map
 import Primer.Core.DSL.Meta (meta')
 import Primer.Core.Meta (ID, Meta (Meta), TyVarName, unLocalName)
 import Primer.Core.Type (
-  Kind (KFun, KHole, KType),
+  Kind (KHole, KType),
   Type' (TCon, TEmptyHole, TFun, THole),
  )
 import Primer.Name (NameCounter)
@@ -122,8 +122,4 @@ annotate :: b -> Meta a -> Meta b
 annotate t (Meta i _ v) = Meta i t v
 
 consistentKinds :: Kind -> Kind -> Bool
-consistentKinds KHole _ = True
-consistentKinds _ KHole = True
-consistentKinds KType KType = True
-consistentKinds (KFun k1 k2) (KFun k1' k2') = consistentKinds k1 k1' && consistentKinds k2 k2'
-consistentKinds _ _ = False
+consistentKinds _ _ = True
