@@ -1,39 +1,25 @@
 module Primer.Core.Transform (
   renameVar,
-  renameLocalVar,
-  renameTyVar,
-  renameTyVarExpr,
-  unfoldApp,
-  foldApp,
-  unfoldAPP,
   unfoldTApp,
   decomposeTAppCon,
   foldTApp,
   mkTAppCon,
-  unfoldFun,
 ) where
 
 import Foreword
 
-import Control.Monad.Fresh (MonadFresh)
 import Data.Data (Data)
 import Data.Generics.Uniplate.Data (descendM)
-import Data.List.NonEmpty qualified as NE
-import Optics (Field2 (_2), getting, noneOf, notElemOf, to, traverseOf, (%))
+import Optics (Field2 (_2), getting, noneOf, to, (%))
 import Primer.Core (
   CaseBranch' (..),
-  Expr,
   Expr' (..),
-  ID,
-  LVarName,
   LocalName (unLocalName),
   TmVarRef (..),
-  TyVarName,
   Type' (..),
   bindName,
   typesInExpr,
  )
-import Primer.Core.DSL (meta)
 import Primer.Core.Meta (TyConName)
 import Primer.Core.Utils (_freeVars, _freeVarsTy)
 
@@ -110,125 +96,12 @@ whenNotFreeIn x e = do
 notFreeIn :: TmVarRef -> Expr' a b -> Bool
 notFreeIn x = noneOf (_freeVars % to (bimap snd snd)) (either (`sameVarRef` x) (`sameVarRef` x))
 
-whenNotFreeInTy :: TyVarName -> Type' b -> Maybe (Type' b)
-whenNotFreeInTy x ty = do
-  guard $ notFreeInTy x ty
-  pure ty
-
-notFreeInTy :: TyVarName -> Type' b -> Bool
-notFreeInTy = notElemOf (getting _freeVarsTy % _2)
-
 sameVarRef :: LocalName k -> TmVarRef -> Bool
 sameVarRef v (LocalVarRef v') = sameVar v v'
 sameVarRef _ (GlobalVarRef _) = False
 
 sameVar :: LocalName k -> LocalName l -> Bool
 sameVar v v' = unLocalName v == unLocalName v'
-
--- | As 'renameVar', but specialised to local variables
-renameLocalVar :: (Data a, Data b) => LVarName -> LVarName -> Expr' a b -> Maybe (Expr' a b)
-renameLocalVar x y = renameVar (LocalVarRef x) (LocalVarRef y)
-
--- | Attempt to replace all free ocurrences of @x@ in @t@ with @y@
--- Returns 'Nothing' if replacement could result in variable capture.
--- See the tests for explanation and examples.
-renameTyVar :: Data a => TyVarName -> TyVarName -> Type' a -> Maybe (Type' a)
--- We cannot use substTy to implement renaming, as that restricts to b~(), so as to not
--- duplicate metadata. But for renaming, we know that will not happen.
-renameTyVar x y ty = case ty of
-  TForall _ v _ _
-    | v == x -> whenNotFreeInTy y ty
-    | v == y -> Nothing
-    | otherwise -> substAllChildren
-  TVar m v
-    | v == x -> pure $ TVar m y
-    | v == y -> Nothing
-    | otherwise -> substAllChildren
-  TLet m v t b
-    | v == x -> TLet m v <$> renameTyVar x y t <*> whenNotFreeInTy y b
-    | v == y -> Nothing
-    | otherwise -> substAllChildren
-  TEmptyHole{} -> substAllChildren
-  THole{} -> substAllChildren
-  TCon{} -> substAllChildren
-  TFun{} -> substAllChildren
-  TApp{} -> substAllChildren
-  where
-    substAllChildren = descendM (renameTyVar x y) ty
-
--- | Attempt to replace all free ocurrences of @x@ in some type inside @e@ with @y@
--- Returns 'Nothing' if replacement could result in variable capture.
--- See the tests for explanation and examples.
-renameTyVarExpr :: forall a b. (Data a, Data b) => TyVarName -> TyVarName -> Expr' a b -> Maybe (Expr' a b)
-renameTyVarExpr x y expr = case expr of
-  Lam _ v _
-    | sameVar v x -> pure expr
-    | sameVar v y -> Nothing
-    | otherwise -> substAllChildren
-  LAM _ v _
-    | v == x -> pure expr
-    | v == y -> Nothing
-    | otherwise -> substAllChildren
-  Let m v e1 e2
-    -- the binding only scopes over e2
-    | sameVar v x -> Let m v <$> renameTyVarExpr x y e1 <*> pure e2
-    | sameVar v y -> Nothing
-    | otherwise -> substAllChildren
-  LetType m v ty e
-    -- the binding only scopes over e
-    | sameVar v x -> LetType m v <$> renameTyVar x y ty <*> pure e
-    | sameVar v y -> Nothing
-    | otherwise -> substAllChildren
-  Letrec m v e1 ty e2
-    -- the binding only scopes over e1 and e2
-    | sameVar v x -> Letrec m v e1 <$> renameTyVar x y ty <*> pure e2
-    | sameVar v y -> Nothing
-    | otherwise -> substAllChildren
-  Case m scrut branches -> Case m <$> renameTyVarExpr x y scrut <*> mapM renameBranch branches
-    where
-      renameBranch b@(CaseBranch con termargs rhs)
-        | any (sameVar x) $ bindingNames b = pure b
-        | any (sameVar y) $ bindingNames b = Nothing
-        | otherwise = CaseBranch con termargs <$> renameTyVarExpr x y rhs
-      bindingNames (CaseBranch _ bs _) = map bindName bs
-  -- Since term and type variables are in the same namespace, we need
-  -- to worry about references to the term var y since we do not want
-  -- to capture such a y.
-  Var _ v
-    | sameVarRef y v -> Nothing
-    | otherwise -> pure expr
-  Hole{} -> substAllChildren
-  EmptyHole{} -> substAllChildren
-  Ann{} -> substAllChildren
-  App{} -> substAllChildren
-  APP{} -> substAllChildren
-  Con{} -> substAllChildren
-  where
-    substAllChildren = descendM (renameTyVarExpr x y) =<< descendTypeM (renameTyVar x y) expr
-    -- NB: cannot use descendBiM here: I want only immediate type
-    -- children, but descendBiM does "top-most" type children: i.e. (λx.x:t)
-    -- will target t even though it is two layers deep!
-    descendTypeM = traverseOf typesInExpr
-
--- | Unfold a nested term application into the application head and a list of arguments.
-unfoldApp :: Expr' a b -> (Expr' a b, [Expr' a b])
-unfoldApp = second reverse . go
-  where
-    go (App _ f x) = let (g, args) = go f in (g, x : args)
-    go e = (e, [])
-
--- | Fold an application head and a list of arguments into a single expression.
-foldApp :: (Foldable t, MonadFresh ID m) => Expr -> t Expr -> m Expr
-foldApp = foldlM $ \a b -> do
-  m <- meta
-  pure $ App m a b
-
--- | Unfold a nested term-level type application into the application head and a list of arguments.
-unfoldAPP :: Expr' a b -> (Expr' a b, [Type' b])
-unfoldAPP = second reverse . go
-  where
-    go (APP _ f x) = let (g, args) = go f in (g, x : args)
-    go e = (e, [])
 
 -- | Unfold a nested type-level application into the application head and a list of arguments.
 unfoldTApp :: Type' a -> (Type' a, [Type' a])
@@ -251,11 +124,3 @@ decomposeTAppCon =
   unfoldTApp <&> \case
     (TCon _ con, args) -> Just (con, args)
     _ -> Nothing
-
--- | Split a function type into an array of argument types and the result type.
--- Takes two arguments: the lhs and rhs of the topmost function node.
-unfoldFun :: Type' a -> Type' a -> (NonEmpty (Type' a), Type' a)
-unfoldFun a (TFun _ b c) =
-  let (argTypes, resultType) = unfoldFun b c
-   in (NE.cons a argTypes, resultType)
-unfoldFun a t = (pure a, t)

@@ -9,7 +9,6 @@ module Primer.Action (
   applyActionsToBody,
   applyActionsToTypeSig,
   moveExpr,
-  uniquifyDefName,
   toProgActionInput,
   toProgActionNoInput,
 ) where
@@ -18,8 +17,6 @@ import Foreword hiding (mod)
 
 import Control.Monad.Fresh (MonadFresh)
 import Data.List (findIndex)
-import Data.Map.Strict qualified as Map
-import Data.Set qualified as Set
 import Primer.Action.Actions (Action (..), Movement (..))
 import Primer.Action.Available qualified as Available
 import Primer.Action.Errors (ActionError (..))
@@ -33,9 +30,7 @@ import Primer.Core (
   ID,
   Type,
   Type' (..),
-  baseName,
   getID,
-  qualifiedModule,
  )
 import Primer.Core qualified as C
 import Primer.Core.DSL (
@@ -48,11 +43,9 @@ import Primer.Core.Utils (forgetTypeMetadata)
 import Primer.Def (
   ASTDef (..),
   Def (..),
-  DefMap,
  )
 import Primer.Module (Module, insertDef)
-import Primer.Name (Name, NameCounter, unName, unsafeMkName)
-import Primer.Questions (uniquify)
+import Primer.Name (Name, NameCounter)
 import Primer.Typecheck (
   CheckEverythingRequest (CheckEverything, toCheck, trusted),
   SmartHoles,
@@ -84,19 +77,6 @@ import Primer.Zipper (
   unfocusLoc,
   up,
  )
-
--- | Given a definition name and a program, return a unique variant of
--- that name (within the specified module). Note that if no definition
--- of the given name already exists in the program, this function will
--- return the same name it's been given.
-uniquifyDefName :: C.ModuleName -> Text -> DefMap -> Text
-uniquifyDefName m name' defs = unName $ uniquify avoid $ unsafeMkName name'
-  where
-    f qn
-      | qualifiedModule qn == m = Set.singleton $ baseName qn
-      | otherwise = mempty
-    avoid :: Set Name
-    avoid = foldMap' f $ Map.keys defs
 
 -- | A shorthand for the constraints needed when applying actions
 type ActionM m =

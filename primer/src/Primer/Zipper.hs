@@ -7,7 +7,6 @@ module Primer.Zipper (
   TypeZip,
   TypeZ,
   CaseBindZ,
-  updateCaseBind,
   unfocusCaseBind,
   caseBindZFocus,
   caseBindZRhs,
@@ -40,12 +39,9 @@ module Primer.Zipper (
   prior,
   foldAbove,
   foldAboveTypeZ,
-  foldBelow,
   unfocusExpr,
   unfocusLoc,
   locToEither,
-  bindersAbove,
-  bindersBelow,
   LetBinding' (..),
   LetBinding,
   letBindingName,
@@ -53,13 +49,8 @@ module Primer.Zipper (
   getBoundHere',
   getBoundHere,
   getBoundHereUp,
-  getBoundHereDn,
-  bindersAboveTy,
-  bindersAboveTypeZ,
   getBoundHereTy,
   getBoundHereUpTy,
-  getBoundHereDnTy,
-  bindersBelowTy,
   SomeNode (..),
   findNodeWithParent,
   findType,
@@ -121,15 +112,11 @@ import Primer.Zipper.Type (
   IsZipper (..),
   LetTypeBinding' (LetTypeBind),
   TypeZip,
-  bindersAboveTy,
-  bindersBelowTy,
   down,
   farthest,
   focus,
   focusOnTy,
   foldAbove,
-  foldBelow,
-  getBoundHereDnTy,
   getBoundHereTy,
   getBoundHereUpTy,
   left,
@@ -190,25 +177,6 @@ _caseBindZFocus = lens caseBindZFocus (\cb f -> cb {caseBindZFocus = f})
 
 
 type CaseBindZ = CaseBindZ' ExprMeta TypeMeta
-
--- Apply an update function to the focus of a case binding, optionally modifying the rhs of the branch too.
--- The update function is given three arguments:
--- - the focused binding
--- - a list of all other bindings in the branch (not including the focused one)
--- - the rhs of the branch
--- It returns a tuple of the updated binding and the updated rhs.
--- This is very specialised to be useful when renaming case branch bindings.
--- It may not be very reusable but I think it's helpful to keep the complexity of 'CaseBindZ'
--- restricted to this module.
-updateCaseBind ::
-  Functor f =>
-  CaseBindZ ->
-  (Bind' ExprMeta -> [Bind' ExprMeta] -> Expr -> f (Bind' ExprMeta, Expr)) ->
-  f CaseBindZ
-updateCaseBind (CaseBindZ z bind rhs bindings update) f =
-  f bind bindings rhs <&> \(bind', rhs') ->
-    let z' = update bind' rhs' z
-     in CaseBindZ z' bind' rhs' bindings update
 
 instance HasID a => HasID (CaseBindZ' a b) where
   _id = _caseBindZFocus % _id
@@ -353,10 +321,6 @@ focusOn' i = fmap snd . search matchesID
               inCaseBinds = findInCaseBinds i z
            in inType <|> inCaseBinds
 
--- Gets all binders that scope over the focussed subtree
-bindersAbove :: ExprZ -> S.Set Name
-bindersAbove = foldAbove getBoundHereUp
-
 foldAboveTypeZ ::
   (Data a, Data b, Monoid m) =>
   (FoldAbove (Type' b) -> m) ->
@@ -372,28 +336,9 @@ foldAboveTypeZ inTy border inExpr tz =
         <> border FA{prior = wholeTy, current = target exz}
         <> foldAbove inExpr exz
 
-bindersAboveTypeZ :: TypeZ -> S.Set Name
-bindersAboveTypeZ =
-  foldAboveTypeZ
-    (S.map unLocalName . getBoundHereUpTy)
-    -- Since nothing both contains a type and binds a variable, we
-    -- could write (const mempty) for the "border" argument,
-    -- but let's keep it around as future proofing
-    (\FA{current} -> getBoundHere current Nothing)
-    getBoundHereUp
-
 -- Get the names bound by this layer of an expression for a given child.
 getBoundHereUp :: (Eq a, Eq b) => FoldAbove (Expr' a b) -> S.Set Name
 getBoundHereUp e = getBoundHere (current e) (Just $ prior e)
-
--- Get the names bound within the focussed subtree
-bindersBelow :: ExprZ -> S.Set Name
-bindersBelow = foldBelow getBoundHereDn
-
--- Get all names bound by this layer of an expression, for any child.
--- E.g. for a "match" we get all vars bound by each branch.
-getBoundHereDn :: (Eq a, Eq b) => Expr' a b -> S.Set Name
-getBoundHereDn e = getBoundHere e Nothing
 
 -- Get the names bound by this layer of an expression (both term and type names)
 -- The second arg is the child we just came out of, if traversing up (and thus

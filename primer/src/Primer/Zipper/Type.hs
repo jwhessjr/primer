@@ -20,15 +20,11 @@ module Primer.Zipper.Type (
   FoldAbove,
   FoldAbove' (FA, current, prior),
   foldAbove,
-  foldBelow,
-  bindersAboveTy,
   LetTypeBinding' (LetTypeBind),
   LetTypeBinding,
   getBoundHereTy',
   getBoundHereTy,
   getBoundHereUpTy,
-  getBoundHereDnTy,
-  bindersBelowTy,
 ) where
 
 import Foreword
@@ -158,32 +154,9 @@ foldAbove f z = go (target z) (up z)
       Nothing -> mempty
       Just z' -> let cur = target z' in f (FA{prior = p, current = cur}) <> go cur (up z')
 
--- | Focus on the current thing, and then everything 'below', in depth-first,
--- leftmost-first order;
--- map each to a monoid, and accumulate
--- NB: 'foldAbove' + 'foldBelow' does not encompass the whole term: it misses
--- siblings.
-foldBelow :: (IsZipper za a, Monoid m) => (a -> m) -> za -> m
-foldBelow f z = f (target z) <> maybe mempty (go . farthest left) (down z)
-  where
-    go z' = f (target z') <> maybe mempty (go . farthest left) (down z') <> maybe mempty go (right z')
-
-bindersAboveTy :: TypeZip -> S.Set TyVarName
-bindersAboveTy = foldAbove getBoundHereUpTy
-
--- Note that we have two specialisations we care about:
--- bindersBelowTy :: TypeZip -> S.Set Name
--- bindersBelowTy :: Zipper (Type' One) (Type' One) -> S.Set Name
-bindersBelowTy :: (Data a, Eq a) => Zipper (Type' a) (Type' a) -> S.Set TyVarName
-bindersBelowTy = foldBelow getBoundHereDnTy
-
 -- Get the names bound by this layer of an type for a given child.
 getBoundHereUpTy :: Eq a => FoldAbove (Type' a) -> S.Set TyVarName
 getBoundHereUpTy e = getBoundHereTy (current e) (Just $ prior e)
-
--- Get all names bound by this layer of an type, for any child.
-getBoundHereDnTy :: Eq a => Type' a -> S.Set TyVarName
-getBoundHereDnTy e = getBoundHereTy e Nothing
 
 getBoundHereTy :: Eq a => Type' a -> Maybe (Type' a) -> S.Set TyVarName
 getBoundHereTy t prev = S.fromList $ either identity (\(LetTypeBind n _) -> n) <$> getBoundHereTy' t prev

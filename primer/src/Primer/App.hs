@@ -15,15 +15,10 @@ module Primer.App (
   Prog (..),
   progAllModules,
   progAllDefs,
-  progAllTypeDefs,
-  allValConNames,
-  allTyConNames,
-  progCxt,
   tcWholeProg,
   tcWholeProgWithImports,
   ProgAction (..),
   ProgError (..),
-  Question (..),
   handleMutationRequest,
   handleEditRequest,
   MutationRequest (..),
@@ -47,7 +42,6 @@ import Data.Set qualified as Set
 import Optics (
   ReversibleOptic (re),
   Setter',
-  ifoldMap,
   lens,
   over,
   set,
@@ -86,10 +80,8 @@ import Primer.Core (
   Meta (..),
   ModuleName,
   TmVarRef (GlobalVarRef, LocalVarRef),
-  TyConName,
   Type' (..),
   TypeMeta,
-  ValConName,
   getID,
   qualifyName,
   _exprMetaLens,
@@ -112,26 +104,14 @@ import Primer.Module (
   deleteDef,
   insertDef,
   moduleDefsQualified,
-  moduleTypesQualified,
   qualifyDefName,
  )
 import Primer.Name (Name, NameCounter, unsafeMkName)
-import Primer.Questions (
-  Question (..),
- )
-import Primer.TypeDef (
-  ASTTypeDef (..),
-  TypeDef (..),
-  TypeDefMap,
-  ValCon (..),
-  typeDefAST,
- )
 import Primer.Typecheck (
   CheckEverythingRequest (CheckEverything, toCheck, trusted),
   Cxt,
   SmartHoles,
   TypeError,
-  buildTypingContextFromModules,
   checkEverything,
  )
 import Primer.Zipper (
@@ -170,14 +150,8 @@ data Prog = Prog
   }
   deriving stock (Eq, Show, Read)
 
-_progModules :: Setter' Prog [Module]
-_progModules = sets $ \f p -> p {progModules = f $ progModules p}
-
 _progSelection :: Setter' Prog (Maybe Selection)
 _progSelection = sets $ \f p -> p {progSelection = f $ progSelection p}
-
-_progSmartHoles :: Setter' Prog SmartHoles
-_progSmartHoles = sets $ \f p -> p {progSmartHoles = f $ progSmartHoles p}
 
 -- | Push a compound action onto the given 'Log', returning the new
 -- 'Log'.
@@ -186,9 +160,6 @@ push as l = Log $ as : unlog l
 
 progAllModules :: Prog -> [Module]
 progAllModules p = progModules p
-
-progAllTypeDefs :: Prog -> Map TyConName (Editable, TypeDef ())
-progAllTypeDefs p = foldMap' (fmap (Editable,) . moduleTypesQualified) (progModules p)
 
 progAllDefs :: Prog -> Map GVarName (Editable, Def)
 progAllDefs p = foldMap' (fmap (Editable,) . moduleDefsQualified) (progModules p)
@@ -203,10 +174,6 @@ progAllDefs p = foldMap' (fmap (Editable,) . moduleDefsQualified) (progModules p
 -- All modules in a @Prog@ shall be well-typed, in the appropriate scope:
 -- all the imports are in one mutual dependency group
 -- the @progModule@ has all the imports in scope
-
--- | Get all type definitions from all modules (including imports)
-allTypes :: Prog -> TypeDefMap
-allTypes = fmap snd . progAllTypeDefs
 
 -- | Get all definitions from all modules (including imports)
 allDefs :: Prog -> DefMap
@@ -866,20 +833,6 @@ copyPasteBody p (fromDefName, fromId) toDefName setup = do
 lookupASTDef :: GVarName -> DefMap -> Maybe ASTDef
 lookupASTDef name = defAST <=< Map.lookup name
 
-progCxt :: Prog -> Cxt
-progCxt p = buildTypingContextFromModules (progAllModules p) (progSmartHoles p)
-
 -- | Run a computation in some context whose errors can be promoted to `ProgError`.
 liftError :: MonadError ProgError m => (e -> ProgError) -> ExceptT e m b -> m b
 liftError = modifyError
-
-allConNames :: Prog -> [(TyConName, [ValConName])]
-allConNames p = ifoldMap (\tn td -> pure (tn, valConName <$> typeDefConstructors td)) $ allTypes p
-  where
-    typeDefConstructors td = maybe [] astTypeDefConstructors $ typeDefAST td
-
-allValConNames :: Prog -> [ValConName]
-allValConNames = snd <=< allConNames
-
-allTyConNames :: Prog -> [TyConName]
-allTyConNames = fmap fst . allConNames

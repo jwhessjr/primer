@@ -8,7 +8,6 @@ module Primer.Typecheck.Kindcheck (
   extendLocalCxtTy,
   extendLocalCxtTys,
   lookupLocalTy,
-  localTyVars,
   consistentKinds,
   annotate,
 ) where
@@ -19,7 +18,7 @@ import Control.Monad.Fresh (MonadFresh)
 import Control.Monad.NestedError (MonadNestedError, throwError')
 import Data.Map qualified as Map
 import Primer.Core.DSL.Meta (meta')
-import Primer.Core.Meta (ID, LocalName (LocalName), Meta (Meta), TyVarName, unLocalName)
+import Primer.Core.Meta (ID, Meta (Meta), TyVarName, unLocalName)
 import Primer.Core.Type (
   Kind (KFun, KHole, KType),
   Type' (TApp, TCon, TEmptyHole, TForall, TFun, THole, TLet, TVar),
@@ -56,9 +55,6 @@ lookupLocalTy v cxt = case Map.lookup (unLocalName v) $ localCxt cxt of
   Just (K k) -> Right k
   Just (T _) -> Left $ TyVarWrongSort (unLocalName v)
   Nothing -> Left $ UnknownTypeVariable v
-
-localTyVars :: Cxt -> Map TyVarName Kind
-localTyVars = Map.mapKeys LocalName . Map.mapMaybe (\case K k -> Just k; T _ -> Nothing) . localCxt
 
 extendLocalCxtTy :: (TyVarName, Kind) -> Cxt -> Cxt
 extendLocalCxtTy (name, k) cxt = cxt{localCxt = Map.insert (unLocalName name) (K k) (localCxt cxt)}

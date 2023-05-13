@@ -5,29 +5,23 @@ module Primer.TypeDef (
   _TypeDefAST,
   ValCon (..),
   _valConArgs,
-  _valConName,
   TypeDefMap,
   typeDefAST,
   typeDefKind,
-  typeDefNameHints,
   typeDefParameters,
   ASTTypeDef (..),
   _astTypeDefConstructors,
-  _astTypeDefParameters,
   PrimTypeDef (..),
   valConType,
   _typedefFields,
   forgetTypeDefMetadata,
-  generateTypeDefIDs,
 ) where
 
 import Foreword
 
-import Control.Monad.Fresh (MonadFresh)
 import Data.Data (Data)
-import Optics (Traversal, over, traverseOf, traversed, (%), traversalVL, Lens', Lens, lens)
+import Optics (Traversal, over, traversed, (%), traversalVL, Lens, lens)
 import Primer.Core.Meta (
-  ID,
   TyConName,
   TyVarName,
   ValConName,
@@ -36,9 +30,8 @@ import Primer.Core.Transform (mkTAppCon)
 import Primer.Core.Type (
   Kind (KFun, KType),
   Type' (TForall, TFun, TVar),
-  TypeMeta,
  )
-import Primer.Core.Utils (forgetTypeMetadata, generateTypeIDs)
+import Primer.Core.Utils (forgetTypeMetadata)
 import Primer.Name (Name)
 
 data TypeDef b
@@ -76,17 +69,11 @@ data ASTTypeDef b = ASTTypeDef
 _astTypeDefConstructors :: Lens (ASTTypeDef b) (ASTTypeDef b') [ValCon b] [ValCon b']
 _astTypeDefConstructors = lens astTypeDefConstructors $ \d cs -> d {astTypeDefConstructors = cs}
 
-_astTypeDefParameters :: Lens' (ASTTypeDef b) [(TyVarName, Kind)]
-_astTypeDefParameters = lens astTypeDefParameters $ \d ps -> d {astTypeDefParameters = ps}
-
 data ValCon b = ValCon
   { valConName :: ValConName
   , valConArgs :: [Type' b]
   }
   deriving stock (Eq, Show, Read, Data)
-
-_valConName :: Lens' (ValCon b) ValConName
-_valConName = lens valConName $ \c n -> c {valConName = n}
 
 _valConArgs :: Lens (ValCon b) (ValCon b') [Type' b] [Type' b']
 _valConArgs = lens valConArgs $ \c as -> c {valConArgs = as}
@@ -98,10 +85,6 @@ valConType tc td vc =
       foralls = foldr (\(n, k) t -> TForall () n k t) args (astTypeDefParameters td)
    in foralls
 
-typeDefNameHints :: TypeDef b -> [Name]
-typeDefNameHints = \case
-  TypeDefPrim t -> primTypeDefNameHints t
-  TypeDefAST t -> astTypeDefNameHints t
 typeDefParameters :: TypeDef b -> [Kind]
 typeDefParameters = \case
   TypeDefPrim t -> primTypeDefParameters t
@@ -119,6 +102,3 @@ _typedefFields = _TypeDefAST % _astTypeDefConstructors % traversed % _valConArgs
 
 forgetTypeDefMetadata :: TypeDef b -> TypeDef ()
 forgetTypeDefMetadata = over _typedefFields forgetTypeMetadata
-
-generateTypeDefIDs :: MonadFresh ID m => TypeDef () -> m (TypeDef TypeMeta)
-generateTypeDefIDs = traverseOf _typedefFields generateTypeIDs

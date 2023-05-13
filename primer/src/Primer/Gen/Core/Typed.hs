@@ -12,7 +12,6 @@ module Primer.Gen.Core.Typed (
   isolateWT,
   forAllT,
   propertyWT,
-  freshNameForCxt,
 ) where
 
 import Foreword hiding (mod)
@@ -20,7 +19,6 @@ import Foreword hiding (mod)
 import Control.Monad.Fresh (MonadFresh, fresh)
 import Control.Monad.Morph (hoist)
 import Control.Monad.Reader (mapReaderT)
-import Data.Map qualified as M
 import Hedgehog (
   Property, property,
   GenT,
@@ -32,7 +30,7 @@ import Primer.Core (
  )
 import Primer.Core.DSL (S)
 import Primer.Module (Module (..))
-import Primer.Name (Name, NameCounter, freshName)
+import Primer.Name (NameCounter)
 import Primer.Test.TestM (
   TestM,
   evalTestM,
@@ -42,8 +40,6 @@ import Primer.Typecheck (
   Cxt (),
   SmartHoles (NoSmartHoles),
   buildTypingContextFromModules',
-  getGlobalBaseNames,
-  localCxt,
  )
 
 {-
@@ -87,12 +83,6 @@ instance MonadFresh NameCounter (PropertyT WT) where
 
 instance MonadFresh ID (PropertyT WT) where
   fresh = lift fresh
-
-freshNameForCxt :: GenT WT Name
-freshNameForCxt = do
-  globs <- getGlobalBaseNames
-  locals <- asks $ M.keysSet . localCxt
-  freshName $ globs <> locals
 
 hoist' :: Applicative f => Cxt -> WT a -> f a
 hoist' cxt = pure . evalTestM 0 . flip runReaderT cxt . unWT

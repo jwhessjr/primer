@@ -29,16 +29,11 @@ executable primer-test
     Primer.Log
     Primer.Module
     Primer.Name
-    Primer.Name.Fresh
     Primer.Pretty
-    Primer.Questions
-    Primer.Refine
     Primer.Subst
     Primer.Typecheck
     Primer.TypeDef
-    Primer.Unification
     Primer.Zipper
-    Primer.ZipperCxt
     Control.Monad.NestedError
     Primer.Action.Actions
     Primer.Action.Errors
@@ -58,7 +53,6 @@ executable primer-test
     Primer.Typecheck.TypeError
     Primer.Typecheck.Utils
     Primer.Zipper.Type
-    Primer.Gen.App
     Primer.Gen.Core.Raw
     Primer.Gen.Core.Typed
     Primer.Test.TestM

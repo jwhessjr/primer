@@ -7,14 +7,12 @@ module Primer.Core.Meta (
   GlobalNameKind (..),
   GlobalName (GlobalName, qualifiedModule, baseName),
   qualifyName,
-  unsafeMkGlobalName,
   TyConName,
   ValConName,
   GVarName,
   LocalNameKind (..),
   LocalName (LocalName, unLocalName),
   TmVarRef (..),
-  unsafeMkLocalName,
   LVarName,
   TyVarName,
   Value,
@@ -38,7 +36,7 @@ import Optics (
   set,
   view,
  )
-import Primer.Name (Name, unsafeMkName)
+import Primer.Name (Name)
 
 -- | An identifier for an expression. Every node of the AST has an ID.
 --
@@ -79,11 +77,6 @@ data GlobalName (k :: GlobalNameKind) = GlobalName
   }
   deriving stock (Eq, Ord, Generic, Data, Show, Read)
 
--- | Construct a name from a Text. This is called unsafe because there are no
--- guarantees about whether the name refers to anything that is in scope.
-unsafeMkGlobalName :: (NonEmpty Text, Text) -> GlobalName k
-unsafeMkGlobalName (m, n) = GlobalName (ModuleName $ fmap unsafeMkName m) (unsafeMkName n)
-
 qualifyName :: ModuleName -> Name -> GlobalName k
 qualifyName = GlobalName
 
@@ -102,9 +95,6 @@ data LocalNameKind
 newtype LocalName (k :: LocalNameKind) = LocalName {unLocalName :: Name}
   deriving stock (Eq, Ord, Show, Read, Data, Generic)
   deriving (IsString) via Name
-
-unsafeMkLocalName :: Text -> LocalName k
-unsafeMkLocalName = LocalName . unsafeMkName
 
 type LVarName = LocalName 'ATmVar
 type TyVarName = LocalName 'ATyVar

@@ -27,14 +27,12 @@ module Primer.Typecheck (
   TypeError (..),
   KindError (..),
   typeOf,
-  maybeTypeOf,
   matchArrowType,
   matchForallType,
   decomposeTAppCon,
   mkTAppCon,
   TypeDefInfo (..),
   TypeDefError (..),
-  getTypeDefInfo,
   getTypeDefInfo',
   lookupConstructor,
   instantiateValCons,
@@ -53,7 +51,6 @@ module Primer.Typecheck (
   extendLocalCxts,
   extendGlobalCxt,
   extendTypeDefCxt,
-  localTyVars,
 ) where
 
 import Foreword
@@ -157,7 +154,6 @@ import Primer.Typecheck.Kindcheck (
   consistentKinds,
   extendLocalCxtTy,
   extendLocalCxtTys,
-  localTyVars,
   synthKind,
  )
 import Primer.Typecheck.SmartHoles (SmartHoles (..))
@@ -167,12 +163,10 @@ import Primer.Typecheck.Utils (
   TypeDefInfo (TypeDefInfo),
   getGlobalBaseNames,
   getGlobalNames,
-  getTypeDefInfo,
   getTypeDefInfo',
   instantiateValCons,
   instantiateValCons',
   lookupConstructor,
-  maybeTypeOf,
   typeOf,
   _typecache,
  )

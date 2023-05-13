@@ -1,6 +1,5 @@
 module Primer.Module (
   Module (..),
-  _moduleTypes,
   _moduleDefs,
   qualifyTyConName,
   moduleTypesQualified,
@@ -8,14 +7,11 @@ module Primer.Module (
   moduleDefsQualified,
   insertDef,
   deleteDef,
-  renameModule,
-  renameModule',
 ) where
 
 import Foreword
 
 import Data.Data (Data)
-import Data.Generics.Uniplate.Data (transformBi)
 import Data.Map (delete, insert, mapKeys, member)
 import Primer.Core (
   GVarName,
@@ -39,9 +35,6 @@ data Module = Module
   , moduleDefs :: Map Name Def -- The current program: a set of definitions indexed by Name
   }
   deriving stock (Eq, Show, Read, Data)
-
-_moduleTypes :: Lens' Module (Map Name (TypeDef TypeMeta))
-_moduleTypes = lens moduleTypes (\m t -> m {moduleTypes = t})
 
 _moduleDefs :: Lens' Module (Map Name Def)
 _moduleDefs = lens moduleDefs (\m d -> m {moduleDefs = d})
@@ -69,19 +62,3 @@ deleteDef m d =
   if d `member` moduleDefsQualified m
     then Just $ m{moduleDefs = delete (baseName d) (moduleDefs m)}
     else Nothing
-
--- | Renames a module and any references to it (in the given 'Traversable' of
--- modules). Returns 'Nothing' if the requested new name is in use
--- (as the name of one of the modules, references are not detected)
-renameModule :: Traversable t => ModuleName -> ModuleName -> t Module -> Maybe (t Module)
-renameModule fromName toName = traverse rn1
-  where
-    rn1 m =
-      if moduleName m == toName
-        then Nothing
-        else pure $ renameModule' fromName toName m
-
--- | Renames all occurrences of the given 'ModuleName'. This does not
--- detect name clashes, see 'renameModule'
-renameModule' :: Data a => ModuleName -> ModuleName -> a -> a
-renameModule' fromName toName = transformBi (\n -> if n == fromName then toName else n)

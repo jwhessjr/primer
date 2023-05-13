@@ -14,8 +14,6 @@ module Primer.Core (
   module Primer.Core.Type,
   TypeCache (..),
   TypeCacheBoth (..),
-  _chkedAt,
-  _synthed,
   ExprMeta,
   _exprMeta,
   _exprMetaLens,
@@ -32,12 +30,10 @@ import Data.Data (Data)
 import Data.Generics.Product
 import Data.Generics.Uniplate.Data ()
 import Optics (
-  AffineFold,
   AffineTraversal',
   Lens,
   Lens',
   Traversal,
-  afailing,
   atraversalVL,
   (%),
  )
@@ -61,8 +57,6 @@ import Primer.Core.Meta (
   getID,
   qualifyName,
   trivialMeta,
-  unsafeMkGlobalName,
-  unsafeMkLocalName,
   _type,
  )
 import Primer.Core.Type (
@@ -95,18 +89,6 @@ data TypeCache
 -- though, to make it clear what each one is!
 data TypeCacheBoth = TCBoth {tcChkedAt :: Type' (), tcSynthed :: Type' ()}
   deriving stock (Eq, Show, Read, Generic, Data)
-
--- TODO `_chkedAt` and `_synthed` should be `AffineTraversal`s,
--- but there is currently no `failing` for AffineTraversals, only for AffineFolds (`afailing`).
--- See https://github.com/well-typed/optics/pull/393
-
--- | An affine fold getting TCChkedAt or TCEmb's chked-at field
-_chkedAt :: AffineFold TypeCache (Type' ())
-_chkedAt = #_TCChkedAt `afailing` (#_TCEmb % #tcChkedAt)
-
--- | An affine fold getting TCSynthed or TCEmb's synthed field
-_synthed :: AffineFold TypeCache (Type' ())
-_synthed = #_TCSynthed `afailing` (#_TCEmb % #tcSynthed)
 
 -- Expression metadata. Each expression is annotated with a type (populated by
 -- the typechecker). These types aren't part of the program so they themselves

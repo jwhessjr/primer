@@ -11,7 +11,6 @@ module Primer.Core.Utils (
   _freeTmVars,
   _freeTyVars,
   _freeVars,
-  freeVars,
   _freeVarsTy,
   freeVarsTy,
   freeGlobalVars,
@@ -24,7 +23,6 @@ import Control.Monad.Fresh (MonadFresh, fresh)
 import Data.Data (Data)
 import Data.Generics.Uniplate.Data (universe)
 import Data.Set qualified as S
-import Data.Set.Optics (setOf)
 import Optics (
   Fold,
   Traversal,
@@ -37,9 +35,6 @@ import Optics (
   traversalVL,
   traverseOf,
   (%),
-  _2,
-  _Left,
-  _Right,
  )
 
 import Primer.Core (
@@ -49,7 +44,6 @@ import Primer.Core (
   HasID (_id),
   ID,
   LVarName,
-  LocalName (unLocalName),
   TmVarRef (GlobalVarRef, LocalVarRef),
   TyVarName,
   Type' (..),
@@ -69,7 +63,6 @@ import Primer.Core.Type.Utils (
   typeIDs,
   _freeVarsTy,
  )
-import Primer.Name (Name)
 
 -- | Regenerate all IDs, not changing any other metadata
 regenerateExprIDs :: (HasID a, HasID b, MonadFresh ID m) => Expr' a b -> m (Expr' a b)
@@ -79,13 +72,6 @@ regenerateExprIDs' :: MonadFresh ID m => (ID -> a -> a') -> (ID -> b -> b') -> E
 regenerateExprIDs' se st =
   traverseOf _exprMeta (\a -> flip se a <$> fresh)
     >=> traverseOf _exprTypeMeta (\a -> flip st a <$> fresh)
-
--- Both term and type vars, but not constructors or global variables.
--- This is because constructor names and global variables are never
--- captured by lambda bindings etc (since they are looked up in a different
--- namespace)
-freeVars :: Expr' a b -> Set Name
-freeVars = setOf $ _freeVars % (_Left % _2 % to unLocalName `summing` _Right % _2 % to unLocalName)
 
 -- We can't offer a traversal, as we can't enforce replacing term vars with
 -- terms and type vars with types. Use _freeTmVars and _freeTyVars for

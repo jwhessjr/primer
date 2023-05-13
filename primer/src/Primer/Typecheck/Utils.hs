@@ -3,12 +3,10 @@
 module Primer.Typecheck.Utils (
   TypeDefError (..),
   TypeDefInfo (..),
-  getTypeDefInfo,
   getTypeDefInfo',
   instantiateValCons,
   instantiateValCons',
   lookupConstructor,
-  maybeTypeOf,
   typeOf,
   _typecache,
   getGlobalNames,
@@ -25,7 +23,7 @@ import Data.Map qualified as Map
 import Data.Set qualified as S
 import Data.Tuple.Extra (fst3)
 import Optics (Lens', view, (%))
-import Primer.Core (Expr, Expr', GlobalName (baseName, qualifiedModule), ModuleName, TypeCache, _exprMetaLens)
+import Primer.Core (Expr', GlobalName (baseName, qualifiedModule), ModuleName, TypeCache, _exprMetaLens)
 import Primer.Core.Meta (Meta, TyConName, ValConName, _type)
 import Primer.Core.Transform (decomposeTAppCon)
 import Primer.Core.Type (Kind, Type' (TEmptyHole, THole))
@@ -58,9 +56,6 @@ data TypeDefError
   | TDINotSaturated -- e.g. @List@ or @List a b@ rather than @List a@
 
 data TypeDefInfo a = TypeDefInfo [Type' a] TyConName (TypeDef ()) -- instantiated parameters, and the typedef (with its name), i.e. [Int] are the parameters for @List Int@
-
-getTypeDefInfo :: MonadReader Cxt m => Type' a -> m (Either TypeDefError (TypeDefInfo a))
-getTypeDefInfo t = reader $ flip getTypeDefInfo' t . typeDefs
 
 getTypeDefInfo' :: TypeDefMap -> Type' a -> Either TypeDefError (TypeDefInfo a)
 getTypeDefInfo' _ (TEmptyHole _) = Left TDIHoleType
@@ -120,10 +115,6 @@ instantiateValCons' tyDefs t =
             {- HLINT ignore instantiateValCons' "Avoid lambda" -}
             f c = (valConName c, map (\a -> substTySimul (M.fromList $ zip defparams params) (forgetTypeMetadata a)) $ valConArgs c)
         pure (tc, tda, map f $ astTypeDefConstructors tda)
-
--- | Get the (potentially absent) type of an 'Expr'
-maybeTypeOf :: Expr -> Maybe TypeCache
-maybeTypeOf = view _typecache
 
 -- | A lens for the type annotation of an 'Expr' or 'ExprT'
 _typecache :: Lens' (Expr' (Meta a) b) a
