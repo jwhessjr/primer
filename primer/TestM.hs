@@ -1,5 +1,5 @@
 -- A test monad for generating names and IDs and typechecking
-module Primer.Test.TestM (
+module TestM (
   TestM,
   evalTestM,
   isolateTestM,
@@ -7,9 +7,9 @@ module Primer.Test.TestM (
 
 import Foreword
 
-import Control.Monad.Fresh
-import Primer.Core (ID (..))
-import Primer.Name (NameCounter)
+import Fresh
+import Core (ID (..))
+import Name (NameCounter)
 
 -- This monad is responsible for generating fresh IDs and names in tests.
 -- If we need other abilities, this will be the base monad.

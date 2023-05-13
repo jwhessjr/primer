@@ -1,9 +1,9 @@
-module Primer.Action.ProgError (ProgError (..)) where
+module ProgError (ProgError (..)) where
 
 import Foreword
 
-import Primer.Action.Errors (ActionError)
-import Primer.Core.Meta (GVarName, ModuleName)
+import Errors (ActionError)
+import Meta (GVarName, ModuleName)
 
 data ProgError
   = NoDefSelected

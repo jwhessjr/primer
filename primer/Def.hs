@@ -1,4 +1,4 @@
-module Primer.Def (
+module Def (
   Def (..),
   _DefAST,
   DefMap,
@@ -12,13 +12,13 @@ module Primer.Def (
 import Foreword
 
 import Data.Data (Data)
-import Primer.Core (
+import Core (
   Expr,
   GVarName,
   Type,
   Type',
  )
-import Primer.Core.Utils (forgetTypeMetadata)
+import CoreUtils (forgetTypeMetadata)
 import Optics (Lens', lens, iso, Iso')
 
 data Def

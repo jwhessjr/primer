@@ -1,10 +1,10 @@
-module Primer.Typecheck.KindError (KindError (..)) where
+module KindError (KindError (..)) where
 
 import Foreword
 
-import Primer.Core.Meta (TyConName, TyVarName)
-import Primer.Core.Type (Kind)
-import Primer.Name (Name)
+import Meta (TyConName, TyVarName)
+import Type (Kind)
+import Name (Name)
 
 data KindError
   = UnknownTypeVariable TyVarName

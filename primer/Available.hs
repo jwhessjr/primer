@@ -1,6 +1,6 @@
 -- | Compute all the possible actions which can be performed on a definition.
 -- This module is expected to be imported qualified, due to various potential name clashes.
-module Primer.Action.Available (
+module Available (
   Level (..),
   Editable (..),
   NodeType (..),
@@ -17,7 +17,7 @@ import Foreword
 
 import Data.Data (Data)
 import Data.Map qualified as Map
-import Primer.Core (
+import Core (
   Expr,
   Expr' (..),
   GVarName,
@@ -25,11 +25,11 @@ import Primer.Core (
   Type,
   Type' (..),
  )
-import Primer.Def (
+import Def (
   DefMap,
  )
-import Primer.Def.Utils (globalInUse)
-import Primer.Zipper (
+import DefUtils (globalInUse)
+import Zipper (
   SomeNode (..),
   findNodeWithParent,
   findType,

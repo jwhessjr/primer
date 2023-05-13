@@ -5,7 +5,7 @@
 -- 'smaller' errors into 'larger' ones. A larger error is a type with a
 -- constructor wrapping the smaller error.
 --
--- We use this in Primer.Action, which has a type ActionError, one of whose
+-- We use this in Action, which has a type ActionError, one of whose
 -- constructors is 'TypeError :: TypeError -> ActionError'. Thus any computation
 -- that raises a TypeError can be lifted to a computation that raises an
 -- ActionError by wrapping the error in the @TypeError@ constructor.
@@ -44,7 +44,7 @@
 --     • The type Bool does not contain a constructor whose field is of type SpecificError
 --     • In the expression:
 --           throwError' SpecificError :: MonadError Bool m => m a
-module Control.Monad.NestedError (MonadNestedError (..), modifyError') where
+module NestedError (MonadNestedError (..), modifyError') where
 
 import Foreword
 

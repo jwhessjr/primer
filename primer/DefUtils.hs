@@ -1,12 +1,12 @@
-module Primer.Def.Utils (globalInUse) where
+module DefUtils (globalInUse) where
 
 import Foreword
 
 import Data.Set qualified as Set
 import Optics (anyOf, folded, to, (%))
-import Primer.Core.Meta (GVarName)
-import Primer.Core.Utils (freeGlobalVars)
-import Primer.Def (Def (..), _DefAST, _astDefExpr)
+import Meta (GVarName)
+import CoreUtils (freeGlobalVars)
+import Def (Def (..), _DefAST, _astDefExpr)
 
 globalInUse :: Foldable f => GVarName -> f Def -> Bool
 globalInUse v =

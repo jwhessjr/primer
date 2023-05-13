@@ -1,6 +1,6 @@
 -- | These functions allow you to create Core expressions easily, without having
 -- to worry about generating unique IDs.
-module Primer.Core.DSL (
+module DSL (
   emptyHole,
   ann,
   branch,
@@ -16,8 +16,8 @@ module Primer.Core.DSL (
 
 import Foreword
 
-import Control.Monad.Fresh (MonadFresh, fresh)
-import Primer.Core (
+import Fresh (MonadFresh, fresh)
+import Core (
   Bind' (..),
   CaseBranch,
   CaseBranch' (..),

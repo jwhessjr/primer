@@ -1,4 +1,4 @@
-module Primer.Core.Meta (
+module Meta (
   HasID (..),
   getID,
   HasMetadata (_metadata),
@@ -35,7 +35,7 @@ import Optics (
   set,
   view,
  )
-import Primer.Name (Name)
+import Name (Name)
 
 -- | An identifier for an expression. Every node of the AST has an ID.
 --
@@ -115,7 +115,7 @@ instance HasID ID where
 instance HasID (Meta a) where
   _id = position @1
 
--- This instance is used in 'Primer.Zipper', but it would be an orphan if we defined it there.
+-- This instance is used in 'Zipper', but it would be an orphan if we defined it there.
 instance HasID a => HasID (Zipper a a) where
   _id = lens getter setter
     where

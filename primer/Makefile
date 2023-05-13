@@ -18,7 +18,7 @@ test:
 serialization-outputs:
 	cabal run primer-test -- -p Serialization.encode --accept
 available-action-outputs:
-	cabal run primer-test -- -p Action.Available --accept
+	cabal run primer-test -- -p Available --accept
 
 docs:
 	cabal haddock

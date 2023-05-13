@@ -9,13 +9,13 @@ import Hedgehog
 import Hedgehog.Gen qualified as Gen
 import Hedgehog.Range qualified as Range
 import Optics (toListOf)
-import Primer.Action (
+import Action (
   ActionError (NameCapture),
   toProgActionInput,
   toProgActionNoInput,
  )
-import Primer.Action.Available qualified as Available
-import Primer.App (
+import Available qualified as Available
+import App (
   App,
   EditAppM,
   Editable (..),
@@ -28,30 +28,30 @@ import Primer.App (
   progModules,
   runEditAppM, handleMutationRequest, MutationRequest (Undo), Log (..), tcWholeProgWithImports, mkApp,
  )
-import Primer.Core (
+import Core (
   GVarName,
   ID,
   qualifyName, ModuleName (..),
  )
-import Primer.Core.Utils (
+import CoreUtils (
   exprIDs,
   typeIDs,
  )
-import Primer.Def (
+import Def (
   ASTDef (..),
   Def (DefAST),
   defAST,
  )
-import Primer.Module (
+import Module (
   Module (..),
  )
-import Primer.Name (Name (unName), unsafeMkName, NameCounter)
-import Primer.Typecheck (
+import Name (Name (unName), unsafeMkName, NameCounter)
+import Typecheck (
   SmartHoles (..), TypeError, Cxt, buildTypingContextFromModules',
  )
-import Primer.TypeDef (ASTTypeDef(..), TypeDef (..))
-import Control.Monad.Fresh (fresh, MonadFresh)
-import Primer.Core.DSL
+import TypeDef (ASTTypeDef(..), TypeDef (..))
+import Fresh (fresh, MonadFresh)
+import DSL
 import Hedgehog.Internal.Runner (checkReport)
 import Hedgehog.Internal.Property (Property(propertyConfig, propertyTest), Skip(SkipToShrink), TestCount, ShrinkPath, forAllT)
 import qualified Hedgehog.Internal.Seed as Seed
@@ -59,7 +59,7 @@ import Hedgehog.Internal.Report (reportStatus, Report (reportSeed, reportTests),
 import Numeric.Natural (Natural)
 import qualified Data.Map.Strict as M
 import Data.List.Extra (enumerate)
-import Primer.Test.TestM (TestM, isolateTestM, evalTestM)
+import TestM (TestM, isolateTestM, evalTestM)
 import Control.Monad.Reader (mapReaderT)
 import Control.Monad.Morph (hoist)
 

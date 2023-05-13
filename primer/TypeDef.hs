@@ -1,4 +1,4 @@
-module Primer.TypeDef (
+module TypeDef (
   TypeDef (..),
   TypeDefMap,
   typeDefKind,
@@ -9,10 +9,10 @@ module Primer.TypeDef (
 import Foreword
 
 import Data.Data (Data)
-import Primer.Core.Meta (
+import Meta (
   TyConName,
  )
-import Primer.Core.Type (
+import Type (
   Kind (KType),
  )
 

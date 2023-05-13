@@ -1,14 +1,14 @@
 -- This module defines the core AST and some functions for operating on it.
 
-module Primer.Core (
+module Core (
   Expr,
   Expr' (..),
   Bind,
   Bind' (..),
   CaseBranch,
   CaseBranch' (..),
-  module Primer.Core.Meta,
-  module Primer.Core.Type,
+  module Meta,
+  module Type,
   TypeCache (..),
   TypeCacheBoth (..),
   ExprMeta,
@@ -34,7 +34,7 @@ import Optics (
   atraversalVL,
   (%),
  )
-import Primer.Core.Meta (
+import Meta (
   GVarName,
   GlobalName (GlobalName, baseName, qualifiedModule),
   GlobalNameKind (..),
@@ -55,7 +55,7 @@ import Primer.Core.Meta (
   qualifyName,
   _type,
  )
-import Primer.Core.Type (
+import Type (
   Kind (..),
   Type,
   Type' (..),

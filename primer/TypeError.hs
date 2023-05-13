@@ -1,12 +1,12 @@
-module Primer.Typecheck.TypeError (TypeError (..)) where
+module TypeError (TypeError (..)) where
 
 import Foreword
 
-import Primer.Core (Expr)
-import Primer.Core.Meta (TmVarRef, TyConName, ValConName)
-import Primer.Core.Type (Type')
-import Primer.Name (Name)
-import Primer.Typecheck.KindError (KindError)
+import Core (Expr)
+import Meta (TmVarRef, TyConName, ValConName)
+import Type (Type')
+import Name (Name)
+import KindError (KindError)
 
 data TypeError
   = InternalError Text

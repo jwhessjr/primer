@@ -3,7 +3,7 @@
 
 -- | This module contains the zipper types @ExprZ@ and @TypeZ@, and functions for
 --  operating on them.
-module Primer.Zipper (
+module Zipper (
   ExprZ,
   TypeZip,
   TypeZ,
@@ -77,7 +77,7 @@ import Optics (
  )
 import Optics.Lens (Lens', equality', lens)
 import Optics.Traversal (traverseOf)
-import Primer.Core (
+import Core (
   Bind,
   Bind' (..),
   CaseBranch',

@@ -1,7 +1,7 @@
 -- This module defines the high level application functions.
 
-module Primer.App (
-  module Primer.Action.Available,
+module App (
+  module Available,
   Log (..),
   App,
   mkApp,
@@ -30,8 +30,8 @@ module Primer.App (
 
 import Foreword hiding (mod)
 
-import Control.Monad.Fresh (MonadFresh (..))
-import Control.Monad.NestedError (MonadNestedError)
+import Fresh (MonadFresh (..))
+import NestedError (MonadNestedError)
 import Data.Data (Data)
 import Data.Foldable (foldMap')
 import Data.Generics.Uniplate.Zipper (
@@ -55,20 +55,20 @@ import Optics (
   _Left,
   _Right, Getter, to,
  )
-import Primer.Action (
+import Action (
   Action,
   ActionError (..),
   ProgAction (..),
   applyActionsToBody,
   applyActionsToTypeSig,
  )
-import Primer.Action.ProgError (ProgError (..))
-import Primer.Action.Available (
+import ProgError (ProgError (..))
+import Available (
   Editable (..),
   Level (..),
   NodeType (..),
  )
-import Primer.Core (
+import Core (
   Expr' (EmptyHole),
   ExprMeta,
   GVarName,
@@ -84,9 +84,9 @@ import Primer.Core (
   _exprMetaLens,
   _typeMetaLens,
  )
-import Primer.Core.Transform (renameVar)
-import Primer.Core.Utils (regenerateExprIDs, regenerateTypeIDs)
-import Primer.Def (
+import Transform (renameVar)
+import CoreUtils (regenerateExprIDs, regenerateTypeIDs)
+import Def (
   ASTDef (..),
   _astDefExpr,
   Def (..),
@@ -94,8 +94,8 @@ import Primer.Def (
   DefMap,
   defAST,
  )
-import Primer.Def.Utils (globalInUse)
-import Primer.Module (
+import DefUtils (globalInUse)
+import Module (
   Module (moduleDefs, moduleName),
   _moduleDefs,
   deleteDef,
@@ -103,15 +103,15 @@ import Primer.Module (
   moduleDefsQualified,
   qualifyDefName,
  )
-import Primer.Name (Name, NameCounter, unsafeMkName)
-import Primer.Typecheck (
+import Name (Name, NameCounter, unsafeMkName)
+import Typecheck (
   CheckEverythingRequest (CheckEverything, toCheck, trusted),
   Cxt,
   SmartHoles,
   TypeError,
   checkEverything,
  )
-import Primer.Zipper (
+import Zipper (
   ExprZ,
   Loc' (InBind, InExpr, InType),
   TypeZ,

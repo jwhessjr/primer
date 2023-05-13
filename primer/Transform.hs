@@ -1,4 +1,4 @@
-module Primer.Core.Transform (
+module Transform (
   renameVar,
 ) where
 
@@ -7,7 +7,7 @@ import Foreword
 import Data.Data (Data)
 import Data.Generics.Uniplate.Data (descendM)
 import Optics (Field2 (_2), getting, noneOf, to, (%))
-import Primer.Core (
+import Core (
   CaseBranch' (..),
   Expr' (..),
   LocalName (unLocalName),
@@ -15,7 +15,7 @@ import Primer.Core (
   bindName,
   typesInExpr,
  )
-import Primer.Core.Utils (_freeVars, _freeVarsTy)
+import CoreUtils (_freeVars, _freeVarsTy)
 
 -- AST transformations.
 -- This module contains global transformations on expressions and types, in

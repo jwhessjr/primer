@@ -1,4 +1,4 @@
-module Control.Monad.Fresh (MonadFresh (..)) where
+module Fresh (MonadFresh (..)) where
 
 import Foreword
 

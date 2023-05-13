@@ -1,8 +1,8 @@
-module Primer.Action.Movement (Movement (..)) where
+module Movement (Movement (..)) where
 
 import Foreword
 
-import Primer.Core.Meta (ValConName)
+import Meta (ValConName)
 
 -- | Core movements
 data Movement = Child1 | Child2 | Parent | Branch ValConName

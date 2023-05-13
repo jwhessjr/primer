@@ -1,4 +1,4 @@
-module Primer.Action.ProgAction (ProgAction (..)) where
+module ProgAction (ProgAction (..)) where
 
 -- We split this module to increase parallelism in our build.
 -- This module does not depend on much, but takes a long time
@@ -10,8 +10,8 @@ module Primer.Action.ProgAction (ProgAction (..)) where
 
 import Foreword
 
-import Primer.Action.Actions (Action)
-import Primer.Core.Meta (GVarName, ID)
+import Actions (Action)
+import Meta (GVarName, ID)
 
 -- | High level actions
 -- These actions move around the whole program or modify definitions

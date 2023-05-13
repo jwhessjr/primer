@@ -1,4 +1,4 @@
-module Primer.Name (
+module Name (
   Name (),
   NameCounter,
   freshName,
@@ -8,7 +8,7 @@ module Primer.Name (
 
 import Foreword
 
-import Control.Monad.Fresh (MonadFresh, fresh)
+import Fresh (MonadFresh, fresh)
 import Data.Char qualified as C
 import Data.Data (Data)
 import Data.Set qualified as S

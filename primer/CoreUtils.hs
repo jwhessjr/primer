@@ -1,4 +1,4 @@
-module Primer.Core.Utils (
+module CoreUtils (
   freshLocalName',
   exprIDs,
   typeIDs,
@@ -16,7 +16,7 @@ module Primer.Core.Utils (
 
 import Foreword
 
-import Control.Monad.Fresh (MonadFresh, fresh)
+import Fresh (MonadFresh, fresh)
 import Data.Data (Data)
 import Data.Generics.Uniplate.Data (universe)
 import Data.Set qualified as S
@@ -33,7 +33,7 @@ import Optics (
   traverseOf,
   (%),
  )
-import Primer.Core (
+import Core (
   CaseBranch' (..),
   Expr' (..),
   GVarName,
@@ -48,7 +48,7 @@ import Primer.Core (
   _exprTypeMeta,
   _typeMeta,
  )
-import Primer.Name (Name, NameCounter, freshName)
+import Name (Name, NameCounter, freshName)
 
 -- | Helper, wrapping 'freshName'
 freshLocalName' :: MonadFresh NameCounter m => S.Set Name -> m (LocalName k)

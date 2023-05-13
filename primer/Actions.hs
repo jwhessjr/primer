@@ -1,4 +1,4 @@
-module Primer.Action.Actions (
+module Actions (
   Action (..),
   Movement (..),
   QualifiedText,
@@ -6,8 +6,8 @@ module Primer.Action.Actions (
 
 import Foreword
 
-import Primer.Action.Movement (Movement (..))
-import Primer.Core.Meta (ID)
+import Movement (Movement (..))
+import Meta (ID)
 
 -- We split this module to increase parallelism in our build.
 -- This module does not depend on much, but takes a long time

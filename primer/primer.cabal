@@ -12,35 +12,35 @@ category:      Editor
 
 executable primer-test
   main-is:            Main.hs
-  hs-source-dirs:     src
+  hs-source-dirs:     .
   other-modules:
-    Control.Monad.Fresh
+    Fresh
     Foreword
-    Primer.Action
-    Primer.Action.Available
-    Primer.App
-    Primer.Core
-    Primer.Core.DSL
-    Primer.Core.Transform
-    Primer.Core.Utils
-    Primer.Def
-    Primer.Def.Utils
-    Primer.Module
-    Primer.Name
-    Primer.Typecheck
-    Primer.TypeDef
-    Primer.Zipper
-    Control.Monad.NestedError
-    Primer.Action.Actions
-    Primer.Action.Errors
-    Primer.Action.Movement
-    Primer.Action.ProgAction
-    Primer.Action.ProgError
-    Primer.Core.Meta
-    Primer.Core.Type
-    Primer.Typecheck.KindError
-    Primer.Typecheck.TypeError
-    Primer.Test.TestM
+    Action
+    Available
+    App
+    Core
+    DSL
+    Transform
+    CoreUtils
+    Def
+    DefUtils
+    Module
+    Name
+    Typecheck
+    TypeDef
+    Zipper
+    NestedError
+    Actions
+    Errors
+    Movement
+    ProgAction
+    ProgError
+    Meta
+    Type
+    KindError
+    TypeError
+    TestM
 
   default-language:   GHC2021
   default-extensions:

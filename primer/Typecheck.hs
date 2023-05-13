@@ -5,7 +5,7 @@
 -- types rather than just numbers.
 -- In future we will want to extend it to support more features such as
 -- polymorphism.
-module Primer.Typecheck (
+module Typecheck (
   Type,
   Expr,
   ExprT,
@@ -44,8 +44,8 @@ module Primer.Typecheck (
 import Foreword
 
 import Control.Arrow ((&&&))
-import Control.Monad.Fresh (MonadFresh (..))
-import Control.Monad.NestedError (MonadNestedError (..), modifyError')
+import Fresh (MonadFresh (..))
+import NestedError (MonadNestedError (..), modifyError')
 import Data.Functor.Compose (Compose (Compose, getCompose))
 import Data.Foldable (foldMap')
 import Data.Map qualified as M
@@ -73,7 +73,7 @@ import Optics (
   (%),
  )
 import Optics.Traversal (traversed)
-import Primer.Core (
+import Core (
   Bind' (..),
   CaseBranch' (..),
   Expr,
@@ -100,15 +100,15 @@ import Primer.Core (
   _exprTypeMeta,
   _typeMeta,
  )
-import Primer.Core.DSL (S, branch, create', emptyHole, meta, meta')
-import Primer.Core.Meta (TyConName, _type)
-import Primer.Core.Utils (
+import DSL (S, branch, create', emptyHole, meta, meta')
+import Meta (TyConName, _type)
+import CoreUtils (
   alphaEqTy,
   forgetTypeMetadata,
   freshLocalName',
   noHoles,
  )
-import Primer.Def (
+import Def (
   ASTDef (..),
   _astDefType,
   Def (..),
@@ -116,7 +116,7 @@ import Primer.Def (
   DefMap,
   defType,
  )
-import Primer.Module (
+import Module (
   Module (
     moduleName
   ),
@@ -124,15 +124,15 @@ import Primer.Module (
   moduleDefsQualified,
   moduleTypesQualified,
  )
-import Primer.Name (Name, NameCounter)
-import Primer.TypeDef (
+import Name (Name, NameCounter)
+import TypeDef (
   ASTTypeDef,
   TypeDef (TypeDefAST),
   TypeDefMap,
   typeDefKind
  )
-import Primer.Typecheck.TypeError (TypeError (..))
-import Primer.Typecheck.KindError (
+import TypeError (TypeError (..))
+import KindError (
   KindError (
     InconsistentKinds,
     KindDoesNotMatchArrow,

@@ -1,4 +1,4 @@
-module Primer.Core.Type (
+module Type (
   Type,
   Type' (..),
   Kind (..),
@@ -16,7 +16,7 @@ import Optics (
   Traversal,
   (%),
  )
-import Primer.Core.Meta (
+import Meta (
   HasID (..),
   HasMetadata (_metadata),
   Meta,

@@ -1,4 +1,4 @@
-module Primer.Action (
+module Action (
   Action (..),
   ActionError (..),
   Movement (..),
@@ -12,14 +12,14 @@ module Primer.Action (
 
 import Foreword hiding (mod)
 
-import Control.Monad.Fresh (MonadFresh)
+import Fresh (MonadFresh)
 import Data.List (findIndex)
-import Primer.Action.Actions (Action (..), Movement (..))
-import Primer.Action.Available qualified as Available
-import Primer.Action.Available (NodeType (..))
-import Primer.Action.Errors (ActionError (..))
-import Primer.Action.ProgAction (ProgAction (..))
-import Primer.Core (
+import Actions (Action (..), Movement (..))
+import Available qualified as Available
+import Available (NodeType (..))
+import Errors (ActionError (..))
+import ProgAction (ProgAction (..))
+import Core (
   Expr,
   Expr' (..),
   GVarName,
@@ -28,21 +28,21 @@ import Primer.Core (
   Type,
   getID,
  )
-import Primer.Core qualified as C
-import Primer.Core.DSL (
+import Core qualified as C
+import DSL (
   ann,
   emptyHole,
   tEmptyHole,
   tfun,
  )
-import Primer.Core.Utils (forgetTypeMetadata)
-import Primer.Def (
+import CoreUtils (forgetTypeMetadata)
+import Def (
   ASTDef (..),
   Def (..),
  )
-import Primer.Module (Module, insertDef)
-import Primer.Name (Name, NameCounter)
-import Primer.Typecheck (
+import Module (Module, insertDef)
+import Name (Name, NameCounter)
+import Typecheck (
   CheckEverythingRequest (CheckEverything, toCheck, trusted),
   SmartHoles,
   buildTypingContextFromModules,
@@ -51,8 +51,8 @@ import Primer.Typecheck (
   exprTtoExpr,
   synth,
  )
-import Primer.Typecheck qualified as TC
-import Primer.Zipper (
+import Typecheck qualified as TC
+import Zipper (
   BindLoc' (..),
   ExprZ,
   IsZipper,

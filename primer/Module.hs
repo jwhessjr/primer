@@ -1,4 +1,4 @@
-module Primer.Module (
+module Module (
   Module (..),
   _moduleDefs,
   qualifyTyConName,
@@ -13,7 +13,7 @@ import Foreword
 
 import Data.Data (Data)
 import Data.Map (delete, insert, mapKeys, member)
-import Primer.Core (
+import Core (
   GVarName,
   GlobalName (baseName),
   ModuleName,
@@ -21,12 +21,12 @@ import Primer.Core (
   TypeMeta,
   qualifyName,
  )
-import Primer.Def (
+import Def (
   Def (..),
   DefMap,
  )
-import Primer.Name (Name)
-import Primer.TypeDef (TypeDef (..), TypeDefMap, forgetTypeDefMetadata)
+import Name (Name)
+import TypeDef (TypeDef (..), TypeDefMap, forgetTypeDefMetadata)
 import Optics (Lens', lens)
 
 data Module = Module

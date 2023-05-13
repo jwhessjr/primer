@@ -1,4 +1,4 @@
-module Primer.Action.Errors (ActionError (..)) where
+module Errors (ActionError (..)) where
 
 -- We split this module to increase parallelism in our build.
 -- This module does not depend on much, but takes a long time
@@ -9,10 +9,10 @@ module Primer.Action.Errors (ActionError (..)) where
 
 import Foreword
 
-import Primer.Action.Actions (Action)
-import Primer.Action.Movement (Movement)
-import Primer.Core (ID)
-import Primer.Typecheck.TypeError (TypeError)
+import Actions (Action)
+import Movement (Movement)
+import Core (ID)
+import TypeError (TypeError)
 
 -- | Errors that may arise when applying an action
 -- TODO: convert all CustomFailures to individual constructors
