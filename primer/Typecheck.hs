@@ -49,7 +49,7 @@ import CoreUtils (
   forgetTypeMetadata,
   noHoles,
  )
-import DSL (S, create', meta')
+import DSL (S, create', meta)
 import Data.Foldable (foldMap')
 import Data.Map.Strict qualified as Map
 import Def (
@@ -138,28 +138,23 @@ type KindM e m =
 type TypeT = Type' TypeMeta
 
 -- Synthesise a kind for the given type
-synthKind :: KindM e m => Type' (Meta a) -> m (Kind, TypeT)
+synthKind :: KindM e m => Type' Meta -> m (Kind, TypeT)
 synthKind = \case
-  TEmptyHole m -> pure (KType, TEmptyHole (annotate () m))
+  TEmptyHole m -> pure (KType, TEmptyHole m)
   TCon m c -> do
     typeDef <- asks (Map.lookup c . typeDefs)
     case typeDef of
       Nothing -> throwError' $ UnknownTypeConstructor c
-      Just def -> let k = typeDefKind def in pure (k, TCon (annotate () m) c)
+      Just def -> let k = typeDefKind def in pure (k, TCon m c)
   TFun m a b -> do
     a' <- checkKind KType a
     b' <- checkKind KType b
-    pure (KType, TFun (annotate () m) a' b')
+    pure (KType, TFun m a' b')
 
-checkKind :: KindM e m => Kind -> Type' (Meta a) -> m TypeT
+checkKind :: KindM e m => Kind -> Type' Meta -> m TypeT
 checkKind _ t = do
   (_, t') <- synthKind t
   pure t'
-
--- | Extend the metadata of an 'Expr' or 'Type'
--- (usually with a 'TypeCache' or 'Kind')
-annotate :: b -> Meta a -> Meta b
-annotate t (Meta i _) = Meta i t
 
 assert :: MonadNestedError TypeError e m => Bool -> Text -> m ()
 assert b s = unless b $ throwError' (InternalError s)
@@ -348,7 +343,7 @@ check t = \case
             then pure e'
             else case sh of
               NoSmartHoles -> throwError' (InconsistentTypes t t')
-              SmartHoles -> Hole <$> meta' () <*> pure e'
+              SmartHoles -> Hole <$> meta <*> pure e'
     case (e, sh) of
       -- If the hole can be dropped leaving a type-correct term, do so
       -- We don't want the recursive call to create a fresh hole though -
@@ -409,5 +404,5 @@ exprTtoExpr = identity
 typeTtoType :: TypeT -> Type' TypeMeta
 typeTtoType = identity
 
-checkKind' :: TypeM e m => Kind -> Type' (Meta a) -> m TypeT
+checkKind' :: TypeM e m => Kind -> Type' Meta -> m TypeT
 checkKind' k t = modifyError' KindError (checkKind k t)

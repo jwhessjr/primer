@@ -30,7 +30,7 @@ type Type = Type' TypeMeta
 
 -- | Type metadata. Each type is optionally annotated with a kind.
 -- Currently we don't fill these in during typechecking.
-type TypeMeta = Meta ()
+type TypeMeta = Meta
 
 -- | NB: Be careful with equality -- it is on-the-nose, rather than up-to-alpha: see Subst:alphaEqTy
 data Type' a

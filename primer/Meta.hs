@@ -37,8 +37,8 @@ newtype ID = ID Int
   deriving stock (Eq, Data)
   deriving newtype (Show, Read, Num, Ord, Enum, Bounded)
 
-data Meta a = Meta ID a
-  deriving stock (Generic, Eq, Show, Read, Data, Functor)
+data Meta = Meta ID
+  deriving stock (Generic, Eq, Show, Read, Data)
 
 newtype ModuleName = ModuleName {unModuleName :: NonEmpty Name}
   deriving stock (Eq, Ord, Show, Read, Data, Generic)
@@ -78,7 +78,7 @@ class HasID a where
 instance HasID ID where
   _id = equality'
 
-instance HasID (Meta a) where
+instance HasID Meta where
   _id = position @1
 
 -- This instance is used in 'Zipper', but it would be an orphan if we defined it there.
