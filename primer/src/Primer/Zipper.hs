@@ -92,7 +92,7 @@ import Primer.Core (
   Bind' (..),
   CaseBranch' (CaseBranch),
   Expr,
-  Expr' (Case, LAM, Lam),
+  Expr' (Case, Lam),
   ExprMeta,
   HasID (..),
   ID,
@@ -363,7 +363,6 @@ letBindingName = \case
 getBoundHere' :: (Eq a, Eq b) => Expr' a b -> Maybe (Expr' a b) -> [Either Name (LetBinding' a b)]
 getBoundHere' e prev = case e of
   Lam _ v _ -> anon v
-  LAM _ tv _ -> anon tv
   Case _ _ bs ->
     let binderss = map (\(CaseBranch _ ns rhs) -> (rhs, map (unLocalName . bindName) ns)) bs
      in case prev of

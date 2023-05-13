@@ -36,11 +36,6 @@ renameVar x y expr = case expr of
     | sameVarRef v x -> whenNotFreeIn y expr
     | sameVarRef v y -> Nothing
     | otherwise -> substAllChildren
-  LAM _ v _
-    -- NB: local term and type variables are in the same namespace
-    | sameVarRef v x -> whenNotFreeIn y expr
-    | sameVarRef v y -> Nothing
-    | otherwise -> substAllChildren
   Case m scrut branches -> Case m <$> renameVar x y scrut <*> mapM renameBranch branches
     where
       renameBranch b@(CaseBranch con termargs rhs)
@@ -56,7 +51,6 @@ renameVar x y expr = case expr of
   EmptyHole{} -> substAllChildren
   Ann{} -> substAllChildren
   App{} -> substAllChildren
-  APP{} -> substAllChildren
   Con{} -> substAllChildren
   -- We assume the term is well-scoped, so do not have any references to the
   -- term vars x,y inside any type child (e.g. annotation), so no need to

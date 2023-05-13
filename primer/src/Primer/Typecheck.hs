@@ -132,7 +132,6 @@ import Primer.Module (
   moduleTypesQualified,
  )
 import Primer.Name (Name, NameCounter)
-import Primer.Subst (substTy)
 import Primer.TypeDef (
   TypeDefMap,
   ValCon (valConArgs, valConName),
@@ -431,19 +430,6 @@ synth = \case
           SmartHoles -> do
             e1Wrap <- Hole <$> meta <*> pure e1
             synth $ App i e1Wrap e2
-  APP i e t -> do
-    (et, e') <- synth e
-    matchForallType et >>= \case
-      Just (v, vk, b) -> do
-        t' <- checkKind' vk t
-        bSub <- substTy v (forgetTypeMetadata t') b
-        pure (bSub, APP (annotate (TCSynthed bSub) i) e' t')
-      Nothing ->
-        asks smartHoles >>= \case
-          NoSmartHoles -> throwError' $ TypeDoesNotMatchForall et
-          SmartHoles -> do
-            eWrap <- Hole <$> meta <*> pure e
-            synth $ APP i eWrap t
   Ann i e t -> do
     -- Check that the type is well-formed by synthesising its kind
     t' <- checkKind' KType t
@@ -505,20 +491,6 @@ check t = \case
             -- explicitly here
             (_, lam') <- synth lam
             Hole <$> meta' (TCEmb TCBoth{tcChkedAt = t, tcSynthed = TEmptyHole ()}) <*> pure lam'
-  lAM@(LAM i n e) -> do
-    matchForallType t >>= \case
-      Just (m, k, b) -> do
-        b' <- substTy m (TVar () n) b
-        e' <- local (extendLocalCxtTy (n, k)) $ check b' e
-        pure $ LAM (annotate (TCChkedAt t) i) n e'
-      Nothing ->
-        asks smartHoles >>= \case
-          NoSmartHoles -> throwError' $ TypeDoesNotMatchForall t
-          SmartHoles -> do
-            -- 'synth' will take care of adding an annotation - no need to do it
-            -- explicitly here
-            (_, lAM') <- synth lAM
-            Hole <$> meta' (TCEmb TCBoth{tcChkedAt = t, tcSynthed = TEmptyHole ()}) <*> pure lAM'
   Case i e brs -> do
     (eT, e') <- synth e
     let caseMeta = annotate (TCChkedAt t) i
@@ -658,7 +630,6 @@ matchForallType :: MonadFresh NameCounter m => Type -> m (Maybe (TyVarName, Kind
 -- These names will never enter the program, so we don't need to avoid shadowing
 matchForallType (TEmptyHole _) = (\n -> Just (n, KHole, TEmptyHole ())) <$> freshLocalName mempty
 matchForallType (THole _ _) = (\n -> Just (n, KHole, TEmptyHole ())) <$> freshLocalName mempty
-matchForallType (TForall _ a k t) = pure $ Just (a, k, t)
 matchForallType _ = pure Nothing
 
 -- | Two types are consistent if they are equal (up to IDs and alpha) when we
@@ -681,10 +652,6 @@ consistentTypes x y = uncurry eqType $ holepunch x y
       let (hs, hs') = holepunch s s'
           (ht, ht') = holepunch t t'
        in (TApp () hs ht, TApp () hs' ht')
-    holepunch (TForall _ n k s) (TForall _ m l t) =
-      let (hs, ht) = holepunch s t
-       in -- Perhaps we need to compare the kinds up to holes also?
-          (TForall () n k hs, TForall () m l ht)
     holepunch s t = (s, t)
 
 -- | Compare two types for alpha equality, ignoring their IDs

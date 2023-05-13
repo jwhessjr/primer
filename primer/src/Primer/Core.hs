@@ -113,10 +113,8 @@ data Expr' a b
   | EmptyHole a
   | Ann a (Expr' a b) (Type' b)
   | App a (Expr' a b) (Expr' a b)
-  | APP a (Expr' a b) (Type' b)
   | Con a ValConName -- See Note [Synthesisable constructors]
   | Lam a LVarName (Expr' a b)
-  | LAM a TyVarName (Expr' a b)
   | Var a TmVarRef
   | Case a (Expr' a b) [CaseBranch' a b] -- See Note [Case]
   deriving stock (Eq, Show, Read, Data, Generic)
@@ -252,7 +250,6 @@ _bindMeta = position @1
 typesInExpr :: AffineTraversal' (Expr' a b) (Type' b)
 typesInExpr = atraversalVL $ \point f -> \case
   Ann m e ty -> Ann m e <$> f ty
-  APP m e ty -> APP m e <$> f ty
   e -> point e
 
 instance HasID a => HasID (Expr' a b) where

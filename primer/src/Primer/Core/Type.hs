@@ -43,7 +43,6 @@ data Type' a
   | TFun a (Type' a) (Type' a)
   | TVar a TyVarName
   | TApp a (Type' a) (Type' a)
-  | TForall a TyVarName Kind (Type' a)
   deriving stock (Eq, Show, Read, Data, Generic)
 
 -- | A traversal over the metadata of a type
