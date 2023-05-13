@@ -41,26 +41,6 @@ renameVar x y expr = case expr of
     | sameVarRef v x -> whenNotFreeIn y expr
     | sameVarRef v y -> Nothing
     | otherwise -> substAllChildren
-  Let m v e1 e2
-    -- the binding only scopes over e2
-    | sameVarRef v x -> Let m v <$> renameVar x y e1 <*> whenNotFreeIn y e2
-    | sameVarRef v y -> Nothing
-    | otherwise -> substAllChildren
-  LetType _ v _ _
-    -- the binding only scopes over _e, but due to assuming well-scoped-ness,
-    -- we don't need to rename inside ty. However, we need to check y is
-    -- not free in both the type and term, as type and term variables live
-    -- in the same namespace, so can capture each other.
-    | sameVarRef v x -> whenNotFreeIn y expr
-    | sameVarRef v y -> Nothing
-    | otherwise -> substAllChildren
-  Letrec _ v _ _ _
-    -- the binding scopes over both expressions, and we need not rename inside types
-    -- however, we need to check y is not free in the type (since type and term
-    -- variables live in the same namespace).
-    | sameVarRef v x -> whenNotFreeIn y expr
-    | sameVarRef v y -> Nothing
-    | otherwise -> substAllChildren
   Case m scrut branches -> Case m <$> renameVar x y scrut <*> mapM renameBranch branches
     where
       renameBranch b@(CaseBranch con termargs rhs)

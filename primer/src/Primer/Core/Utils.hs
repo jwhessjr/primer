@@ -100,12 +100,6 @@ _freeTmVars = traversalVL $ go mempty
         , not $ S.member n bound ->
             curry f m n
         | otherwise -> pure t
-      Let m v e b -> Let m v <$> go bound f e <*> go (S.insert v bound) f b
-      Letrec m v e t b -> Letrec m v <$> go (S.insert v bound) f e <*> pure t <*> go (S.insert v bound) f b
-      LetType m tv ty e ->
-        -- A well scoped term will not refer to tv as a term
-        -- variable, so we do not need to add it to the bound set
-        LetType m tv ty <$> go bound f e
       Case m e bs -> Case m <$> go bound f e <*> traverse freeVarsBr bs
       where
         freeVarsBr (CaseBranch c binds e) = CaseBranch c binds <$> go (S.union bound $ S.fromList $ map bindName binds) f e
@@ -127,15 +121,6 @@ _freeTyVars = traversalVL $ go mempty
         Lam m v <$> go bound f e
       LAM m tv e -> LAM m tv <$> go (S.insert tv bound) f e
       t@Var{} -> pure t -- These are always term variables, so not a target
-      Let m v e b ->
-        -- A well scoped term will not refer to v as a type
-        -- variable, so we do not need to add it to the bound set
-        Let m v <$> go bound f e <*> go bound f b
-      Letrec m v e ty b ->
-        -- A well scoped term will not refer to v as a type
-        -- variable, so we do not need to add it to the bound set
-        Letrec m v <$> go bound f e <*> traverseFreeVarsTy bound f ty <*> go bound f b
-      LetType m v ty e -> LetType m v <$> traverseFreeVarsTy bound f ty <*> go (S.insert v bound) f e
       Case m e bs -> Case m <$> go bound f e <*> traverse freeVarsBr bs
       where
         freeVarsBr (CaseBranch c binds e) = CaseBranch c binds <$> go bound f e -- case branches only bind term variables

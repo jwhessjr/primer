@@ -479,22 +479,6 @@ synth = \case
   Hole i e -> do
     (_, e') <- synth e
     pure $ annSynth1 (TEmptyHole ()) i Hole e'
-  Let i x a b -> do
-    -- Synthesise a type for the bound expression
-    (aT, a') <- synth a
-    -- Extend the context with the binding, and synthesise the body
-    (bT, b') <- local (extendLocalCxt (x, aT)) $ synth b
-    pure $ annSynth3 bT i Let x a' b'
-  Letrec i x a tA b -> do
-    -- Check that tA is well-formed
-    tA' <- checkKind' KType tA
-    let t = forgetTypeMetadata tA'
-        ctx' = extendLocalCxt (x, t)
-    -- Check the bound expression against its annotation
-    a' <- local ctx' $ check t a
-    -- Extend the context with the binding, and synthesise the body
-    (bT, b') <- local ctx' $ synth b
-    pure $ annSynth4 bT i Letrec x a' tA' b'
   e ->
     asks smartHoles >>= \case
       NoSmartHoles -> throwError' $ CannotSynthesiseType e
@@ -509,8 +493,6 @@ synth = \case
     annSynth0 t i x = (t, x $ annotate (TCSynthed t) i)
     annSynth1 t i c = annSynth0 t i . flip c
     annSynth2 t i c = annSynth1 t i . flip c
-    annSynth3 t i c = annSynth2 t i . flip c
-    annSynth4 t i c = annSynth3 t i . flip c
 
 -- | Similar to synth, but for checking rather than synthesis.
 check :: TypeM e m => Type -> Expr -> m ExprT
@@ -542,24 +524,6 @@ check t = \case
             -- explicitly here
             (_, lAM') <- synth lAM
             Hole <$> meta' (TCEmb TCBoth{tcChkedAt = t, tcSynthed = TEmptyHole ()}) <*> pure lAM'
-  Let i x a b -> do
-    -- Synthesise a type for the bound expression
-    (aT, a') <- synth a
-    -- Extend the context with the binding, and check the body against the type
-    b' <- local (extendLocalCxt (x, aT)) $ check t b
-    -- NB here: if b were synthesisable, we bubble that information up to the
-    -- let, saying @typeOf b'@ rather than @TCChkedAt t@
-    -- TODO: why do we do this?
-    pure $ Let (annotate (typeOf b') i) x a' b'
-  Letrec i x a tA b -> do
-    -- Check that tA is well-formed
-    tA' <- checkKind' KType tA
-    let ctx' = extendLocalCxt (x, forgetTypeMetadata tA')
-    -- Check the bound expression against its annotation
-    a' <- local ctx' $ check (forgetTypeMetadata tA') a
-    -- Extend the context with the binding, and synthesise the body
-    b' <- local ctx' $ check t b
-    pure $ Letrec (annotate (TCChkedAt t) i) x a' tA' b'
   Case i e brs -> do
     (eT, e') <- synth e
     let caseMeta = annotate (TCChkedAt t) i

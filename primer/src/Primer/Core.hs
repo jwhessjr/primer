@@ -118,35 +118,6 @@ data Expr' a b
   | Lam a LVarName (Expr' a b)
   | LAM a TyVarName (Expr' a b)
   | Var a TmVarRef
-  | Let
-      a
-      LVarName
-      -- ^ bound variable
-      (Expr' a b)
-      -- ^ value the variable is bound to
-      (Expr' a b)
-      -- ^ expression the binding scopes over
-  | -- | LetType binds a type to a name in some expression.
-    -- It is currently only constructed automatically during evaluation -
-    -- the student can't directly make it.
-    LetType
-      a
-      TyVarName
-      -- ^ bound variable
-      (Type' b)
-      -- ^ value the variable is bound to
-      (Expr' a b)
-      -- ^ expression the binding scopes over
-  | Letrec
-      a
-      LVarName
-      -- ^ bound variable
-      (Expr' a b)
-      -- ^ value the variable is bound to; the variable itself is in scope, as this is a recursive let
-      (Type' b)
-      -- ^ type of the bound variable (variable is not in scope in this type)
-      (Expr' a b)
-      -- ^ body of the let; binding scopes over this
   | Case a (Expr' a b) [CaseBranch' a b] -- See Note [Case]
   deriving stock (Eq, Show, Read, Data, Generic)
 
@@ -282,8 +253,6 @@ typesInExpr :: AffineTraversal' (Expr' a b) (Type' b)
 typesInExpr = atraversalVL $ \point f -> \case
   Ann m e ty -> Ann m e <$> f ty
   APP m e ty -> APP m e <$> f ty
-  LetType m x ty e -> (\ty' -> LetType m x ty' e) <$> f ty
-  Letrec m x b ty e -> (\ty' -> Letrec m x b ty' e) <$> f ty
   e -> point e
 
 instance HasID a => HasID (Expr' a b) where
