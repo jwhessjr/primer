@@ -5,22 +5,12 @@ module App (
   App,
   mkApp,
   appProg,
-  appIdCounter,
-  appNameCounter,
   EditAppM,
-  QueryAppM,
   runEditAppM,
   Prog (..),
-  progAllModules,
   progAllDefs,
-  ProgAction (..),
   ProgError (..),
   handleEditRequest,
-  MutationRequest (..),
-  Selection (..),
-  NodeSelection (..),
-  lookupASTDef,
-  liftError,
 ) where
 
 import Foreword hiding (mod)
@@ -118,11 +108,8 @@ data Prog = Prog
 _progSelection :: Setter' Prog (Maybe Selection)
 _progSelection = sets $ \f p -> p{progSelection = f $ progSelection p}
 
-progAllModules :: Prog -> [Module]
-progAllModules p = progModules p
-
 progAllDefs :: Prog -> Map GVarName Def
-progAllDefs p = foldMap' (moduleDefsQualified) (progModules p)
+progAllDefs p = foldMap' moduleDefsQualified (progModules p)
 
 -- Note [Modules]
 -- The invariant is that the @progImports@ modules are never edited, but
@@ -142,7 +129,7 @@ data Selection = Selection
   -- ^ the ID of some ASTDef
   , selectedNode :: Maybe NodeSelection
   }
-  deriving stock (Eq, Show, Read, Data)
+  deriving stock (Eq, Show, Read)
 
 _selectedDef :: Getter Selection GVarName
 _selectedDef = to selectedDef
@@ -161,18 +148,12 @@ data NodeSelection = NodeSelection
 instance HasID NodeSelection where
   _id = lens meta $ \ns i -> ns {meta = i}
 
--- | The type of requests which can mutate the application state.
-data MutationRequest
-  = Edit [ProgAction]
-  deriving stock (Eq, Show, Read)
-
 -- * Request handlers
 
 -- This only looks in the editable modules, not in any imports
 focusNode :: MonadError ProgError m => Prog -> GVarName -> ID -> m (Either (Either ExprZ TypeZ) TypeZip)
 focusNode prog = focusNodeDefs $ foldMap' moduleDefsQualified $ progModules prog
 
--- This looks in the editable modules and also in any imports
 focusNodeImports :: MonadError ProgError m => Prog -> GVarName -> ID -> m (Either (Either ExprZ TypeZ) TypeZip)
 focusNodeImports prog = focusNodeDefs $ progAllDefs prog
 
@@ -187,9 +168,6 @@ focusNodeDefs defs defname nodeid =
             Nothing -> throwError $ ActionError (IDNotFound nodeid)
             Just x -> pure x
 
--- | Handle an edit request
---
--- Note that a successful edit resets the redo log.
 handleEditRequest :: forall m l. MonadEditApp l ProgError m => [ProgAction] -> m Prog
 handleEditRequest actions = do
   (prog, _) <- gets appProg >>= \p -> foldlM go (p, Nothing) actions
@@ -207,7 +185,7 @@ handleEditRequest actions = do
 applyProgAction :: MonadEdit m ProgError => Prog -> Maybe GVarName -> ProgAction -> m Prog
 applyProgAction prog mdefName = \case
   MoveToDef d -> do
-    m <- lookupEditableModule (qualifiedModule d) prog
+    m <- lookupModule (qualifiedModule d) prog
     case Map.lookup d $ moduleDefsQualified m of
       Nothing -> throwError $ DefNotFound d
       Just _ -> pure $ prog & _progSelection ?~ Selection d Nothing
@@ -229,7 +207,7 @@ applyProgAction prog mdefName = \case
         let m' = m{moduleDefs = Map.insert newNameBase (DefAST def) $ Map.delete defName defs}
         pure (m' : ms, Just $ Selection newName Nothing)
   BodyAction actions -> editModuleOf mdefName prog $ \m defName def -> do
-    res <- applyActionsToBody (progAllModules prog) def actions
+    res <- applyActionsToBody (progModules prog) def actions
     case res of
       Left err -> throwError $ ActionError err
       Right (def', z) -> do
@@ -268,18 +246,9 @@ applyProgAction prog mdefName = \case
     Nothing -> throwError NoDefSelected
     Just i -> copyPasteBody prog fromIds i setup
 
-lookupEditableModule :: MonadError ProgError m => ModuleName -> Prog -> m Module
-lookupEditableModule n p =
-  lookupModule' n p >>= \case
-    MLEditable m -> pure m
-
--- | Describes return type of successfully looking a module up in the program.
--- We get the module and also whether it is imported or not.
-data ModuleLookup = MLEditable Module
-
-lookupModule' :: MonadError ProgError m => ModuleName -> Prog -> m ModuleLookup
-lookupModule' n p = case find ((n ==) . moduleName) (progModules p) of
-  Just m -> pure $ MLEditable m
+lookupModule :: MonadError ProgError m => ModuleName -> Prog -> m Module
+lookupModule n p = case find ((n ==) . moduleName) (progModules p) of
+  Just m -> pure m
   Nothing -> throwError $ ModuleNotFound n
 
 editModule ::
@@ -289,7 +258,7 @@ editModule ::
   (Module -> m (Module, Maybe Selection)) ->
   m Prog
 editModule n p f = do
-  m <- lookupEditableModule n p
+  m <- lookupModule n p
   (m', s) <- f m
   pure $
     p
@@ -305,7 +274,7 @@ editModuleCross ::
   ((Module, [Module]) -> m ([Module], Maybe Selection)) ->
   m Prog
 editModuleCross n p f = do
-  m <- lookupEditableModule n p
+  m <- lookupModule n p
   let otherModules = filter ((/= n) . moduleName) (progModules p)
   (m', s) <- f (m, otherModules)
   pure $
@@ -551,7 +520,7 @@ copyPasteBody p (fromDefName, fromId) toDefName setup = do
   finalProg <- editModuleOf (Just toDefName) p $ \mod toDefBaseName oldDef -> do
     -- The Loc zipper captures all the changes, they are only reflected in the
     -- returned Def, which we thus ignore
-    doneSetup <- applyActionsToBody (progAllModules p) oldDef setup
+    doneSetup <- applyActionsToBody (progModules p) oldDef setup
     tgt <- case doneSetup of
       Left err -> throwError $ ActionError err
       Right (_, tgt) -> pure tgt
@@ -571,41 +540,6 @@ copyPasteBody p (fromDefName, fromId) toDefName setup = do
       (Left srcE, InExpr tgtE) -> do
         let scopedCopy = target srcE
         freshCopy <- regenerateExprIDs scopedCopy
-        -- TODO: need to care about types and directions here (and write tests for this caring!)
-        {-
-        - Currently, with smart holes, nothing will go too wrong (i.e. no crashes/rejections happen), but if
-        - smartholes were turned off (which currently needs changing in the source code, then things could go wrong, and the TC throws errors.
-        - The cases we need to consider are (note that the metadata gives us what type each subtree was chk/syn (could be Nothing, due to our
-        - represention, but we can consider that as a hole)
-        - NB: as we always paste into a hole, it will always synth ?, but it may also have been checked against a concrete type
-        - From    To    Want
-        - e ∈ T   ∈ ?   e       if T is ? (or maybe don't special-case this, for consistency?)
-        -               {? e ?} otherwise, to avoid "jumpy holes" (paste a 2∈Nat into '? True', would get '2 {? True ?}', but want '{? 2 ?} True', probably?
-        - T ∋ t   ∈ ?   t : ?       if T is ? (or maybe don't special-case this, for consistency?)
-        -               {? t : T ?} otherwise (avoid jumpy holes, as above)
-        - e ∈ T   R ∋   e       if this would TC (i.e. T and R are consistent)
-        -               {? e ?} otherwise
-        - T ∋ t   R ∋   t           if this would TC (i.e. if T is more specific than R, I expect)
-        -               {? t : T ?} otherwise
-        -
-        - Let's also tabulate what smartholes would give
-        -    From    To    Want                   SH gives               Example ('raise' the term in >e<)
-        -    e ∈ T   ∈ ?   e       if T is ?      e
-        -!!!               {? e ?} otherwise      e, and jumpy holes.    (? : ? -> Bool -> ?) >Succ< True
-        -    T ∋ t   ∈ ?   t : ?       if T is ?  t : ?                  ? >λx.?< ?
-        -!!!               {? t : T ?} otherwise  t : ?                  (? : (Bool -> Bool) -> ?) >λx.?< ?
-        -    e ∈ T   R ∋   e       if  would TC   e                      Bool ∋ not >not True< [using extra not so obv. syn, even if ctors are chk only]
-        -                  {? e ?} otherwise      {? e ?}                Bool ∋ >isEven< ?
-        -    T ∋ t   R ∋   t         if would TC  t                      Bool -> Bool ∋ (? : (Bool -> Bool) -> ?) >(λx.?)<
-        -!!!               {? t : T ?} otherwise  {? t : ? ?}            Bool ∋ (? : (Bool -> Bool) -> ?) >(λx.?)<
-        -
-        - We could also consider what to do with embeddings: R ∋ e ∈ T: what happens for
-        -     Bool ∋ even >(add 0 0)<   [use add so obv. syn, even if ctors are chk only]
-        - ?
-        -
-        - so with SH, we are almost doing well, except we have a case of jumpy holes, and some cases of losing type information,
-        - denoted by !!! above
-        -}
         pasted <- case target tgtE of
           EmptyHole _ -> pure $ replace freshCopy tgtE
           _ -> throwError $ CopyPasteError "copy/paste setup didn't select an empty hole"
