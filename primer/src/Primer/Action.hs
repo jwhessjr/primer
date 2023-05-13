@@ -20,10 +20,9 @@ import Control.Monad.Fresh (MonadFresh)
 import Data.Aeson (Value)
 import Data.Generics.Product (typed)
 import Data.List (findIndex)
-import Data.List.NonEmpty qualified as NE
 import Data.Map.Strict qualified as Map
 import Data.Set qualified as Set
-import Optics (set, (%), (?~), (^.), (^?), _Just)
+import Optics (set, (%), (?~))
 import Primer.Action.Actions (Action (..), Movement (..), QualifiedText)
 import Primer.Action.Available qualified as Available
 import Primer.Action.Errors (ActionError (..))
@@ -51,9 +50,6 @@ import Primer.Core (
   qualifiedModule,
   unsafeMkGlobalName,
   unsafeMkLocalName,
-  _chkedAt,
-  _exprMetaLens,
-  _type,
  )
 import Primer.Core qualified as C
 import Primer.Core.DSL (
@@ -78,7 +74,7 @@ import Primer.Core.DSL (
   tvar,
   var,
  )
-import Primer.Core.Transform (renameLocalVar, renameTyVar, renameTyVarExpr, unfoldFun)
+import Primer.Core.Transform (renameLocalVar, renameTyVar, renameTyVarExpr)
 import Primer.Core.Utils (forgetTypeMetadata, generateTypeIDs)
 import Primer.Def (
   ASTDef (..),
@@ -118,11 +114,8 @@ import Primer.Zipper (
   IsZipper,
   Loc,
   Loc' (..),
-  SomeNode (..),
   TypeZ,
   down,
-  findNodeWithParent,
-  findType,
   focus,
   focusLoc,
   focusOn,
@@ -822,65 +815,15 @@ toProgActionNoInput ::
   Available.NoInputAction ->
   Either ActionError [ProgAction]
 toProgActionNoInput defs def defName mNodeSel = \case
-  Available.MakeCase ->
-    toProgAction [ConstructCase]
-  Available.MakeApp ->
-    toProgAction [ConstructApp, Move Child2]
-  Available.MakeAPP ->
-    toProgAction [ConstructAPP, EnterType]
-  Available.MakeAnn ->
-    toProgAction [ConstructAnn]
-  Available.RemoveAnn ->
-    toProgAction [RemoveAnn]
-  Available.LetToRec ->
-    toProgAction [ConvertLetToLetrec]
   Available.Raise -> do
     id <- mid
     pure [MoveToDef defName, CopyPasteBody (defName, id) [SetCursor id, Move Parent, Delete]]
-  Available.EnterHole ->
-    toProgAction [EnterHole]
-  Available.RemoveHole ->
-    toProgAction [FinishHole]
-  Available.DeleteExpr ->
-    toProgAction [Delete]
   Available.MakeFun ->
     -- We arbitrarily choose that the "construct a function type" action places the focused expression
     -- on the domain (left) side of the arrow.
     toProgAction [ConstructArrowL, Move Child1]
-  Available.AddInput -> do
-    -- This action traverses the function type and adds a function arrow to the end of it,
-    -- resulting in a new argument type. The result type is unchanged.
-    -- The cursor location is also unchanged.
-    -- e.g. A -> B -> C ==> A -> B -> ? -> C
-    id <- mid
-    type_ <- case findType id $ astDefType def of
-      Just t -> pure t
-      Nothing -> case map fst $ findNodeWithParent id $ astDefExpr def of
-        Just (TypeNode t) -> pure t
-        Just sm -> Left $ NeedType sm
-        Nothing -> Left $ IDNotFound id
-    l <- case type_ of
-      TFun _ a b -> pure $ NE.length $ fst $ unfoldFun a b
-      t -> Left $ NeedTFun t
-    let moveToLastArg = replicate l (Move Child2)
-        moveBack = replicate l (Move Parent)
-     in toProgAction $ moveToLastArg <> [ConstructArrowR] <> moveBack
-  Available.MakeTApp ->
-    toProgAction [ConstructTApp, Move Child1]
-  Available.RaiseType -> do
-    id <- mid
-    pure [MoveToDef defName, CopyPasteSig (defName, id) [SetCursor id, Move Parent, Delete]]
   Available.DeleteType ->
     toProgAction [Delete]
-  Available.DuplicateDef ->
-    let sigID = getID $ astDefType def
-        bodyID = getID $ astDefExpr def
-        copyName = uniquifyDefName (qualifiedModule defName) (unName (baseName defName) <> "Copy") defs
-     in pure
-          [ CreateDef (qualifiedModule defName) (Just copyName)
-          , CopyPasteSig (defName, sigID) []
-          , CopyPasteBody (defName, bodyID) []
-          ]
   Available.DeleteDef ->
     pure [DeleteDef defName]
   where
@@ -897,83 +840,13 @@ toProgActionInput ::
   Available.InputAction ->
   Either ActionError [ProgAction]
 toProgActionInput def defName mNodeSel opt0 = \case
-  Available.MakeCon -> do
-    opt <- optGlobal
-    toProg [ConstructCon opt]
-  Available.MakeConSat -> do
-    ref <- offerRefined
-    opt <- optGlobal
-    toProg [if ref then ConstructRefinedCon opt else ConstructSaturatedCon opt]
-  Available.MakeVar ->
-    toProg [ConstructVar optVar]
-  Available.MakeVarSat -> do
-    ref <- offerRefined
-    toProg [if ref then InsertRefinedVar optVar else InsertSaturatedVar optVar]
-  Available.MakeLet -> do
-    opt <- optNoCxt
-    toProg [ConstructLet $ Just opt]
-  Available.MakeLetRec -> do
-    opt <- optNoCxt
-    toProg [ConstructLetrec $ Just opt]
-  Available.MakeLam -> do
-    opt <- optNoCxt
-    toProg [ConstructLam $ Just opt]
-  Available.MakeLAM -> do
-    opt <- optNoCxt
-    toProg [ConstructLAM $ Just opt]
-  Available.RenamePattern -> do
-    opt <- optNoCxt
-    toProg [RenameCaseBinding opt]
-  Available.RenameLet -> do
-    opt <- optNoCxt
-    toProg [RenameLet opt]
-  Available.RenameLam -> do
-    opt <- optNoCxt
-    toProg [RenameLam opt]
-  Available.RenameLAM -> do
-    opt <- optNoCxt
-    toProg [RenameLAM opt]
-  Available.MakeTCon -> do
-    opt <- optGlobal
-    toProg [ConstructTCon opt]
-  Available.MakeTVar -> do
-    opt <- optNoCxt
-    toProg [ConstructTVar opt]
-  Available.MakeForall -> do
-    opt <- optNoCxt
-    toProg [ConstructTForall $ Just opt, Move Child1]
-  Available.RenameForall -> do
-    opt <- optNoCxt
-    toProg [RenameForall opt]
-  Available.RenameDef -> do
+ Available.RenameDef -> do
     opt <- optNoCxt
     pure [RenameDef defName opt]
   where
-    mid = maybeToEither NoNodeSelection $ snd <$> mNodeSel
-    optVar = case opt0.context of
-      Just q -> GlobalVarRef $ unsafeMkGlobalName (q, opt0.option)
-      Nothing -> LocalVarRef $ unsafeMkLocalName opt0.option
-    -- Note that we use an option with @context = Nothing@ for inputs of
-    -- (some offered actions as well as) any @FreeInput@ (including for
-    -- insertion of a primitive integer)
     optNoCxt = case opt0.context of
       Just _ -> Left $ NeedGlobal opt0
       Nothing -> pure opt0.option
-    optGlobal = case opt0.context of
-      Nothing -> Left $ NeedLocal opt0
-      Just q -> pure (q, opt0.option)
-    toProg actions = toProg' actions defName <$> maybeToEither NoNodeSelection mNodeSel
-    offerRefined = do
-      id <- mid
-      -- If we have a useful type, offer the refine action, otherwise offer the saturate action.
-      case findNodeWithParent id $ astDefExpr def of
-        Just (ExprNode e, _) -> pure $ case e ^. _exprMetaLens ^? _type % _Just % _chkedAt of
-          Just (TEmptyHole _) -> False
-          Just (THole _ _) -> False
-          Just _ -> True
-          _ -> False
-        Just (sm, _) -> Left $ NeedType sm
-        Nothing -> Left $ IDNotFound id
 
 toProg' :: [Action] -> GVarName -> (NodeType, ID) -> [ProgAction]
 toProg' actions defName (nt, id) =
