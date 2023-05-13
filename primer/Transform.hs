@@ -26,10 +26,6 @@ import Optics (Field2 (_2), getting, noneOf, to, (%))
 -- See the tests for explanation and examples.
 renameVar :: (Data a, Data b) => TmVarRef -> TmVarRef -> Expr' a b -> Maybe (Expr' a b)
 renameVar x y expr = case expr of
-  Lam _ v _
-    | sameVarRef v x -> whenNotFreeIn y expr
-    | sameVarRef v y -> Nothing
-    | otherwise -> substAllChildren
   Case m scrut branches -> Case m <$> renameVar x y scrut <*> mapM renameBranch branches
     where
       renameBranch b@(CaseBranch con termargs rhs)
@@ -49,11 +45,6 @@ renameVar x y expr = case expr of
     substAllChildren = do
       guard $ noneOf (typesInExpr % getting _freeVarsTy % _2) (`sameVarRef` y) expr
       descendM (renameVar x y) expr
-
-whenNotFreeIn :: TmVarRef -> Expr' a b -> Maybe (Expr' a b)
-whenNotFreeIn x e = do
-  guard $ notFreeIn x e
-  pure e
 
 notFreeIn :: TmVarRef -> Expr' a b -> Bool
 notFreeIn x = noneOf (_freeVars % to (bimap snd snd)) (either (`sameVarRef` x) (`sameVarRef` x))

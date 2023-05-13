@@ -129,7 +129,6 @@ _freeTmVars = traversalVL $ go mempty
       Hole m e -> Hole m <$> go bound f e
       t@EmptyHole{} -> pure t
       Ann m e ty -> Ann m <$> go bound f e <*> pure ty
-      Lam m v e -> Lam m v <$> go (S.insert v bound) f e
       Case m e bs -> Case m <$> go bound f e <*> traverse freeVarsBr bs
       where
         freeVarsBr (CaseBranch c binds e) = CaseBranch c binds <$> go (S.union bound $ S.fromList $ map bindName binds) f e
@@ -142,10 +141,6 @@ _freeTyVars = traversalVL $ go mempty
       Hole m e -> Hole m <$> go bound f e
       t@EmptyHole{} -> pure t
       Ann m e ty -> Ann m <$> go bound f e <*> traverseFreeVarsTy bound f ty
-      Lam m v e ->
-        -- A well scoped term will not refer to v as a type
-        -- variable, so we do not need to add it to the bound set
-        Lam m v <$> go bound f e
       Case m e bs -> Case m <$> go bound f e <*> traverse freeVarsBr bs
       where
         freeVarsBr (CaseBranch c binds e) = CaseBranch c binds <$> go bound f e -- case branches only bind term variables

@@ -35,7 +35,6 @@ module Typecheck (
   getGlobalNames,
   getGlobalBaseNames,
   consistentTypes,
-  extendLocalCxt,
   extendLocalCxts,
   extendGlobalCxt,
   extendTypeDefCxt,
@@ -214,9 +213,6 @@ type ExprT = Expr' (Meta TypeCache) (Meta Kind)
 
 assert :: MonadNestedError TypeError e m => Bool -> Text -> m ()
 assert b s = unless b $ throwError' (InternalError s)
-
-extendLocalCxt :: (LVarName, Type) -> Cxt -> Cxt
-extendLocalCxt (name, ty) cxt = cxt{localCxt = Map.insert (unLocalName name) (T ty) (localCxt cxt)}
 
 extendLocalCxts :: [(LVarName, Type)] -> Cxt -> Cxt
 extendLocalCxts x cxt = cxt{localCxt = Map.fromList (bimap unLocalName T <$> x) <> localCxt cxt}
@@ -411,19 +407,6 @@ synth = \case
 -- | Similar to synth, but for checking rather than synthesis.
 check :: TypeM e m => Type -> Expr -> m ExprT
 check t = \case
-  lam@(Lam i x e) -> do
-    case matchArrowType t of
-      Just (t1, t2) -> do
-        e' <- local (extendLocalCxt (x, t1)) $ check t2 e
-        pure (Lam (annotate (TCChkedAt t) i) x e')
-      Nothing ->
-        asks smartHoles >>= \case
-          NoSmartHoles -> throwError' $ TypeDoesNotMatchArrow t
-          SmartHoles -> do
-            -- 'synth' will take care of adding an annotation - no need to do it
-            -- explicitly here
-            (_, lam') <- synth lam
-            Hole <$> meta' (TCEmb TCBoth{tcChkedAt = t, tcSynthed = TEmptyHole ()}) <*> pure lam'
   Case i e brs -> do
     (eT, e') <- synth e
     let caseMeta = annotate (TCChkedAt t) i
@@ -547,14 +530,6 @@ checkBranch t (vc, args) (CaseBranch nb patterns rhs) =
           <> show vc
           <> " but found branch on "
           <> show nb
-
--- | Checks if a type can be unified with a function (arrow) type. Returns the
--- arrowised version - i.e. if it's a hole then it returns an arrow type with
--- holes on both sides.
-matchArrowType :: Type -> Maybe (Type, Type)
-matchArrowType (TEmptyHole _) = pure (TEmptyHole (), TEmptyHole ())
-matchArrowType (TFun _ a b) = pure (a, b)
-matchArrowType _ = Nothing
 
 -- | Two types are consistent if they are equal (up to IDs and alpha) when we
 -- also count holes as being equal to anything.

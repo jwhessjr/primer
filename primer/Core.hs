@@ -111,7 +111,6 @@ data Expr' a b
   = Hole a (Expr' a b) -- See Note [Holes and bidirectionality]
   | EmptyHole a
   | Ann a (Expr' a b) (Type' b)
-  | Lam a LVarName (Expr' a b)
   | Case a (Expr' a b) [CaseBranch' a b] -- See Note [Case]
   deriving stock (Eq, Show, Read, Data, Generic)
 
