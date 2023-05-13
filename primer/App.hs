@@ -25,11 +25,8 @@ import Available (
  )
 import Core (
   GVarName,
-  GlobalName (baseName, qualifiedModule),
   HasID (_id),
   ID (..),
-  ModuleName,
-  qualifyName,
   _exprMetaLens,
   _typeMetaLens,
  )
@@ -42,11 +39,9 @@ import Def (
 import DefUtils (globalInUse)
 import Fresh (MonadFresh (..))
 import Module (
-  Module (moduleDefs, moduleName),
+  Module (moduleDefs),
   deleteDef,
   insertDef,
-  moduleDefsQualified,
-  qualifyDefName,
  )
 import Optics (
   Setter',
@@ -74,7 +69,7 @@ _progSelection :: Setter' Prog (Maybe Selection)
 _progSelection = sets $ \f p -> p{progSelection = f $ progSelection p}
 
 progAllDefs :: Prog -> Map GVarName Def
-progAllDefs = moduleDefsQualified . progModule
+progAllDefs = moduleDefs . progModule
 
 -- Note [Modules]
 -- The invariant is that the @progImports@ modules are never edited, but
@@ -126,25 +121,23 @@ handleEditRequest actions = do
 applyProgAction :: MonadEdit m ProgError => Prog -> Maybe GVarName -> ProgAction -> m Prog
 applyProgAction prog mdefName = \case
   MoveToDef d -> do
-    m <- lookupModule (qualifiedModule d) prog
-    case Map.lookup d $ moduleDefsQualified m of
+    let m = progModule prog
+    case Map.lookup d $ moduleDefs m of
       Nothing -> throwError $ DefNotFound d
       Just _ -> pure $ prog & _progSelection ?~ Selection d Nothing
-  DeleteDef d -> editModule (qualifiedModule d) prog $ \m ->
+  DeleteDef d -> editModule prog $ \m ->
     case deleteDef m d of
-      Nothing -> throwError $ DefNotFound d
-      Just mod' -> do
+      mod' -> do
         when (globalInUse d $ moduleDefs mod') $
           throwError $
             DefInUse d
         pure (mod', Nothing)
-  RenameDef d newNameBase -> editModuleOf (Just d) prog $ \m defName def -> do
+  RenameDef d newName -> editModuleOf (Just d) prog $ \m defName def -> do
     let defs = moduleDefs m
-        newName = qualifyName (moduleName m) newNameBase
-    if Map.member newNameBase defs
+    if Map.member newName defs
       then throwError $ DefAlreadyExists newName
       else do
-        let m' = m{moduleDefs = Map.insert newNameBase (DefAST def) $ Map.delete defName defs}
+        let m' = m{moduleDefs = Map.insert newName (DefAST def) $ Map.delete defName defs}
         pure (m', Just $ Selection newName Nothing)
   BodyAction actions -> editModuleOf mdefName prog $ \m defName def -> do
     res <- applyActionsToBody (progModule prog) def actions
@@ -155,7 +148,7 @@ applyProgAction prog mdefName = \case
         pure
           ( insertDef m defName (DefAST def')
           , Just $
-              Selection (qualifyDefName m defName) $
+              Selection defName $
                 Just
                   NodeSelection
                     { nodeType = BodyNode
@@ -172,7 +165,7 @@ applyProgAction prog mdefName = \case
          in pure
               ( mod'
               , Just $
-                  Selection (qualifyDefName curMod defName) $
+                  Selection defName $
                     Just
                       NodeSelection
                         { nodeType = SigNode
@@ -180,20 +173,13 @@ applyProgAction prog mdefName = \case
                         }
               )
 
-lookupModule :: MonadError ProgError m => ModuleName -> Prog -> m Module
-lookupModule n p = if n == moduleName (progModule p)
-  then pure $ progModule p
-  else throwError $ ModuleNotFound n
-
 editModule ::
   MonadError ProgError m =>
-  ModuleName ->
   Prog ->
   (Module -> m (Module, Maybe Selection)) ->
   m Prog
-editModule n p f = do
-  m <- lookupModule n p
-  (m', s) <- f m
+editModule p f = do
+  (m', s) <- f $ progModule p
   pure $
     p
       { progModule = m'
@@ -208,9 +194,9 @@ editModuleOf ::
   m Prog
 editModuleOf mdefName prog f = case mdefName of
   Nothing -> throwError NoDefSelected
-  Just defname -> editModule (qualifiedModule defname) prog $ \m ->
-    case Map.lookup (baseName defname) (moduleDefs m) of
-      Just (DefAST def) -> f m (baseName defname) def
+  Just defname -> editModule prog $ \m ->
+    case Map.lookup defname (moduleDefs m) of
+      Just (DefAST def) -> f m defname def
       _ -> throwError $ DefNotFound defname
 
 -- | A shorthand for the constraints we need when performing mutation

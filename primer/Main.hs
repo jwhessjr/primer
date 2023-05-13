@@ -24,8 +24,6 @@ import Available qualified as Available
 import Core (
   GVarName,
   ID,
-  ModuleName (..),
-  qualifyName,
  )
 import CoreUtils (
   exprIDs,
@@ -214,14 +212,12 @@ runEditAppMLogs m a' = runIdentity $ runEditAppM m a'
 
 prog :: MonadFresh ID m => m Prog
 prog = do
-  let modName = ModuleName{unModuleName = "M" :| ["0"]}
-      a = qualifyName modName "a6"
+  let a = "a6"
   e <- emptyHole `ann` tEmptyHole
   t <- tcon a
   let m =
         Module
-          { moduleName = modName
-          , moduleTypes =
+          { moduleTypes =
               Map.fromList
                 [
                   ( "a6"

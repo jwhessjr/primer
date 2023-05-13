@@ -39,7 +39,6 @@ import Core (
   Kind (..),
   Type' (..),
   TypeMeta,
-  qualifyName,
  )
 import CoreUtils (
   alphaEqTy,
@@ -66,11 +65,7 @@ import KindError (
   ),
  )
 import Module (
-  Module (
-    moduleName
-  ),
-  moduleDefsQualified,
-  moduleTypesQualified,
+  Module (moduleTypes, moduleDefs),
   _moduleDefs,
  )
 import NestedError (MonadNestedError (..), modifyError')
@@ -83,18 +78,15 @@ import Optics (
   Optic',
   WithIx,
   equality,
-  icompose,
   itoListOf,
   itraversed,
-  reindexed,
-  selfIndex,
   to,
   traverseOf,
   (%),
  )
 import TypeDef (
   TypeDefMap,
-  typeDefKind,
+  typeDefKind, forgetTypeDefMetadata,
  )
 import TypeError (TypeError (..))
 
@@ -172,8 +164,8 @@ buildTypingContext tydefs defs =
 buildTypingContextFromModules :: [Module] -> Cxt
 buildTypingContextFromModules modules =
   buildTypingContext
-    (foldMap' moduleTypesQualified modules)
-    (foldMap' moduleDefsQualified modules)
+    (foldMap' (fmap forgetTypeDefMetadata . moduleTypes) modules)
+    (foldMap' moduleDefs modules)
 
 -- | A shorthand for the constraints needed when kindchecking
 type TypeM e m =
@@ -219,7 +211,7 @@ checkEverything ::
 checkEverything CheckEverything{toCheck} =
   let cxt = buildTypingContextFromModules []
    in flip runReaderT cxt $ do
-        let newTypes = moduleTypesQualified toCheck
+        let newTypes = forgetTypeDefMetadata <$> moduleTypes toCheck
         checkTypeDefs newTypes
         local (extendTypeDefCxt newTypes) $ do
           -- Kind check and update (for smartholes) all the types.
@@ -251,11 +243,7 @@ checkEverything CheckEverything{toCheck} =
     traverseDefs :: IxTraversal' Text Module Def
     traverseDefs = traverseDefs' equality
     foldDefTypesWithName :: IxFold GVarName Module Type
-    foldDefTypesWithName =
-      icompose qualifyName $
-        traverseDefs' (reindexed moduleName selfIndex)
-          % to defType
-          % to forgetTypeMetadata
+    foldDefTypesWithName = traverseDefs % to defType % to forgetTypeMetadata
 
 {- HLINT ignore synth "Avoid lambda using `infix`" -}
 -- Note [Let expressions]

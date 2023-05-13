@@ -4,8 +4,7 @@ module Meta (
   ID (ID),
   ModuleName (ModuleName, unModuleName),
   GlobalNameKind (..),
-  GlobalName (GlobalName, qualifiedModule, baseName),
-  qualifyName,
+  GlobalName,
   TyConName,
   GVarName,
   Meta,
@@ -45,16 +44,7 @@ data GlobalNameKind
   = ATyCon
   | ADefName
 
--- | Global names are fully qualified with a module name.
--- They are tagged with what sort of name they are.
-data GlobalName (k :: GlobalNameKind) = GlobalName
-  { qualifiedModule :: ModuleName
-  , baseName :: Text
-  }
-  deriving stock (Eq, Ord, Generic, Data, Show, Read)
-
-qualifyName :: ModuleName -> Text -> GlobalName k
-qualifyName = GlobalName
+type GlobalName (k :: GlobalNameKind) = Text
 
 type TyConName = GlobalName 'ATyCon
 type GVarName = GlobalName 'ADefName

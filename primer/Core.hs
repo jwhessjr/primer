@@ -21,7 +21,7 @@ import Data.Generics.Product
 import Data.Generics.Uniplate.Data ()
 import Meta (
   GVarName,
-  GlobalName (GlobalName, baseName, qualifiedModule),
+  GlobalName,
   GlobalNameKind (..),
   HasID (..),
   ID (ID),
@@ -29,7 +29,6 @@ import Meta (
   ModuleName (ModuleName, unModuleName),
   TyConName,
   getID,
-  qualifyName,
  )
 import Optics (
   AffineTraversal',
