@@ -163,7 +163,6 @@ pickPos p = ((\(defName, def) -> (defName,) <$> pickLoc def) =<<) <$> pickDef
           , defAST d <&> \d' -> (7,) . Gen.element $ fmap (Right . (d',BodyNode,)) $ toListOf exprIDs $ astDefExpr d'
           ]
 
--- TODO: if I work in PropertyT, should I revive the labels I dropped?
 -- 'Nothing' means that a somewhat-expected problem occured:
 -- - picked a node with no actions available
 -- - picked an action with no options available
@@ -211,18 +210,8 @@ runRandomAvailableAction a = do
         (_, (Left _, _)) -> failure
         (_, (Right _, a''')) -> pure $ Just a'''
 
---runEditAppMLogs :: Monad m => EditAppM Identity ProgError a -> App -> PropertyT m (Either ProgError a, App)
---runEditAppMLogs m a' = pure $ runIdentity $ runEditAppM m a'
 runEditAppMLogs :: EditAppM Identity ProgError a -> App -> (Either ProgError a, App)
 runEditAppMLogs m a' = runIdentity $ runEditAppM m a'
-
--- helper type for tasty_undo_redo
-data Act
-  = AddTm
-  | AddTy
-  | Un
-  | Avail
-  deriving stock (Show)
 
 prog :: MonadFresh ID m => m Prog
 prog = do
@@ -252,8 +241,6 @@ tasty_undo_redo :: Property
 tasty_undo_redo = withTests 500 $
   withDiscards 2000 $
     property $ do
-      -- We only test SmartHoles mode (which is the only supported user-facing
-      -- mode - NoSmartHoles is only used for internal sanity testing etc)
       let (p',i) = create prog
       let a = mkApp i (toEnum $ fromEnum i) p'
       let n = 4
