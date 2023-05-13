@@ -16,7 +16,7 @@ module Primer.Core.DSL (
 
 import Foreword
 
-import Control.Monad.Fresh (MonadFresh)
+import Control.Monad.Fresh (MonadFresh, fresh)
 import Primer.Core (
   Bind' (..),
   CaseBranch,
@@ -24,17 +24,47 @@ import Primer.Core (
   Expr,
   Expr' (..),
   ID,
+  Meta (..),
   LVarName,
+  TyConName,
   Type,
+  Type' (..),
   TypeCache,
   ValConName,
  )
-import Primer.Core.DSL.Meta (S, create, create', meta, meta')
-import Primer.Core.DSL.Type (
-  tEmptyHole,
-  tcon,
-  tfun,
- )
+
+newtype S a = S {unS :: State ID a}
+  deriving newtype (Functor, Applicative, Monad)
+
+instance MonadFresh ID S where
+  fresh = S $ do
+    i <- get
+    put (i + 1)
+    pure i
+
+-- | Evaluate a DSL expression with a starting ID of 0, producing an
+-- @a@ and the next available fresh 'ID'.
+create :: S a -> (a, ID)
+create = flip runState 0 . unS
+
+-- | As 'create', but drop the 'ID'.
+create' :: S a -> a
+create' = fst . create
+
+meta :: MonadFresh ID m => m (Meta (Maybe a))
+meta = meta' Nothing
+
+meta' :: MonadFresh ID m => a -> m (Meta a)
+meta' a = Meta <$> fresh <*> pure a <*> pure Nothing
+
+tEmptyHole :: MonadFresh ID m => m Type
+tEmptyHole = TEmptyHole <$> meta
+
+tcon :: MonadFresh ID m => TyConName -> m Type
+tcon t = TCon <$> meta <*> pure t
+
+tfun :: MonadFresh ID m => m Type -> m Type -> m Type
+tfun a b = TFun <$> meta <*> a <*> b
 
 emptyHole :: MonadFresh ID m => m Expr
 emptyHole = EmptyHole <$> meta

@@ -36,8 +36,6 @@ executable primer-test
     Primer.Action.Movement
     Primer.Action.ProgAction
     Primer.Action.ProgError
-    Primer.Core.DSL.Meta
-    Primer.Core.DSL.Type
     Primer.Core.Fresh
     Primer.Core.Meta
     Primer.Core.Type
