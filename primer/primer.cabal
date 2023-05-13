@@ -33,11 +33,8 @@ executable primer-test
     Errors
     Movement
     ProgAction
-    ProgError
     Meta
     Type
-    KindError
-    TypeError
 
   default-language:   GHC2021
   default-extensions:

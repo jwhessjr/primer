@@ -49,7 +49,7 @@ import Optics (
   (.~),
   (?~),
  )
-import ProgError (ProgError (..))
+import Errors (ProgError (..))
 import Zipper (
   locToEither,
   target,

@@ -1,4 +1,9 @@
-module Errors (ActionError (..)) where
+module Errors (
+  KindError (..),
+  TypeError (..),
+  ActionError (..),
+  ProgError (..)
+  ) where
 
 -- We split this module to increase parallelism in our build.
 -- This module does not depend on much, but takes a long time
@@ -10,8 +15,23 @@ module Errors (ActionError (..)) where
 import Foreword
 
 import Actions (Action)
+import Core (Expr)
 import Movement (Movement)
-import TypeError (TypeError)
+import Type (Kind, Type')
+
+data KindError
+  = UnknownTypeConstructor Text
+  | InconsistentKinds Kind Kind
+  | KindDoesNotMatchArrow Kind
+  deriving stock (Eq, Show, Read)
+
+data TypeError
+  = InternalError Text
+  | CannotSynthesiseType Expr
+  | InconsistentTypes (Type' ()) (Type' ())
+  | TypeDoesNotMatchArrow (Type' ())
+  | KindError KindError
+  deriving stock (Eq, Show, Read)
 
 -- | Errors that may arise when applying an action
 -- TODO: convert all CustomFailures to individual constructors
@@ -35,3 +55,18 @@ data ActionError
   deriving stock (Eq, Show, Read, Generic)
 
 -- cannot remove generic here as is used in MonadNestedError
+
+
+data ProgError
+  = NoDefSelected
+  | DefNotFound Text
+  | DefAlreadyExists Text
+  | DefInUse Text
+  | ActionError ActionError
+  | -- | Currently copy/paste is only exposed in the frontend via select
+    --   channels, which should never go wrong. Consequently, this is an
+    --   "internal error" which should never happen!
+    --   If/when we expose it more broadly, we should refactor this to contain
+    --   a descriptive ADT, rather than a string.
+    CopyPasteError Text
+  deriving stock (Eq, Show, Read)

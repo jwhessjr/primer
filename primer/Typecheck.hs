@@ -54,12 +54,13 @@ import Def (
   _astDefType,
  )
 import Fresh (MonadFresh (..))
-import KindError (
+import Errors (
   KindError (
     InconsistentKinds,
     KindDoesNotMatchArrow,
     UnknownTypeConstructor
   ),
+  TypeError (..),
  )
 import Module (
   Module (moduleTypes, moduleDefs),
@@ -85,7 +86,6 @@ import TypeDef (
   TypeDefMap,
   typeDefKind, forgetTypeDefMetadata,
  )
-import TypeError (TypeError (..))
 
 type Type = Type' ()
 
