@@ -25,7 +25,6 @@ executable primer-test
     Def
     DefUtils
     Module
-    Name
     Typecheck
     TypeDef
     Zipper

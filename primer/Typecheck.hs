@@ -73,7 +73,6 @@ import Module (
   moduleTypesQualified,
   _moduleDefs,
  )
-import Name (Name)
 import NestedError (MonadNestedError (..), modifyError')
 import Optics (
   A_Traversal,
@@ -106,7 +105,7 @@ data KindOrType = K Kind | T Type
 
 data Cxt = Cxt
   { typeDefs :: TypeDefMap
-  , localCxt :: Map Name KindOrType
+  , localCxt :: Map Text KindOrType
   -- ^ local variables. invariant: the Name comes from a @LocalName k@, and
   -- the tag @k@ should say whether the value is a kind or a type.
   -- We detect violations of this in 'lookupLocal' (thus we key this map
@@ -244,12 +243,12 @@ checkEverything CheckEverything{toCheck} =
     -- - specify an index (using selfIndex and reindexed), giving a fold
     traverseDefs' ::
       ( JoinKinds k A_Traversal l
-      , AppendIndices is (WithIx Name) js
+      , AppendIndices is (WithIx Text) js
       ) =>
       Optic' k is Module Module ->
       Optic' l js Module Def
     traverseDefs' o = o % (_moduleDefs % itraversed)
-    traverseDefs :: IxTraversal' Name Module Def
+    traverseDefs :: IxTraversal' Text Module Def
     traverseDefs = traverseDefs' equality
     foldDefTypesWithName :: IxFold GVarName Module Type
     foldDefTypesWithName =

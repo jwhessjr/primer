@@ -48,7 +48,6 @@ import Module (
   moduleDefsQualified,
   qualifyDefName,
  )
-import Name (Name, unsafeMkName)
 import Optics (
   Setter',
   lens,
@@ -139,9 +138,8 @@ applyProgAction prog mdefName = \case
           throwError $
             DefInUse d
         pure (mod', Nothing)
-  RenameDef d nameStr -> editModuleOf (Just d) prog $ \m defName def -> do
+  RenameDef d newNameBase -> editModuleOf (Just d) prog $ \m defName def -> do
     let defs = moduleDefs m
-        newNameBase = unsafeMkName nameStr
         newName = qualifyName (moduleName m) newNameBase
     if Map.member newNameBase defs
       then throwError $ DefAlreadyExists newName
@@ -206,7 +204,7 @@ editModuleOf ::
   MonadError ProgError m =>
   Maybe GVarName ->
   Prog ->
-  (Module -> Name -> ASTDef -> m (Module, Maybe Selection)) ->
+  (Module -> Text -> ASTDef -> m (Module, Maybe Selection)) ->
   m Prog
 editModuleOf mdefName prog f = case mdefName of
   Nothing -> throwError NoDefSelected

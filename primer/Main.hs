@@ -63,7 +63,6 @@ import Hedgehog.Range qualified as Range
 import Module (
   Module (..),
  )
-import Name (Name (unName), unsafeMkName)
 import Numeric.Natural (Natural)
 import Optics (toListOf)
 import TypeDef (ASTTypeDef (..), TypeDef (..))
@@ -187,7 +186,7 @@ runRandomAvailableAction a = do
               toProgActionNoInput defName loc act'
           Just <$> actionSucceeds (handleEditRequest progActs) a
         Available.Input act' -> do
-          n <- forAll $ unName <$> genName
+          n <- forAll genName
           progActs <- either (const failure) pure $ toProgActionInput defName (Available.Option n) act'
           actionSucceedsOrCapture StudentProvided (handleEditRequest progActs) a
   where
@@ -253,8 +252,8 @@ iterateNM n a f
   | n <= 0 = pure a
   | otherwise = f a >>= \fa -> iterateNM (n - 1) fa f
 
-genName :: MonadGen m => m Name
-genName = unsafeMkName <$> Gen.frequency [(9, fixed), (1, random)]
+genName :: MonadGen m => m Text
+genName = Gen.frequency [(9, fixed), (1, random)]
   where
     fixed = Gen.element ["x", "y", "z", "foo", "bar"]
     random = Gen.text (Range.linear 1 10) Gen.alpha

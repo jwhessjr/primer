@@ -16,7 +16,6 @@ import Foreword
 import Data.Data (Data)
 import Data.Generics.Uniplate.Data ()
 import Data.Generics.Uniplate.Zipper (Zipper, hole, replaceHole)
-import Name (Name)
 import Optics (
   Lens',
   equality',
@@ -38,7 +37,7 @@ newtype ID = ID Int
 
 type Meta = ID
 
-newtype ModuleName = ModuleName {unModuleName :: NonEmpty Name}
+newtype ModuleName = ModuleName {unModuleName :: NonEmpty Text}
   deriving stock (Eq, Ord, Show, Read, Data, Generic)
 
 -- | Tags for 'GlobalName'
@@ -50,11 +49,11 @@ data GlobalNameKind
 -- They are tagged with what sort of name they are.
 data GlobalName (k :: GlobalNameKind) = GlobalName
   { qualifiedModule :: ModuleName
-  , baseName :: Name
+  , baseName :: Text
   }
   deriving stock (Eq, Ord, Generic, Data, Show, Read)
 
-qualifyName :: ModuleName -> Name -> GlobalName k
+qualifyName :: ModuleName -> Text -> GlobalName k
 qualifyName = GlobalName
 
 type TyConName = GlobalName 'ATyCon

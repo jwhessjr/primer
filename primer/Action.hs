@@ -36,7 +36,6 @@ import Def (
 import Errors (ActionError (..))
 import Fresh (MonadFresh)
 import Module (Module, insertDef)
-import Name (Name)
 import ProgAction (ProgAction (..))
 import Typecheck (
   CheckEverythingRequest (CheckEverything, toCheck),
@@ -82,7 +81,7 @@ applyActionsToTypeSig ::
   (MonadFresh ID m) =>
   Module ->
   -- | This must be one of the definitions in the @Module@, with its correct name
-  (Name, ASTDef) ->
+  (Text, ASTDef) ->
   [Action] ->
   m (Either ActionError (Module, TypeZ))
 applyActionsToTypeSig mod (defName, def) actions =
