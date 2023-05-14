@@ -29,7 +29,6 @@ import Core (
 import Data.Data (Data)
 import Data.Map.Strict qualified as Map
 import Def (
-  ASTDef (..),
   Def (..),
  )
 import DefUtils (globalInUse)
@@ -133,7 +132,7 @@ applyProgAction prog mdefName = \case
     if Map.member newName defs
       then throwError $ DefAlreadyExists newName
       else do
-        let m' = m{moduleDefs = Map.insert newName (DefAST def) $ Map.delete defName defs}
+        let m' = m{moduleDefs = Map.insert newName def $ Map.delete defName defs}
         pure (m', Just $ Selection newName Nothing)
   BodyAction actions -> editModuleOf mdefName prog $ \m defName def -> do
     res <- applyActionsToBody (progModule prog) def actions
@@ -142,7 +141,7 @@ applyProgAction prog mdefName = \case
       Right (def', z) -> do
         let meta = either (view _exprMetaLens . target) (view _typeMetaLens . target) $ locToEither z
         pure
-          ( insertDef m defName (DefAST def')
+          ( insertDef m defName def'
           , Just $
               Selection defName $
                 Just
@@ -186,13 +185,13 @@ editModuleOf ::
   MonadError Error m =>
   Maybe Text ->
   Prog ->
-  (Module -> Text -> ASTDef -> m (Module, Maybe Selection)) ->
+  (Module -> Text -> Def -> m (Module, Maybe Selection)) ->
   m Prog
 editModuleOf mdefName prog f = case mdefName of
   Nothing -> throwError NoDefSelected
   Just defname -> editModule prog $ \m ->
     case Map.lookup defname (moduleDefs m) of
-      Just (DefAST def) -> f m defname def
+      Just def -> f m defname def
       _ -> throwError $ DefNotFound defname
 
 -- | A shorthand for the constraints we need when performing mutation

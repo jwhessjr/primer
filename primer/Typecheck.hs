@@ -23,12 +23,9 @@ import CoreUtils (
  )
 import Data.Map.Strict qualified as Map
 import Def (
-  ASTDef (..),
   Def (..),
   DefMap,
-  defType,
-  _DefAST,
-  _astDefType,
+  _defType,
  )
 import Fresh (MonadFresh (..))
 import Errors (
@@ -124,7 +121,7 @@ initialCxt =
 -- | Construct an initial typing context, with all given definitions in scope as global variables.
 buildTypingContext :: TypeDefMap -> DefMap -> Cxt
 buildTypingContext tydefs defs =
-  let globals = Map.assocs $ fmap defType defs
+  let globals =  Map.assocs $ fmap (forgetTypeMetadata . defType) defs
    in extendTypeDefCxt tydefs $ extendGlobalCxt globals initialCxt
 
 buildTypingContextFromModule :: Module -> Cxt
@@ -182,16 +179,16 @@ checkEverything CheckEverything{toCheck} =
           -- Kind check and update (for smartholes) all the types.
           -- Note that this may give ill-typed definitions if the type changes
           -- since we have not checked the expressions against the new types.
-          updatedTypes <- traverseOf (traverseDefs % _DefAST % _astDefType) (checkKind KType) toCheck
+          updatedTypes <- traverseOf (traverseDefs % _defType) (checkKind KType) toCheck
           -- Now extend the context with the new types
           let defsUpdatedTypes = itoListOf foldDefTypesWithName updatedTypes
           local (extendGlobalCxt defsUpdatedTypes) $
             -- Check the body (of AST definitions) against the new type
             traverseOf
-              (traverseDefs % _DefAST)
+              traverseDefs
               ( \def -> do
-                  e <- check (forgetTypeMetadata $ astDefType def) (astDefExpr def)
-                  pure $ def{astDefExpr = e}
+                  e <- check (forgetTypeMetadata $ defType def) (defExpr def)
+                  pure $ def{defExpr = e}
               )
               updatedTypes
   where

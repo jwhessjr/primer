@@ -25,7 +25,6 @@ import DSL (
   tfun,
  )
 import Def (
-  ASTDef (..),
   Def (..),
  )
 import Errors (Error (..))
@@ -75,7 +74,7 @@ applyActionsToTypeSig ::
   (MonadFresh Int m) =>
   Module ->
   -- | This must be one of the definitions in the @Module@, with its correct name
-  (Text, ASTDef) ->
+  (Text, Def) ->
   [Action] ->
   m (Either Error (Module, TypeZ))
 applyActionsToTypeSig mod (defName, def) actions =
@@ -86,11 +85,11 @@ applyActionsToTypeSig mod (defName, def) actions =
   where
     go :: ActionM m => m (Module, TypeZ)
     go = do
-      zt <- withWrappedType (astDefType def) (\zt -> foldlM (flip applyActionAndSynth) (InType zt) actions)
+      zt <- withWrappedType (defType def) (\zt -> foldlM (flip applyActionAndSynth) (InType zt) actions)
       let t = target (top zt)
-      e <- check (forgetTypeMetadata t) (astDefExpr def)
-      let def' = def{astDefExpr = e, astDefType = t}
-          mod' = insertDef mod defName (DefAST def')
+      e <- check (forgetTypeMetadata t) (defExpr def)
+      let def' = def{defExpr = e, defType = t}
+          mod' = insertDef mod defName def'
       -- The actions were applied to the type successfully, and the definition body has been
       -- typechecked against the new type.
       -- Now we need to typecheck the whole program again, to check any uses of the definition
@@ -146,19 +145,19 @@ refocus Refocus{pre, post} = do
 applyActionsToBody ::
   MonadFresh Int m =>
   Module ->
-  ASTDef ->
+  Def ->
   [Action] ->
-  m (Either Error (ASTDef, Loc))
+  m (Either Error (Def, Loc))
 applyActionsToBody mod def actions =
   go
     & flip runReaderT (buildTypingContextFromModule mod)
     & runExceptT
   where
-    go :: ActionM m => m (ASTDef, Loc)
+    go :: ActionM m => m (Def, Loc)
     go = do
-      ze <- foldlM (flip (applyActionAndCheck (astDefType def))) (focusLoc (astDefExpr def)) actions
-      e' <- check (forgetTypeMetadata (astDefType def)) (unfocus ze)
-      let def' = def{astDefExpr = e'}
+      ze <- foldlM (flip (applyActionAndCheck (defType def))) (focusLoc (defExpr def)) actions
+      e' <- check (forgetTypeMetadata (defType def)) (unfocus ze)
+      let def' = def{defExpr = e'}
       refocus Refocus{pre = ze, post = e'} >>= \case
         Nothing -> throwError $ InternalFailure "lost ID after typechecking"
         Just z -> pure (def', z)

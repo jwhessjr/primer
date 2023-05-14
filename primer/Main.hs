@@ -29,9 +29,7 @@ import Data.Map qualified as Map
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
 import Def (
-  ASTDef (..),
-  Def (DefAST),
-  defAST,
+  Def (..),
  )
 import Fresh (MonadFresh)
 import Hedgehog
@@ -141,7 +139,7 @@ data Provenance
 
 -- gives def name and perhaps a node inside it (if Nothing, then has selected the definition itself)
 -- If the outer Maybe is Nothing, then there were no definitions at all!
-pickPos :: Prog -> Maybe (Gen (Text, Either Def (ASTDef, NodeType, Int)))
+pickPos :: Prog -> Maybe (Gen (Text, Either Def (Def, NodeType, Int)))
 pickPos p = ((\(defName, def) -> (defName,) <$> pickLoc def) =<<) <$> pickDef
   where
     pickDef = case Map.toList $ progAllDefs p of
@@ -151,8 +149,8 @@ pickPos p = ((\(defName, def) -> (defName,) <$> pickLoc def) =<<) <$> pickDef
       Gen.frequency $
         catMaybes
           [ Just (1, pure $ Left d)
-          , defAST d <&> \d' -> (2,) . Gen.element $ fmap (Right . (d',SigNode,)) $ toListOf typeIDs $ astDefType d'
-          , defAST d <&> \d' -> (7,) . Gen.element $ fmap (Right . (d',BodyNode,)) $ toListOf exprIDs $ astDefExpr d'
+          , Just $ (2,) . Gen.element $ fmap (Right . (d,SigNode,)) $ toListOf typeIDs $ defType d
+          , Just $ (7,) . Gen.element $ fmap (Right . (d,BodyNode,)) $ toListOf exprIDs $ defExpr d
           ]
 
 -- 'Nothing' means that a somewhat-expected problem occured:
@@ -165,8 +163,8 @@ runRandomAvailableAction a = do
   let defMap = progAllDefs $ appProg a
   let (loc, acts) = case defLoc of
         Left _ -> (Nothing, Available.forDef defMap defName)
-        Right (d, SigNode, i) -> (Just (SigNode, i), Available.forSig (astDefType d) i)
-        Right (d, BodyNode, i) -> (Just (BodyNode, i), Available.forBody (astDefExpr d) i)
+        Right (d, SigNode, i) -> (Just (SigNode, i), Available.forSig (defType d) i)
+        Right (d, BodyNode, i) -> (Just (BodyNode, i), Available.forBody (defExpr d) i)
   case acts of
     [] -> label "no offered actions" >> pure Nothing
     acts' -> do
@@ -216,7 +214,7 @@ prog = do
                   , TypeDef
                   )
                 ]
-          , moduleDefs = Map.fromList [("a", DefAST $ ASTDef e t)]
+          , moduleDefs = Map.fromList [("a", Def e t)]
           }
   pure $
     Prog
