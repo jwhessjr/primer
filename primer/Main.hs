@@ -57,7 +57,7 @@ import Module (
  )
 import Numeric.Natural (Natural)
 import Optics (toListOf)
-import TypeDef (ASTTypeDef (..), TypeDef (..))
+import TypeDef (TypeDef (..))
 import Errors (Error(DefAlreadyExists))
 
 main :: IO ()
@@ -213,7 +213,7 @@ prog = do
               Map.fromList
                 [
                   ( "a6"
-                  , TypeDefAST ASTTypeDef{}
+                  , TypeDef
                   )
                 ]
           , moduleDefs = Map.fromList [("a", DefAST $ ASTDef e t)]

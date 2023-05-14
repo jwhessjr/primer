@@ -7,9 +7,6 @@ module Module (
 
 import Foreword
 
-import Core (
-  TypeMeta,
- )
 import Data.Data (Data)
 import Data.Map (delete, insert)
 import Def (
@@ -19,7 +16,7 @@ import Optics (Lens', lens)
 import TypeDef (TypeDef (..))
 
 data Module = Module
-  { moduleTypes :: Map Text (TypeDef TypeMeta)
+  { moduleTypes :: Map Text TypeDef
   , moduleDefs :: Map Text Def -- The current program: a set of definitions indexed by Name
   }
   deriving stock (Eq, Show, Read, Data)

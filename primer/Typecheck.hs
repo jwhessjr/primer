@@ -56,7 +56,6 @@ import Optics (
  )
 import TypeDef (
   TypeDefMap,
-  typeDefKind, forgetTypeDefMetadata,
  )
 
 type Type = Type' ()
@@ -94,7 +93,7 @@ synthKind = \case
     typeDef <- asks (Map.lookup c . typeDefs)
     case typeDef of
       Nothing -> throwError $ UnknownTypeConstructor c
-      Just def -> let k = typeDefKind def in pure (k, TCon m c)
+      Just _ -> pure (KType, TCon m c)
   TFun m a b -> do
     a' <- checkKind KType a
     b' <- checkKind KType b
@@ -132,7 +131,7 @@ buildTypingContext tydefs defs =
 buildTypingContextFromModules :: [Module] -> Cxt
 buildTypingContextFromModules modules =
   buildTypingContext
-    (foldMap' (fmap forgetTypeDefMetadata . moduleTypes) modules)
+    (foldMap' moduleTypes modules)
     (foldMap' moduleDefs modules)
 
 -- | A shorthand for the constraints needed when kindchecking
@@ -178,7 +177,7 @@ checkEverything ::
 checkEverything CheckEverything{toCheck} =
   let cxt = buildTypingContextFromModules []
    in flip runReaderT cxt $ do
-        let newTypes = forgetTypeDefMetadata <$> moduleTypes toCheck
+        let newTypes = moduleTypes toCheck
         checkTypeDefs newTypes
         local (extendTypeDefCxt newTypes) $ do
           -- Kind check and update (for smartholes) all the types.
