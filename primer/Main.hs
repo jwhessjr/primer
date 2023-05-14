@@ -9,7 +9,6 @@ import Action (
 import App (
   App,
   EditAppM,
-  NodeType (..),
   Prog (..),
   appProg,
   handleEditRequest,
@@ -19,6 +18,7 @@ import App (
   runEditAppM,
  )
 import Available qualified as Available
+import Available (NodeType (..))
 import CoreUtils (
   exprIDs,
   typeIDs,

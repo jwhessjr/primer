@@ -1,7 +1,6 @@
 -- This module defines the high level application functions.
 
 module App (
-  module Available,
   App,
   mkApp,
   appProg,

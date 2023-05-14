@@ -4,27 +4,17 @@
 --  operating on them.
 module Zipper (
   ExprZ,
-  TypeZip,
   TypeZ,
-  IsZipper (asZipper),
   Loc,
   Loc' (..),
   focusType,
   focusLoc,
-  unfocusType,
   focus,
   unfocus,
   target,
-  _target,
   replace,
   focusOn,
-  focusOnTy,
   top,
-  up,
-  down,
-  left,
-  right,
-  farthest,
   unfocusExpr,
   unfocusLoc,
   locToEither,
@@ -67,9 +57,6 @@ import Optics.Lens (Lens', equality', lens)
 import Optics.Traversal (traverseOf)
 
 type TypeZip' b = Zipper (Type' b) (Type' b)
-
--- | An ordinary zipper for 'Type's
-type TypeZip = TypeZip' TypeMeta
 
 -- | We want to use up, down, left, right, etc. on 'ExprZ' and 'TypeZ',
 -- despite them being very different types. This class enables that, by proxying

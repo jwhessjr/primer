@@ -1,30 +1,10 @@
-{-# LANGUAGE ImpredicativeTypes #-}
-
--- | Typechecking for Core expressions.
--- This closely follows the type system of Hazelnut, but supports arbitrary
--- types rather than just numbers.
--- In future we will want to extend it to support more features such as
--- polymorphism.
 module Typecheck (
-  Type,
-  Expr,
   synth,
   check,
-  synthKind,
-  checkKind,
-  checkTypeDefs,
   CheckEverythingRequest (..),
   checkEverything,
   Cxt (..),
-  KindOrType (..),
-  initialCxt,
-  buildTypingContext,
   buildTypingContextFromModules,
-  exprTtoExpr,
-  typeTtoType,
-  consistentTypes,
-  extendGlobalCxt,
-  extendTypeDefCxt,
 ) where
 
 import Foreword
@@ -204,7 +184,7 @@ checkEverything CheckEverything{toCheck} =
           -- Kind check and update (for smartholes) all the types.
           -- Note that this may give ill-typed definitions if the type changes
           -- since we have not checked the expressions against the new types.
-          updatedTypes <- traverseOf (traverseDefs % _DefAST % _astDefType) (fmap typeTtoType . checkKind' KType) toCheck
+          updatedTypes <- traverseOf (traverseDefs % _DefAST % _astDefType) (checkKind KType) toCheck
           -- Now extend the context with the new types
           let defsUpdatedTypes = itoListOf foldDefTypesWithName updatedTypes
           local (extendGlobalCxt defsUpdatedTypes) $
@@ -213,7 +193,7 @@ checkEverything CheckEverything{toCheck} =
               (traverseDefs % _DefAST)
               ( \def -> do
                   e <- check (forgetTypeMetadata $ astDefType def) (astDefExpr def)
-                  pure $ def{astDefExpr = exprTtoExpr e}
+                  pure $ def{astDefExpr = e}
               )
               updatedTypes
   where
@@ -259,7 +239,7 @@ synth :: TypeM e m => Expr -> m (Type, Expr)
 synth = \case
   Ann i e t -> do
     -- Check that the type is well-formed by synthesising its kind
-    t' <- checkKind' KType t
+    t' <- checkKind KType t
     let t'' = forgetTypeMetadata t'
     -- Check e against the annotation
     e' <- check t'' e
@@ -344,14 +324,3 @@ consistentTypes x y = uncurry eqType $ holepunch x y
 -- | Compare two types for alpha equality, ignoring their IDs
 eqType :: Type' a -> Type' b -> Bool
 eqType t1 t2 = forgetTypeMetadata t1 `alphaEqTy` forgetTypeMetadata t2
-
--- | Convert @Expr (Meta Type) (Meta Kind)@ to @Expr (Meta (Maybe Type)) (Meta (Maybe Kind))@
-exprTtoExpr :: Expr -> Expr
-exprTtoExpr = identity
-
--- | Convert @Type (Meta Kind)@ to @Type (Meta (Maybe Kind))@
-typeTtoType :: TypeT -> Type' TypeMeta
-typeTtoType = identity
-
-checkKind' :: TypeM e m => Kind -> Type' Int -> m TypeT
-checkKind' k t = checkKind k t

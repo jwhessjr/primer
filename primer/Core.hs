@@ -5,8 +5,6 @@ module Core (
   Expr' (..),
   module Meta,
   module Type,
-  TypeCache (..),
-  TypeCacheBoth (..),
   ExprMeta,
   _exprMeta,
   _exprMetaLens,
@@ -38,28 +36,6 @@ import Type (
   _typeMeta,
   _typeMetaLens,
  )
-
--- | Typechecking will add metadata to each node describing its type.
--- Some nodes are purely synthesised, some are purely checked, and some
--- (the "embeddings") are both. These embeddings are synthesisable but in a
--- checkable context, like 'x' in 'f x'.
---
--- Since with type holes the synthesised and checked-at types for embeddings
--- may differ, we record both of them, so downstream consumers can choose which
--- one is better for their needs, rather than having the choice forced upon
--- them.
-data TypeCache
-  = TCSynthed (Type' ())
-  | TCChkedAt (Type' ())
-  | TCEmb TypeCacheBoth
-  deriving stock (Eq, Show, Read, Generic, Data)
-
--- We were checking at the first, but term was synthesisable and synth'd the
--- second We don't inline this into TypeCache because then we would get partial
--- functions from tcChkedAt and tcSynthed. We really want to name these fields
--- though, to make it clear what each one is!
-data TypeCacheBoth = TCBoth {tcChkedAt :: Type' (), tcSynthed :: Type' ()}
-  deriving stock (Eq, Show, Read, Generic, Data)
 
 -- Expression metadata. Each expression is annotated with a type (populated by
 -- the typechecker). These types aren't part of the program so they themselves

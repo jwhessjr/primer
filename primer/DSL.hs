@@ -7,7 +7,6 @@ module DSL (
   tcon,
   tfun,
   create,
-  S,
 ) where
 
 import Foreword

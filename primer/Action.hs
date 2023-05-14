@@ -1,5 +1,4 @@
 module Action (
-  Action (..),
   ProgAction (..),
   applyActionsToBody,
   applyActionsToTypeSig,
@@ -38,7 +37,6 @@ import Typecheck (
   buildTypingContextFromModules,
   check,
   checkEverything,
-  exprTtoExpr,
   synth,
  )
 import Typecheck qualified as TC
@@ -91,7 +89,7 @@ applyActionsToTypeSig mod (defName, def) actions =
       zt <- withWrappedType (astDefType def) (\zt -> foldlM (flip applyActionAndSynth) (InType zt) actions)
       let t = target (top zt)
       e <- check (forgetTypeMetadata t) (astDefExpr def)
-      let def' = def{astDefExpr = exprTtoExpr e, astDefType = t}
+      let def' = def{astDefExpr = e, astDefType = t}
           mod' = insertDef mod defName (DefAST def')
       -- The actions were applied to the type successfully, and the definition body has been
       -- typechecked against the new type.
@@ -159,7 +157,7 @@ applyActionsToBody mod def actions =
     go :: ActionM m => m (ASTDef, Loc)
     go = do
       ze <- foldlM (flip (applyActionAndCheck (astDefType def))) (focusLoc (astDefExpr def)) actions
-      e' <- exprTtoExpr <$> check (forgetTypeMetadata (astDefType def)) (unfocus ze)
+      e' <- check (forgetTypeMetadata (astDefType def)) (unfocus ze)
       let def' = def{astDefExpr = e'}
       refocus Refocus{pre = ze, post = e'} >>= \case
         Nothing -> throwError $ InternalFailure "lost ID after typechecking"
@@ -170,7 +168,7 @@ applyActionAndCheck ty action z = do
   z' <- applyAction' action z
   typedAST <- check (forgetTypeMetadata ty) $ unfocus z'
   -- Refocus on where we were previously
-  refocus Refocus{pre = z', post = exprTtoExpr typedAST} >>= \case
+  refocus Refocus{pre = z', post = typedAST} >>= \case
     Just z'' -> pure z''
     Nothing -> throwError $ CustomFailure action "internal error: lost ID after typechecking"
 
@@ -191,7 +189,7 @@ synthZ :: ActionM m => Loc -> m (Maybe Loc)
 synthZ z = do
   (_, typedAST) <- synth $ unfocus z
   -- Refocus on where we were previously
-  refocus Refocus{pre = z, post = exprTtoExpr typedAST}
+  refocus Refocus{pre = z, post = typedAST}
 
 applyAction' :: ActionM m => Action -> Loc -> m Loc
 applyAction' a = case a of
