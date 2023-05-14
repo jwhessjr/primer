@@ -36,7 +36,7 @@ data Expr
   = Hole Int Expr
   | EmptyHole Int
   | Ann Int Expr Type
-  deriving stock (Eq, Show, Read, Data, Generic)
+  deriving stock (Eq, Show, Read, Data)
 
 -- Note [Holes and bidirectionality]
 --

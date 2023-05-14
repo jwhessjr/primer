@@ -22,7 +22,7 @@ data Type
   = TEmptyHole Int
   | TCon Int Text
   | TFun Int Type Type
-  deriving stock (Eq, Show, Read, Data, Generic)
+  deriving stock (Eq, Show, Read, Data)
 
 -- | A traversal over the metadata of a type
 _typeMeta :: Traversal' Type Int
@@ -44,7 +44,7 @@ _typeMetaLens = lensVL $ \f -> \case
 
 -- | Core kinds.
 data Kind = KType
-  deriving stock (Eq, Show, Read, Data, Generic)
+  deriving stock (Eq, Show, Read, Data)
 
 instance HasID Type where
   _id = _typeMetaLens % _id
