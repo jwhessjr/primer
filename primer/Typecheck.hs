@@ -4,7 +4,7 @@ module Typecheck (
   CheckEverythingRequest (..),
   checkEverything,
   Cxt (..),
-  buildTypingContextFromModule,
+  buildTypingContext,
 ) where
 
 import Foreword hiding (mod)
@@ -27,10 +27,6 @@ import Def (
 import Fresh (MonadFresh (..))
 import Errors (
   Error (..),
- )
-import Module (
-  Module (moduleTypes, moduleDefs),
-  _moduleDefs,
  )
 import Optics (
   A_Traversal,
@@ -119,12 +115,6 @@ buildTypingContext tydefs defs =
   let globals =  Map.assocs $ fmap defType defs
    in extendTypeDefCxt tydefs $ extendGlobalCxt globals initialCxt
 
-buildTypingContextFromModule :: Module -> Cxt
-buildTypingContextFromModule mod =
-  buildTypingContext
-    (moduleTypes mod)
-    (moduleDefs mod)
-
 -- | A shorthand for the constraints needed when kindchecking
 type TypeM e m =
   ( Monad m
@@ -146,7 +136,7 @@ checkTypeDefs tds = do
   -- https://github.com/hackworthltd/primer/issues/3)
   assert (Map.disjoint existingTypes tds) "Duplicate-ly-named TypeDefs"
 
-data CheckEverythingRequest = CheckEverything { toCheck :: Module}
+data CheckEverythingRequest = CheckEverything { toCheckTys :: TypeDefMap, toCheckTms :: DefMap}
 
 -- | Check a (mutually-recursive set of) module(s), in a given trusted
 -- environment of modules.
@@ -164,29 +154,28 @@ checkEverything ::
   forall m.
   (MonadFresh Int m , MonadError Error m) =>
   CheckEverythingRequest ->
-  m Module
-checkEverything CheckEverything{toCheck} =
+  m (TypeDefMap, DefMap)
+checkEverything CheckEverything{toCheckTys, toCheckTms} =
   let cxt = initialCxt
    in flip runReaderT cxt $ do
-        let newTypes = moduleTypes toCheck
-        checkTypeDefs newTypes
-        local (extendTypeDefCxt newTypes) $ do
+        checkTypeDefs toCheckTys
+        local (extendTypeDefCxt toCheckTys) $ do
           -- Kind check and update (for smartholes) all the types.
           -- Note that this may give ill-typed definitions if the type changes
           -- since we have not checked the expressions against the new types.
-          updatedTypes <- traverseOf (traverseDefs % _defType) (checkKind KType) toCheck
+          updatedTypes <- traverseOf (traverseDefs % _defType) (checkKind KType) toCheckTms
           -- Now extend the context with the new types
           let defsUpdatedTypes = itoListOf foldDefTypesWithName updatedTypes
           local (extendGlobalCxt defsUpdatedTypes) $
             -- Check the body (of AST definitions) against the new type
-            traverseOf
+            (toCheckTys,) <$> traverseOf
               traverseDefs
               ( \def -> do
                   e <- check (defType def) (defExpr def)
                   pure $ def{defExpr = e}
               )
               updatedTypes
-  where
+            where
     -- The first argument of traverseDefs' is intended to either
     -- - be equality, giving a traveral
     -- - specify an index (using selfIndex and reindexed), giving a fold
@@ -194,12 +183,12 @@ checkEverything CheckEverything{toCheck} =
       ( JoinKinds k A_Traversal l
       , AppendIndices is (WithIx Text) js
       ) =>
-      Optic' k is Module Module ->
-      Optic' l js Module Def
-    traverseDefs' o = o % (_moduleDefs % itraversed)
-    traverseDefs :: IxTraversal' Text Module Def
+      Optic' k is DefMap DefMap ->
+      Optic' l js DefMap Def
+    traverseDefs' o = o % itraversed
+    traverseDefs :: IxTraversal' Text DefMap Def
     traverseDefs = traverseDefs' equality
-    foldDefTypesWithName :: IxFold Text Module Type
+    foldDefTypesWithName :: IxFold Text DefMap Type
     foldDefTypesWithName = traverseDefs % to defType
 
 {- HLINT ignore synth "Avoid lambda using `infix`" -}

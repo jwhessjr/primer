@@ -23,15 +23,14 @@ import DSL (
   tfun,
  )
 import Def (
-  Def (..),
+  Def (..), DefMap,
  )
 import Errors (Error (..))
 import Fresh (MonadFresh)
-import Module (Module, insertDef)
 import ProgAction (ProgAction (..))
 import Typecheck (
-  CheckEverythingRequest (CheckEverything, toCheck),
-  buildTypingContextFromModule,
+  CheckEverythingRequest (CheckEverything, toCheckTys, toCheckTms),
+  buildTypingContext,
   check,
   checkEverything,
   synth,
@@ -52,6 +51,8 @@ import Zipper (
   unfocusExpr,
   unfocusLoc,
  )
+import TypeDef (TypeDefMap)
+import qualified Data.Map.Strict as M
 
 -- | A shorthand for the constraints needed when applying actions
 type ActionM m =
@@ -69,32 +70,33 @@ type ActionM m =
 -- change.
 applyActionsToTypeSig ::
   (MonadFresh Int m) =>
-  Module ->
+  TypeDefMap ->
+  DefMap ->
   -- | This must be one of the definitions in the @Module@, with its correct name
   (Text, Def) ->
   [Action] ->
-  m (Either Error (Module, TypeZ))
-applyActionsToTypeSig mod (defName, def) actions =
+  m (Either Error (TypeDefMap, DefMap, TypeZ))
+applyActionsToTypeSig tys tms (defName, def) actions =
   runReaderT
     go
-    (buildTypingContextFromModule mod)
+    (buildTypingContext tys tms)
     & runExceptT
   where
-    go :: ActionM m => m (Module, TypeZ)
+    go :: ActionM m => m (TypeDefMap, DefMap, TypeZ)
     go = do
       zt <- withWrappedType (defType def) (\zt -> foldlM (flip applyActionAndSynth) (InType zt) actions)
       let t = target (top zt)
       e <- check t (defExpr def)
       let def' = def{defExpr = e, defType = t}
-          mod' = insertDef mod defName def'
+          tms' = M.insert defName def' tms
       -- The actions were applied to the type successfully, and the definition body has been
       -- typechecked against the new type.
       -- Now we need to typecheck the whole program again, to check any uses of the definition
       -- We make sure that the updated type is present in the global context.
       -- Here we just check the whole of the mutable prog, excluding imports.
       -- (for efficiency, we need not check the type definitions, but we do not implement this optimisation)
-      checkEverything (CheckEverything{toCheck = mod'})
-        >>= \checkedMod -> pure (checkedMod, zt)
+      checkEverything (CheckEverything{toCheckTys = tys, toCheckTms = tms'})
+        >>= \(chkTy,chkTm) -> pure (chkTy, chkTm, zt)
     -- Actions expect that all ASTs have a top-level expression of some sort.
     -- Signatures don't have this: they're just a type.
     -- We fake it by wrapping the type in a top-level annotation node, then unwrapping afterwards.
@@ -141,13 +143,14 @@ refocus Refocus{pre, post} = do
 -- After applying the actions, we check the new Expr against the type sig of the definition.
 applyActionsToBody ::
   MonadFresh Int m =>
-  Module ->
+  TypeDefMap ->
+  DefMap ->
   Def ->
   [Action] ->
   m (Either Error (Def, Loc))
-applyActionsToBody mod def actions =
+applyActionsToBody tys tms def actions =
   go
-    & flip runReaderT (buildTypingContextFromModule mod)
+    & flip runReaderT (buildTypingContext tys tms)
     & runExceptT
   where
     go :: ActionM m => m (Def, Loc)

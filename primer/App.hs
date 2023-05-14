@@ -33,11 +33,6 @@ import Def (
  )
 import DefUtils (globalInUse)
 import Fresh (MonadFresh (..))
-import Module (
-  Module (moduleDefs),
-  deleteDef,
-  insertDef,
- )
 import Optics (
   Setter',
   lens,
@@ -46,15 +41,30 @@ import Optics (
   (.~),
   (?~),
  )
+import TypeDef (TypeDef (..))
 import Errors (Error (..))
 import Zipper (
   locToEither,
   target,
  )
+  {-
+
+_moduleDefs :: Lens' Module (Map Text Def)
+_moduleDefs = lens moduleDefs (\m d -> m{moduleDefs = d})
+
+-- | This assumes that the definition has the correct name to be inserted
+-- into the module. I.e. @qualifiedModule (defName d) == moduleName m@.
+insertDef :: Module -> Text -> Def -> Module
+insertDef m n d = m{moduleDefs = insert n d $ moduleDefs m}
+
+deleteDef :: Module -> Text -> Module
+deleteDef m d = m{moduleDefs = delete d (moduleDefs m)}
+-}
 
 -- | The full program state.
 data Prog = Prog
-  { progModule :: Module
+  { progTypes :: Map Text TypeDef
+  , progDefs :: Map Text Def -- The current program: a set of definitions indexed by Name
   -- ^ The editable "home" modules
   , progSelection :: Maybe Selection
   }
@@ -64,7 +74,7 @@ _progSelection :: Setter' Prog (Maybe Selection)
 _progSelection = sets $ \f p -> p{progSelection = f $ progSelection p}
 
 progAllDefs :: Prog -> Map Text Def
-progAllDefs = moduleDefs . progModule
+progAllDefs = progDefs
 
 -- Note [Modules]
 -- The invariant is that the @progImports@ modules are never edited, but
@@ -116,32 +126,28 @@ handleEditRequest actions = do
 applyProgAction :: MonadEdit m Error => Prog -> Maybe Text -> ProgAction -> m Prog
 applyProgAction prog mdefName = \case
   MoveToDef d -> do
-    let m = progModule prog
-    case Map.lookup d $ moduleDefs m of
+    case Map.lookup d $ progDefs prog of
       Nothing -> throwError $ DefNotFound d
       Just _ -> pure $ prog & _progSelection ?~ Selection d Nothing
-  DeleteDef d -> editModule prog $ \m ->
-    case deleteDef m d of
-      mod' -> do
-        when (globalInUse d $ moduleDefs mod') $
-          throwError $
-            DefInUse d
-        pure (mod', Nothing)
-  RenameDef d newName -> editModuleOf (Just d) prog $ \m defName def -> do
-    let defs = moduleDefs m
+  DeleteDef d -> let defs' = Map.delete d (progDefs prog)
+                 in do
+        when (globalInUse d defs') $ throwError $ DefInUse d
+        pure $ prog {progDefs = defs'}
+  RenameDef d newName -> editModuleOf (Just d) prog $ \ts defs defName def -> do
     if Map.member newName defs
       then throwError $ DefAlreadyExists newName
       else do
-        let m' = m{moduleDefs = Map.insert newName def $ Map.delete defName defs}
-        pure (m', Just $ Selection newName Nothing)
-  BodyAction actions -> editModuleOf mdefName prog $ \m defName def -> do
-    res <- applyActionsToBody (progModule prog) def actions
+        let defs' = Map.insert newName def $ Map.delete defName defs
+        pure (ts, defs', Just $ Selection newName Nothing)
+  BodyAction actions -> editModuleOf mdefName prog $ \ts ds defName def -> do
+    res <- applyActionsToBody ts ds def actions
     case res of
       Left err -> throwError err
       Right (def', z) -> do
         let meta = either (view _exprMetaLens . target) (view _typeMetaLens . target) $ locToEither z
         pure
-          ( insertDef m defName def'
+          ( ts
+          , Map.insert defName def' ds
           , Just $
               Selection defName $
                 Just
@@ -150,15 +156,16 @@ applyProgAction prog mdefName = \case
                     , meta
                     }
           )
-  SigAction actions -> editModuleOf mdefName prog $ \curMod defName def -> do
-    res <- applyActionsToTypeSig curMod (defName, def) actions
+  SigAction actions -> editModuleOf mdefName prog $ \ts ds defName def -> do
+    res <- applyActionsToTypeSig ts ds (defName, def) actions
     case res of
       Left err -> throwError err
-      Right (mod', zt) -> do
+      Right (ts', ds', zt) -> do
         let node = target zt
             meta = view _typeMetaLens node
          in pure
-              ( mod'
+              ( ts'
+              , ds'
               , Just $
                   Selection defName $
                     Just
@@ -171,13 +178,14 @@ applyProgAction prog mdefName = \case
 editModule ::
   MonadError Error m =>
   Prog ->
-  (Module -> m (Module, Maybe Selection)) ->
+  (Map Text TypeDef -> Map Text Def -> m (Map Text TypeDef, Map Text Def, Maybe Selection)) ->
   m Prog
 editModule p f = do
-  (m', s) <- f $ progModule p
+  (ts, ds, s) <- f (progTypes p) (progDefs p)
   pure $
     p
-      { progModule = m'
+      { progTypes = ts
+      , progDefs = ds
       , progSelection = s
       }
 
@@ -185,13 +193,13 @@ editModuleOf ::
   MonadError Error m =>
   Maybe Text ->
   Prog ->
-  (Module -> Text -> Def -> m (Module, Maybe Selection)) ->
+  (Map Text TypeDef -> Map Text Def -> Text -> Def -> m (Map Text TypeDef, Map Text Def, Maybe Selection)) ->
   m Prog
 editModuleOf mdefName prog f = case mdefName of
   Nothing -> throwError NoDefSelected
-  Just defname -> editModule prog $ \m ->
-    case Map.lookup defname (moduleDefs m) of
-      Just def -> f m defname def
+  Just defname -> editModule prog $ \ts ds ->
+    case Map.lookup defname ds of
+      Just def -> f ts ds defname def
       _ -> throwError $ DefNotFound defname
 
 -- | A shorthand for the constraints we need when performing mutation

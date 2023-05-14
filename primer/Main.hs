@@ -14,7 +14,6 @@ import App (
   handleEditRequest,
   mkApp,
   progAllDefs,
-  progModule,
   runEditAppM,
  )
 import Available qualified as Available
@@ -50,9 +49,6 @@ import Hedgehog.Internal.Report (
 import Hedgehog.Internal.Runner (checkReport)
 import Hedgehog.Internal.Seed qualified as Seed
 import Hedgehog.Range qualified as Range
-import Module (
-  Module (..),
- )
 import Numeric.Natural (Natural)
 import Optics (toListOf)
 import TypeDef (TypeDef (..))
@@ -205,20 +201,10 @@ prog = do
   let a = "a6"
   e <- emptyHole `ann` tEmptyHole
   t <- tcon a
-  let m =
-        Module
-          { moduleTypes =
-              Map.fromList
-                [
-                  ( "a6"
-                  , TypeDef
-                  )
-                ]
-          , moduleDefs = Map.fromList [("a", Def e t)]
-          }
   pure $
     Prog
-      { progModule = m
+      { progTypes = Map.fromList [( "a6" , TypeDef)]
+      , progDefs = Map.fromList [("a", Def e t)]
       , progSelection = Nothing
       }
 
