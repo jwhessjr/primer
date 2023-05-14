@@ -1,7 +1,6 @@
 module CoreUtils (
   exprIDs,
   typeIDs,
-  forgetTypeMetadata,
   noHoles,
   freeGlobalVars,
   alphaEqTy,
@@ -10,31 +9,29 @@ module CoreUtils (
 import Foreword
 
 import Core (
+  Type (..),
   Expr' (..),
   HasID (_id),
-  Type' (..),
   _exprMeta,
   _exprTypeMeta,
   _typeMeta,
  )
-import Data.Data (Data)
 import Data.Generics.Uniplate.Data (universe)
 import Optics (
   Traversal',
   adjoin,
-  set,
   (%),
  )
 
 -- | Test whether an type contains any holes
 -- (empty or non-empty, or inside a kind)
-noHoles :: Data a => Type' a -> Bool
+noHoles :: Type -> Bool
 noHoles t = flip all (universe t) $ \case
   TEmptyHole{} -> False
   _ -> True
 
 -- Check two types for alpha equality, ignoring IDs
-alphaEqTy :: Type' a -> Type' b -> Bool
+alphaEqTy :: Type -> Type -> Bool
 alphaEqTy = go
   where
     go (TEmptyHole _) (TEmptyHole _) = True
@@ -43,12 +40,12 @@ alphaEqTy = go
     go _ _ = False
 
 -- | Traverse the 'ID's in a 'Type''.
-typeIDs :: HasID a => Traversal' (Type' a) Int
-typeIDs = _typeMeta % _id
+typeIDs :: Traversal' Type Int
+typeIDs = _typeMeta
 
 freeGlobalVars :: Expr' a b -> Set Text
 freeGlobalVars _ = mempty
 
 -- | Traverse the 'ID's in an 'Expr''.
-exprIDs :: (HasID a, HasID b) => Traversal' (Expr' a b) Int
-exprIDs = (_exprMeta % _id) `adjoin` (_exprTypeMeta % _id)
+exprIDs :: HasID a => Traversal' (Expr' a Int) Int
+exprIDs = (_exprMeta % _id) `adjoin` _exprTypeMeta

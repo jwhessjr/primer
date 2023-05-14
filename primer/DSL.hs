@@ -14,8 +14,7 @@ import Foreword
 import Core (
   Expr,
   Expr' (..),
-  Type,
-  Type' (..),
+  Type (..),
  )
 import Fresh (MonadFresh, fresh)
 

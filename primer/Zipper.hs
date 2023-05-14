@@ -31,8 +31,7 @@ import Core (
   ExprMeta,
   HasID (..),
   Type,
-  Type' (),
-  TypeMeta,
+  Type (),
   getID,
   typesInExpr,
  )
@@ -56,7 +55,7 @@ import Optics (
 import Optics.Lens (Lens', equality', lens)
 import Optics.Traversal (traverseOf)
 
-type TypeZip' b = Zipper (Type' b) (Type' b)
+type TypeZip' = Zipper Type Type
 
 -- | We want to use up, down, left, right, etc. on 'ExprZ' and 'TypeZ',
 -- despite them being very different types. This class enables that, by proxying
@@ -101,18 +100,16 @@ replace = over asZipper . replaceHole
 
 -- | Focus on the node with the given 'ID', if it exists in the type
 focusOnTy ::
-  (Data b, HasID b) =>
   Int ->
-  Type' b ->
-  Maybe (Zipper (Type' b) (Type' b))
+  Type ->
+  Maybe (Zipper Type Type)
 focusOnTy i = focusOnTy' i . focus
 
 -- | Focus on the node with the given 'ID', if it exists in the focussed type
 focusOnTy' ::
-  (Data b, HasID b) =>
   Int ->
-  Zipper (Type' b) (Type' b) ->
-  Maybe (Zipper (Type' b) (Type' b))
+  Zipper Type Type ->
+  Maybe (Zipper Type Type)
 focusOnTy' i = fmap snd . search matchesID
   where
     matchesID z
@@ -135,37 +132,37 @@ search f z
 farthest :: (a -> Maybe a) -> a -> a
 farthest f = go where go a = maybe a go (f a)
 
-type ExprZ' a b = Zipper (Expr' a b) (Expr' a b)
+type ExprZ' a = Zipper (Expr' a Int) (Expr' a Int)
 
 -- | An ordinary zipper for 'Expr's
-type ExprZ = ExprZ' ExprMeta TypeMeta
+type ExprZ = ExprZ' ExprMeta
 
 -- | A zipper for 'Type's embedded in expressions.
 -- For such types, we need a way
 -- to navigate around them without losing our place in the wider expression.
 -- This type contains a Zipper for a 'Type' and a function that will place the
 -- unzippered type back into the wider expression zipper, keeping its place.
-data TypeZ' a b = TypeZ (TypeZip' b) (Type' b -> ExprZ' a b)
+data TypeZ' a = TypeZ TypeZip' (Type -> ExprZ' a)
 
-tzpos1 :: Lens' (TypeZ' a b) (TypeZip' b)
+tzpos1 :: Lens' (TypeZ' a) TypeZip'
 tzpos1 = lens (\(TypeZ z _) -> z) (\(TypeZ _ f) z -> TypeZ z f)
 
-type TypeZ = TypeZ' ExprMeta TypeMeta
+type TypeZ = TypeZ' ExprMeta
 
-instance HasID b => HasID (TypeZ' a b) where
+instance HasID (TypeZ' a) where
   _id = tzpos1 % _id
 
 -- | A specific location in our AST.
 -- This can either be in an expression, type, or binding.
-data Loc' a b
+data Loc' a
   = -- | An expression
-    InExpr (ExprZ' a b)
+    InExpr (ExprZ' a)
   | -- | A type
-    InType (TypeZ' a b)
+    InType (TypeZ' a)
 
-type Loc = Loc' ExprMeta TypeMeta
+type Loc = Loc' ExprMeta
 
-instance (HasID a, HasID b) => HasID (Loc' a b) where
+instance HasID a => HasID (Loc' a) where
   _id = lens getter setter
     where
       getter = \case
@@ -182,7 +179,7 @@ instance (HasID a, HasID b) => HasID (Loc' a b) where
 -- the current target. This expects that the target is an @Ann@, @App@,
 -- @Letrec@ or @LetType@ node (as those are the only ones that contain a
 -- @Type@).
-focusType :: (Data a, Data b) => ExprZ' a b -> Maybe (TypeZ' a b)
+focusType :: Data a => ExprZ' a -> Maybe (TypeZ' a)
 focusType z = do
   t <- z ^? l
   pure $ TypeZ (zipper t) $ \t' -> z & l .~ t'
@@ -190,10 +187,10 @@ focusType z = do
     l = _target % typesInExpr
 
 -- | Switch from a 'Type' zipper back to an 'Expr' zipper.
-unfocusType :: TypeZ' a b -> ExprZ' a b
+unfocusType :: TypeZ' a -> ExprZ' a
 unfocusType (TypeZ zt f) = f (fromZipper zt)
 
-instance Data b => IsZipper (TypeZ' a b) (Type' b) where
+instance IsZipper (TypeZ' a) Type where
   asZipper = tzpos1
 
 -- | Convert an 'Expr' to a 'Loc' which focuses on the top of the expression.
@@ -201,7 +198,7 @@ focusLoc :: Expr -> Loc
 focusLoc = InExpr . focus
 
 -- | Convert an 'Expr' zipper to an 'Expr'
-unfocusExpr :: ExprZ' a b -> Expr' a b
+unfocusExpr :: ExprZ' a -> Expr' a Int
 unfocusExpr = fromZipper
 
 -- | Convert a 'Loc' to an 'ExprZ'.
@@ -214,7 +211,7 @@ unfocusLoc (InType z) = unfocusType z
 -- If the 'Loc' is in a case bind, we shift focus to the parent case expression.
 -- This function is mainly to keep compatibility with code which still expects 'Either ExprZ TypeZ'
 -- as a representation of an AST location.
-locToEither :: Loc' a b -> Either (ExprZ' a b) (TypeZ' a b)
+locToEither :: Loc' a -> Either (ExprZ' a) (TypeZ' a)
 locToEither (InExpr z) = Left z
 locToEither (InType z) = Right z
 
@@ -224,11 +221,11 @@ unfocus :: Loc -> Expr
 unfocus = unfocusExpr . unfocusLoc
 
 -- | Focus on the node with the given 'ID', if it exists in the expression
-focusOn :: (Data a, Data b, HasID a, HasID b) => Int -> Expr' a b -> Maybe (Loc' a b)
+focusOn :: (Data a, HasID a) => Int -> Expr' a Int -> Maybe (Loc' a)
 focusOn i = focusOn' i . focus
 
 -- | Focus on the node with the given 'ID', if it exists in the focussed expression
-focusOn' :: (Data a, Data b, HasID a, HasID b) => Int -> ExprZ' a b -> Maybe (Loc' a b)
+focusOn' :: (Data a, HasID a) => Int -> ExprZ' a -> Maybe (Loc' a)
 focusOn' i = fmap snd . search matchesID
   where
     matchesID z

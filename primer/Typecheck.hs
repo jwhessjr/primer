@@ -13,9 +13,7 @@ import Core (
   Expr,
   Expr' (..),
   Kind (..),
-  Type,
-  Type' (..),
-  TypeMeta,
+  Type (..),
  )
 import CoreUtils (
   alphaEqTy,
@@ -77,10 +75,10 @@ type KindM e m =
   , MonadError Error m
   )
 
-type TypeT = Type' TypeMeta
+type TypeT = Type
 
 -- Synthesise a kind for the given type
-synthKind :: KindM e m => Type' Int -> m (Kind, TypeT)
+synthKind :: KindM e m => Type -> m (Kind, TypeT)
 synthKind = \case
   TEmptyHole m -> pure (KType, TEmptyHole m)
   TCon m c -> do
@@ -93,7 +91,7 @@ synthKind = \case
     b' <- checkKind KType b
     pure (KType, TFun m a' b')
 
-checkKind :: KindM e m => Kind -> Type' Int -> m TypeT
+checkKind :: KindM e m => Kind -> Type -> m TypeT
 checkKind _ t = do
   (_, t') <- synthKind t
   pure t'

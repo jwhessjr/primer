@@ -26,13 +26,11 @@ import Optics (
   Lens',
   Traversal,
   atraversalVL,
-  (%),
+  (%), traversalVL, traverseOf,
  )
 import Type (
   Kind (..),
-  Type,
-  Type' (..),
-  TypeMeta,
+  Type (..),
   _typeMeta,
   _typeMetaLens,
  )
@@ -51,7 +49,7 @@ type ExprMeta = Int
 --  tuple '(ID, Maybe Value)'. The first element is the ID of the node, and the
 --  second element is an optional JSON object of metadata owned by the frontend,
 --  which we treat as opaque.
-type Expr = Expr' ExprMeta TypeMeta
+type Expr = Expr' ExprMeta Int
 
 -- | The generic expression type.
 -- a is the type of annotations that are placed on every expression node.
@@ -61,7 +59,7 @@ type Expr = Expr' ExprMeta TypeMeta
 data Expr' a b
   = Hole a (Expr' a b) -- See Note [Holes and bidirectionality]
   | EmptyHole a
-  | Ann a (Expr' a b) (Type' b)
+  | Ann a (Expr' a b) Type
   deriving stock (Eq, Show, Read, Data, Generic)
 
 -- Note [Holes and bidirectionality]
@@ -159,11 +157,16 @@ _exprMetaLens :: Lens' (Expr' a b) a
 _exprMetaLens = position @1
 
 -- | A traversal over the type metadata of an expression
-_exprTypeMeta :: forall a b c. Traversal (Expr' a b) (Expr' a c) b c
-_exprTypeMeta = param @0
+_exprTypeMeta :: forall a . Traversal (Expr' a Int) (Expr' a Int) Int Int
+_exprTypeMeta = traversalVL go
+  where
+    go f = \case
+      Hole i e -> Hole i <$> go f e
+      EmptyHole i -> pure $ EmptyHole i
+      Ann i e t -> Ann i e <$> traverseOf _typeMeta f t
 
 -- | Note that this does not recurse in to sub-expressions or sub-types.
-typesInExpr :: AffineTraversal' (Expr' a b) (Type' b)
+typesInExpr :: AffineTraversal' (Expr' a b) Type
 typesInExpr = atraversalVL $ \point f -> \case
   Ann m e ty -> Ann m e <$> f ty
   e -> point e
