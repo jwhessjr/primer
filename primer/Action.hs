@@ -12,8 +12,7 @@ import Actions (Action (..))
 import Available (NodeType (..))
 import Available qualified as Available
 import Core (
-  Expr,
-  Expr' (..),
+  Expr (..),
   Type,
   getID,
  )
@@ -40,8 +39,7 @@ import Typecheck (
 import Typecheck qualified as TC
 import Zipper (
   ExprZ,
-  Loc,
-  Loc' (..),
+  Loc (..),
   TypeZ,
   focus,
   focusLoc,

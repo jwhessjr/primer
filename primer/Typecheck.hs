@@ -10,8 +10,7 @@ module Typecheck (
 import Foreword hiding (mod)
 
 import Core (
-  Expr,
-  Expr' (..),
+  Expr (..),
   Kind (..),
   Type (..),
  )

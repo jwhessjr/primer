@@ -5,8 +5,7 @@
 module Zipper (
   ExprZ,
   TypeZ,
-  Loc,
-  Loc' (..),
+  Loc (..),
   focusType,
   focusLoc,
   focus,
@@ -27,8 +26,7 @@ import Foreword
 
 import Core (
   Expr,
-  Expr',
-  ExprMeta,
+  Expr,
   HasID (..),
   Type,
   Type (),
@@ -57,7 +55,7 @@ import Optics.Traversal (traverseOf)
 
 type TypeZip' = Zipper Type Type
 
--- | We want to use up, down, left, right, etc. on 'ExprZ' and 'TypeZ',
+-- | We want to use up, down, left, right, etc. on 'ExprZnd 'TypeZ',
 -- despite them being very different types. This class enables that, by proxying
 -- each method through to the underlying Zipper.
 -- @za@ is the user-facing type, i.e. 'ExprZ' or 'TypeZ'.
@@ -132,37 +130,30 @@ search f z
 farthest :: (a -> Maybe a) -> a -> a
 farthest f = go where go a = maybe a go (f a)
 
-type ExprZ' a = Zipper (Expr' a Int) (Expr' a Int)
-
--- | An ordinary zipper for 'Expr's
-type ExprZ = ExprZ' ExprMeta
+type ExprZ = Zipper Expr Expr
 
 -- | A zipper for 'Type's embedded in expressions.
 -- For such types, we need a way
 -- to navigate around them without losing our place in the wider expression.
 -- This type contains a Zipper for a 'Type' and a function that will place the
 -- unzippered type back into the wider expression zipper, keeping its place.
-data TypeZ' a = TypeZ TypeZip' (Type -> ExprZ' a)
+data TypeZ = TypeZ TypeZip' (Type -> ExprZ)
 
-tzpos1 :: Lens' (TypeZ' a) TypeZip'
+tzpos1 :: Lens' TypeZ TypeZip'
 tzpos1 = lens (\(TypeZ z _) -> z) (\(TypeZ _ f) z -> TypeZ z f)
 
-type TypeZ = TypeZ' ExprMeta
-
-instance HasID (TypeZ' a) where
+instance HasID TypeZ where
   _id = tzpos1 % _id
 
 -- | A specific location in our AST.
 -- This can either be in an expression, type, or binding.
-data Loc' a
+data Loc
   = -- | An expression
-    InExpr (ExprZ' a)
+    InExpr ExprZ
   | -- | A type
-    InType (TypeZ' a)
+    InType TypeZ
 
-type Loc = Loc' ExprMeta
-
-instance HasID a => HasID (Loc' a) where
+instance HasID Loc where
   _id = lens getter setter
     where
       getter = \case
@@ -179,7 +170,7 @@ instance HasID a => HasID (Loc' a) where
 -- the current target. This expects that the target is an @Ann@, @App@,
 -- @Letrec@ or @LetType@ node (as those are the only ones that contain a
 -- @Type@).
-focusType :: Data a => ExprZ' a -> Maybe (TypeZ' a)
+focusType :: ExprZ -> Maybe TypeZ
 focusType z = do
   t <- z ^? l
   pure $ TypeZ (zipper t) $ \t' -> z & l .~ t'
@@ -187,10 +178,10 @@ focusType z = do
     l = _target % typesInExpr
 
 -- | Switch from a 'Type' zipper back to an 'Expr' zipper.
-unfocusType :: TypeZ' a -> ExprZ' a
+unfocusType :: TypeZ -> ExprZ
 unfocusType (TypeZ zt f) = f (fromZipper zt)
 
-instance IsZipper (TypeZ' a) Type where
+instance IsZipper TypeZ Type where
   asZipper = tzpos1
 
 -- | Convert an 'Expr' to a 'Loc' which focuses on the top of the expression.
@@ -198,7 +189,7 @@ focusLoc :: Expr -> Loc
 focusLoc = InExpr . focus
 
 -- | Convert an 'Expr' zipper to an 'Expr'
-unfocusExpr :: ExprZ' a -> Expr' a Int
+unfocusExpr :: ExprZ -> Expr
 unfocusExpr = fromZipper
 
 -- | Convert a 'Loc' to an 'ExprZ'.
@@ -211,7 +202,7 @@ unfocusLoc (InType z) = unfocusType z
 -- If the 'Loc' is in a case bind, we shift focus to the parent case expression.
 -- This function is mainly to keep compatibility with code which still expects 'Either ExprZ TypeZ'
 -- as a representation of an AST location.
-locToEither :: Loc' a -> Either (ExprZ' a) (TypeZ' a)
+locToEither :: Loc -> Either ExprZ TypeZ
 locToEither (InExpr z) = Left z
 locToEither (InType z) = Right z
 
@@ -221,11 +212,11 @@ unfocus :: Loc -> Expr
 unfocus = unfocusExpr . unfocusLoc
 
 -- | Focus on the node with the given 'ID', if it exists in the expression
-focusOn :: (Data a, HasID a) => Int -> Expr' a Int -> Maybe (Loc' a)
+focusOn :: Int -> Expr -> Maybe Loc
 focusOn i = focusOn' i . focus
 
 -- | Focus on the node with the given 'ID', if it exists in the focussed expression
-focusOn' :: (Data a, HasID a) => Int -> ExprZ' a -> Maybe (Loc' a)
+focusOn' :: Int -> ExprZ -> Maybe Loc
 focusOn' i = fmap snd . search matchesID
   where
     matchesID z

@@ -1,11 +1,9 @@
 -- This module defines the core AST and some functions for operating on it.
 
 module Core (
-  Expr,
-  Expr' (..),
+  Expr (..),
   module Meta,
   module Type,
-  ExprMeta,
   _exprMeta,
   _exprMetaLens,
   _exprTypeMeta,
@@ -15,7 +13,6 @@ module Core (
 import Foreword
 
 import Data.Data (Data)
-import Data.Generics.Product
 import Data.Generics.Uniplate.Data ()
 import Meta (
   HasID (..),
@@ -24,9 +21,9 @@ import Meta (
 import Optics (
   AffineTraversal',
   Lens',
-  Traversal,
+  Traversal',
   atraversalVL,
-  (%), traversalVL, traverseOf,
+  traversalVL, traverseOf, lensVL,
  )
 import Type (
   Kind (..),
@@ -35,31 +32,10 @@ import Type (
   _typeMetaLens,
  )
 
--- Expression metadata. Each expression is annotated with a type (populated by
--- the typechecker). These types aren't part of the program so they themselves
--- have no metadata - we indicate this with the '()' argument.
--- They're optional (i.e. in a 'Maybe') because when
--- modifying the AST in an action we aren't necessarily sure of the type of the
--- nodes we're inserting.
-type ExprMeta = Int
-
--- | The core AST.
---  This is the canonical representation of Primer programs.  It is similar to
---  System F, but with support for empty and non-empty holes.  Each node holds a
---  tuple '(ID, Maybe Value)'. The first element is the ID of the node, and the
---  second element is an optional JSON object of metadata owned by the frontend,
---  which we treat as opaque.
-type Expr = Expr' ExprMeta Int
-
--- | The generic expression type.
--- a is the type of annotations that are placed on every expression node.
--- b is the type of annotations that are placed on every type node.
--- Most of the backend fixes a ~ b ~ ID.
--- The typechecker produces a ~ (ID, Type' ()), b ~ ID.
-data Expr' a b
-  = Hole a (Expr' a b) -- See Note [Holes and bidirectionality]
-  | EmptyHole a
-  | Ann a (Expr' a b) Type
+data Expr
+  = Hole Int Expr
+  | EmptyHole Int
+  | Ann Int Expr Type
   deriving stock (Eq, Show, Read, Data, Generic)
 
 -- Note [Holes and bidirectionality]
@@ -147,17 +123,27 @@ data Expr' a b
 -- we have got exactly one branch per constructor.
 
 -- | A traversal over the metadata of an expression.
-_exprMeta :: forall a b c. Traversal (Expr' a b) (Expr' c b) a c
-_exprMeta = param @1
+_exprMeta :: Traversal' Expr Int
+_exprMeta = traversalVL go
+  where
+    go f = \case
+      Hole i e -> Hole <$> f i <*> go f e
+      EmptyHole i -> EmptyHole <$> f i
+      Ann i e t -> Ann <$> f i <*> go f e <*> traverseOf _typeMeta f t
 
 -- | A lens on to the metadata of an expression.
 -- Note that unlike '_exprMeta', this is shallow i.e. it does not recurse in to sub-expressions.
 -- And for this reason, it cannot be type-changing.
-_exprMetaLens :: Lens' (Expr' a b) a
-_exprMetaLens = position @1
+_exprMetaLens :: Lens' Expr Int
+_exprMetaLens = lensVL go
+  where
+    go f = \case
+      Hole i e -> (`Hole` e) <$> f i
+      EmptyHole i -> EmptyHole <$> f i
+      Ann i e t -> (\j -> Ann j e t) <$> f i
 
 -- | A traversal over the type metadata of an expression
-_exprTypeMeta :: forall a . Traversal (Expr' a Int) (Expr' a Int) Int Int
+_exprTypeMeta :: Traversal' Expr Int
 _exprTypeMeta = traversalVL go
   where
     go f = \case
@@ -166,10 +152,10 @@ _exprTypeMeta = traversalVL go
       Ann i e t -> Ann i e <$> traverseOf _typeMeta f t
 
 -- | Note that this does not recurse in to sub-expressions or sub-types.
-typesInExpr :: AffineTraversal' (Expr' a b) Type
+typesInExpr :: AffineTraversal' Expr Type
 typesInExpr = atraversalVL $ \point f -> \case
   Ann m e ty -> Ann m e <$> f ty
   e -> point e
 
-instance HasID a => HasID (Expr' a b) where
-  _id = position @1 % _id
+instance HasID Expr where
+  _id = _exprMetaLens

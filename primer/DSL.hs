@@ -12,8 +12,7 @@ module DSL (
 import Foreword
 
 import Core (
-  Expr,
-  Expr' (..),
+  Expr (..),
   Type (..),
  )
 import Fresh (MonadFresh, fresh)

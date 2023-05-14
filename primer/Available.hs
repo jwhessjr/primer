@@ -14,8 +14,7 @@ module Available (
 import Foreword
 
 import Core (
-  Expr,
-  Expr' (..),
+  Expr (..),
   Type (..),
  )
 import Data.Data (Data)
