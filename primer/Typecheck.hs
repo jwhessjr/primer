@@ -13,12 +13,12 @@ import Core (
   Expr,
   Expr' (..),
   Kind (..),
+  Type,
   Type' (..),
   TypeMeta,
  )
 import CoreUtils (
   alphaEqTy,
-  forgetTypeMetadata,
   noHoles,
  )
 import Data.Map.Strict qualified as Map
@@ -53,8 +53,6 @@ import Optics (
 import TypeDef (
   TypeDefMap,
  )
-
-type Type = Type' ()
 
 data KindOrType = K Kind | T Type
   deriving stock (Show, Eq)
@@ -121,7 +119,7 @@ initialCxt =
 -- | Construct an initial typing context, with all given definitions in scope as global variables.
 buildTypingContext :: TypeDefMap -> DefMap -> Cxt
 buildTypingContext tydefs defs =
-  let globals =  Map.assocs $ fmap (forgetTypeMetadata . defType) defs
+  let globals =  Map.assocs $ fmap defType defs
    in extendTypeDefCxt tydefs $ extendGlobalCxt globals initialCxt
 
 buildTypingContextFromModule :: Module -> Cxt
@@ -187,7 +185,7 @@ checkEverything CheckEverything{toCheck} =
             traverseOf
               traverseDefs
               ( \def -> do
-                  e <- check (forgetTypeMetadata $ defType def) (defExpr def)
+                  e <- check (defType def) (defExpr def)
                   pure $ def{defExpr = e}
               )
               updatedTypes
@@ -205,7 +203,7 @@ checkEverything CheckEverything{toCheck} =
     traverseDefs :: IxTraversal' Text Module Def
     traverseDefs = traverseDefs' equality
     foldDefTypesWithName :: IxFold Text Module Type
-    foldDefTypesWithName = traverseDefs % to defType % to forgetTypeMetadata
+    foldDefTypesWithName = traverseDefs % to defType
 
 {- HLINT ignore synth "Avoid lambda using `infix`" -}
 -- Note [Let expressions]
@@ -235,12 +233,13 @@ synth = \case
   Ann i e t -> do
     -- Check that the type is well-formed by synthesising its kind
     t' <- checkKind KType t
-    let t'' = forgetTypeMetadata t'
     -- Check e against the annotation
-    e' <- check t'' e
+    e' <- check t' e
     -- Annotate the Ann with the same type as e
-    pure (t'', Ann i e' t')
-  EmptyHole i -> pure (TEmptyHole (), EmptyHole i)
+    pure (t', Ann i e' t')
+  EmptyHole i -> do
+    m <- fresh
+    pure (TEmptyHole m, EmptyHole i)
   -- We assume that constructor names are unique
   -- See Note [Synthesisable constructors] in Core.hs
   -- When synthesising a hole, we first check that the expression inside it
@@ -257,7 +256,8 @@ synth = \case
   -- See https://github.com/hackworthltd/primer/issues/7
   Hole i e -> do
     (_, e') <- synth e
-    pure (TEmptyHole (), Hole i e')
+    m <- fresh
+    pure (TEmptyHole m, Hole i e')
 
 -- | Similar to synth, but for checking rather than synthesis.
 check :: TypeM e m => Type -> Expr -> m Expr
@@ -303,19 +303,16 @@ check t = \case
 -- | Two types are consistent if they are equal (up to IDs and alpha) when we
 -- also count holes as being equal to anything.
 consistentTypes :: Type -> Type -> Bool
-consistentTypes x y = uncurry eqType $ holepunch x y
+consistentTypes x y = uncurry alphaEqTy $ holepunch x y
   where
     -- We punch holes in each type so they "match" in the sense that
     -- they have holes in the same places. (At least, until we find
     -- obviously different constructors.)
-    holepunch (TEmptyHole _) _ = (TEmptyHole (), TEmptyHole ())
-    holepunch _ (TEmptyHole _) = (TEmptyHole (), TEmptyHole ())
+    -- NB: alphaEqTy will ignore the IDs, so we put dummy ones here
+    holepunch (TEmptyHole _) _ = (TEmptyHole 0, TEmptyHole 0)
+    holepunch _ (TEmptyHole _) = (TEmptyHole 0, TEmptyHole 0)
     holepunch (TFun _ s t) (TFun _ s' t') =
       let (hs, hs') = holepunch s s'
           (ht, ht') = holepunch t t'
-       in (TFun () hs ht, TFun () hs' ht')
+       in (TFun 0 hs ht, TFun 0 hs' ht')
     holepunch s t = (s, t)
-
--- | Compare two types for alpha equality, ignoring their IDs
-eqType :: Type' a -> Type' b -> Bool
-eqType t1 t2 = forgetTypeMetadata t1 `alphaEqTy` forgetTypeMetadata t2

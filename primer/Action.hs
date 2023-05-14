@@ -17,7 +17,6 @@ import Core (
   Type,
   getID,
  )
-import CoreUtils (forgetTypeMetadata)
 import DSL (
   ann,
   emptyHole,
@@ -87,7 +86,7 @@ applyActionsToTypeSig mod (defName, def) actions =
     go = do
       zt <- withWrappedType (defType def) (\zt -> foldlM (flip applyActionAndSynth) (InType zt) actions)
       let t = target (top zt)
-      e <- check (forgetTypeMetadata t) (defExpr def)
+      e <- check t (defExpr def)
       let def' = def{defExpr = e, defType = t}
           mod' = insertDef mod defName def'
       -- The actions were applied to the type successfully, and the definition body has been
@@ -156,7 +155,7 @@ applyActionsToBody mod def actions =
     go :: ActionM m => m (Def, Loc)
     go = do
       ze <- foldlM (flip (applyActionAndCheck (defType def))) (focusLoc (defExpr def)) actions
-      e' <- check (forgetTypeMetadata (defType def)) (unfocus ze)
+      e' <- check (defType def) (unfocus ze)
       let def' = def{defExpr = e'}
       refocus Refocus{pre = ze, post = e'} >>= \case
         Nothing -> throwError $ InternalFailure "lost ID after typechecking"
@@ -165,7 +164,7 @@ applyActionsToBody mod def actions =
 applyActionAndCheck :: ActionM m => Type -> Action -> Loc -> m Loc
 applyActionAndCheck ty action z = do
   z' <- applyAction' action z
-  typedAST <- check (forgetTypeMetadata ty) $ unfocus z'
+  typedAST <- check ty $ unfocus z'
   -- Refocus on where we were previously
   refocus Refocus{pre = z', post = typedAST} >>= \case
     Just z'' -> pure z''

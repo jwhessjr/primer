@@ -26,11 +26,6 @@ import Optics (
   (%),
  )
 
--- | Replace all 'ID's in a Type with unit.
--- Technically this replaces all annotations, regardless of what they are.
-forgetTypeMetadata :: Type' a -> Type' ()
-forgetTypeMetadata = set _typeMeta ()
-
 -- | Test whether an type contains any holes
 -- (empty or non-empty, or inside a kind)
 noHoles :: Data a => Type' a -> Bool
@@ -38,15 +33,8 @@ noHoles t = flip all (universe t) $ \case
   TEmptyHole{} -> False
   _ -> True
 
--- Check two types for alpha equality
---
--- it makes usage easier if this is pure
--- i.e. we don't want to need a fresh name supply
--- We assume both inputs are both from the same context
---
--- Note that we do not expand TLets, they must be structurally
--- the same (perhaps with a different named binding)
-alphaEqTy :: Type' () -> Type' () -> Bool
+-- Check two types for alpha equality, ignoring IDs
+alphaEqTy :: Type' a -> Type' b -> Bool
 alphaEqTy = go
   where
     go (TEmptyHole _) (TEmptyHole _) = True
