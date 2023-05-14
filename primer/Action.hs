@@ -34,7 +34,7 @@ import Module (Module, insertDef)
 import ProgAction (ProgAction (..))
 import Typecheck (
   CheckEverythingRequest (CheckEverything, toCheck),
-  buildTypingContextFromModules,
+  buildTypingContextFromModule,
   check,
   checkEverything,
   synth,
@@ -81,7 +81,7 @@ applyActionsToTypeSig ::
 applyActionsToTypeSig mod (defName, def) actions =
   runReaderT
     go
-    (buildTypingContextFromModules [mod])
+    (buildTypingContextFromModule mod)
     & runExceptT
   where
     go :: ActionM m => m (Module, TypeZ)
@@ -151,7 +151,7 @@ applyActionsToBody ::
   m (Either Error (ASTDef, Loc))
 applyActionsToBody mod def actions =
   go
-    & flip runReaderT (buildTypingContextFromModules [mod])
+    & flip runReaderT (buildTypingContextFromModule mod)
     & runExceptT
   where
     go :: ActionM m => m (ASTDef, Loc)

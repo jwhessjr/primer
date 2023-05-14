@@ -4,10 +4,10 @@ module Typecheck (
   CheckEverythingRequest (..),
   checkEverything,
   Cxt (..),
-  buildTypingContextFromModules,
+  buildTypingContextFromModule,
 ) where
 
-import Foreword
+import Foreword hiding (mod)
 
 import Core (
   Expr,
@@ -21,7 +21,6 @@ import CoreUtils (
   forgetTypeMetadata,
   noHoles,
  )
-import Data.Foldable (foldMap')
 import Data.Map.Strict qualified as Map
 import Def (
   ASTDef (..),
@@ -128,11 +127,11 @@ buildTypingContext tydefs defs =
   let globals = Map.assocs $ fmap defType defs
    in extendTypeDefCxt tydefs $ extendGlobalCxt globals initialCxt
 
-buildTypingContextFromModules :: [Module] -> Cxt
-buildTypingContextFromModules modules =
+buildTypingContextFromModule :: Module -> Cxt
+buildTypingContextFromModule mod =
   buildTypingContext
-    (foldMap' moduleTypes modules)
-    (foldMap' moduleDefs modules)
+    (moduleTypes mod)
+    (moduleDefs mod)
 
 -- | A shorthand for the constraints needed when kindchecking
 type TypeM e m =
@@ -175,7 +174,7 @@ checkEverything ::
   CheckEverythingRequest ->
   m Module
 checkEverything CheckEverything{toCheck} =
-  let cxt = buildTypingContextFromModules []
+  let cxt = initialCxt
    in flip runReaderT cxt $ do
         let newTypes = moduleTypes toCheck
         checkTypeDefs newTypes
