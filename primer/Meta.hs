@@ -5,7 +5,6 @@ module Meta (
 
 import Foreword
 
-import Data.Generics.Uniplate.Data ()
 import Data.Generics.Uniplate.Zipper (Zipper, hole, replaceHole)
 import Optics (
   Lens',

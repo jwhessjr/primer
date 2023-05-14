@@ -13,7 +13,6 @@ module Core (
 import Foreword
 
 import Data.Data (Data)
-import Data.Generics.Uniplate.Data ()
 import Meta (
   HasID (..),
   getID,
