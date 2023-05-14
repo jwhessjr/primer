@@ -3,6 +3,7 @@
 -- | This module contains the zipper types @ExprZ@ and @TypeZ@, and functions for
 --  operating on them.
 module Zipper (
+  IsZipper,
   ExprZ,
   TypeZ,
   Loc (..),
@@ -13,8 +14,10 @@ module Zipper (
   target,
   replace,
   focusOn,
+  focusOnTy,
   top,
   unfocusExpr,
+  unfocusType,
   unfocusLoc,
   locToEither,
   SomeNode (..),

@@ -171,7 +171,7 @@ runRandomAvailableAction a = do
           progActs <-
             either (\e -> annotateShow e >> failure) pure $
               toProgActionNoInput defName loc act'
-          Just <$> actionSucceeds (handleEditRequest progActs) a
+          Just <$> actionSucceeds (handleEditRequest [progActs]) a
         Available.Input act' -> do
           n <- forAll genName
           progActs <- either (const failure) pure $ toProgActionInput defName (Available.Option n) act'

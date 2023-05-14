@@ -16,7 +16,7 @@ import Foreword hiding (mod)
 import Action (
   ProgAction (..),
   applyActionsToBody,
-  applyActionsToTypeSig,
+  applyActionsToTypeSig, constructArrowL,
  )
 import Available (
   NodeType (..),
@@ -24,7 +24,7 @@ import Available (
 import Core (
   HasID (_id),
   _exprMetaLens,
-  _typeMetaLens,
+  _typeMetaLens, Expr (EmptyHole), Type (TEmptyHole),
  )
 import Data.Data (Data)
 import Data.Map.Strict qualified as Map
@@ -45,8 +45,11 @@ import TypeDef (TypeDef (..))
 import Errors (Error (..))
 import Zipper (
   locToEither,
-  target,
+  target, focusOn, focusOnTy, replace, unfocusExpr, unfocusLoc, Loc (..), unfocusType,
  )
+import Typecheck (checkEverything, CheckEverythingRequest (CheckEverything, toCheckTms, toCheckTys))
+import Actions (Action(..))
+import Data.Generics.Uniplate.Zipper (fromZipper)
   {-
 
 _moduleDefs :: Lens' Module (Map Text Def)
@@ -124,11 +127,7 @@ handleEditRequest actions = do
 -- The 'GVarName' argument is the currently-selected definition, which is
 -- provided for convenience: it is the same as the one in the progSelection.
 applyProgAction :: MonadEdit m Error => Prog -> Maybe Text -> ProgAction -> m Prog
-applyProgAction prog mdefName = \case
-  MoveToDef d -> do
-    case Map.lookup d $ progDefs prog of
-      Nothing -> throwError $ DefNotFound d
-      Just _ -> pure $ prog & _progSelection ?~ Selection d Nothing
+applyProgAction prog mdefName = recheck <=< \case
   DeleteDef d -> let defs' = Map.delete d (progDefs prog)
                  in do
         when (globalInUse d defs') $ throwError $ DefInUse d
@@ -139,41 +138,44 @@ applyProgAction prog mdefName = \case
       else do
         let defs' = Map.insert newName def $ Map.delete defName defs
         pure (ts, defs', Just $ Selection newName Nothing)
-  BodyAction actions -> editModuleOf mdefName prog $ \ts ds defName def -> do
-    res <- applyActionsToBody ts ds def actions
-    case res of
-      Left err -> throwError err
-      Right (def', z) -> do
-        let meta = either (view _exprMetaLens . target) (view _typeMetaLens . target) $ locToEither z
-        pure
-          ( ts
-          , Map.insert defName def' ds
-          , Just $
-              Selection defName $
-                Just
-                  NodeSelection
-                    { nodeType = BodyNode
-                    , meta
-                    }
-          )
-  SigAction actions -> editModuleOf mdefName prog $ \ts ds defName def -> do
-    res <- applyActionsToTypeSig ts ds (defName, def) actions
-    case res of
-      Left err -> throwError err
-      Right (ts', ds', zt) -> do
-        let node = target zt
-            meta = view _typeMetaLens node
-         in pure
-              ( ts'
-              , ds'
-              , Just $
-                  Selection defName $
-                    Just
-                      NodeSelection
-                        { nodeType = SigNode
-                        , meta = meta
-                        }
-              )
+  BodyAction defName id Delete -> editModuleOf (Just defName) prog $ \ts ds _ def -> do
+    loc <- case focusOn id (defExpr def) of
+      Nothing -> throwError $ IDNotFound id
+      Just x -> pure x
+    i <- fresh
+    let e' = case loc of
+         InExpr ez -> unfocusExpr $ replace (EmptyHole i) ez
+         InType tz -> unfocusExpr $ unfocusType $ replace (TEmptyHole i) tz
+    let ds' = Map.insert defName (def {defExpr = e'}) ds
+    pure (ts,ds',Nothing)
+  BodyAction defName id ConstructArrowL -> editModuleOf (Just defName) prog $ \ts ds _ def -> do
+    loc <- case focusOn id (defExpr def) of
+      Nothing -> throwError $ IDNotFound id
+      Just x -> pure x
+    e' <- case loc of
+         InExpr _ -> throwError $ CustomFailure ConstructArrowL "not in type"
+         InType tz -> unfocusExpr . unfocusType <$> constructArrowL tz
+    let ds' = Map.insert defName (def {defExpr = e'}) ds
+    pure (ts,ds',Nothing)
+  SigAction defName id Delete -> editModuleOf (Just defName) prog $ \ts ds _ def -> do
+    tz <- case focusOnTy id (defType def) of
+      Nothing -> throwError $ IDNotFound id
+      Just x -> pure x
+    i <- fresh
+    let t' = fromZipper $ replace (TEmptyHole i) tz
+    let ds' = Map.insert defName (def {defType = t'}) ds
+    pure (ts,ds',Nothing)
+  SigAction defName id ConstructArrowL -> editModuleOf (Just defName) prog $ \ts ds _ def -> do
+    tz <- case focusOnTy id (defType def) of
+      Nothing -> throwError $ IDNotFound id
+      Just x -> pure x
+    t' <- fromZipper <$> constructArrowL tz
+    let ds' = Map.insert defName (def {defType = t'}) ds
+    pure (ts,ds',Nothing)
+  where
+    recheck p = do
+      (tys,tms) <- checkEverything $ CheckEverything {toCheckTys = progTypes p, toCheckTms = progDefs p}
+      pure $ p {progTypes = tys, progDefs = tms}
 
 editModule ::
   MonadError Error m =>

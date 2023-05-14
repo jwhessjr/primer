@@ -15,14 +15,8 @@ import Actions (Action)
 -- | High level actions
 -- These actions move around the whole program or modify definitions
 data ProgAction
-  = -- | Move the cursor to the definition with the given Name
-    MoveToDef Text
-  | -- | Rename the definition with the given (base) Name
-    RenameDef Text Text
-  | -- | Delete a new definition
-    DeleteDef Text
-  | -- | Execute a sequence of actions on the body of the definition
-    BodyAction [Action]
-  | -- | Execute a sequence of actions on the type annotation of the definition
-    SigAction [Action]
+  = RenameDef Text Text
+  | DeleteDef Text
+  | BodyAction Text Int Action
+  | SigAction Text Int Action
   deriving stock (Eq, Show, Read)

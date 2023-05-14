@@ -14,7 +14,6 @@ import Foreword
 --  Some of them take Text arguments rather than Name because they represent
 --  untrusted input from the frontend.
 data Action
-  = SetCursor Int
-  | Delete
+  = Delete
   | ConstructArrowL
   deriving stock (Eq, Show, Read)

@@ -4,6 +4,7 @@ module Action (
   applyActionsToTypeSig,
   toProgActionInput,
   toProgActionNoInput,
+  constructArrowL,
 ) where
 
 import Foreword hiding (mod)
@@ -38,6 +39,7 @@ import Typecheck (
 import Typecheck qualified as TC
 import Zipper (
   ExprZ,
+  IsZipper,
   Loc (..),
   TypeZ,
   focus,
@@ -192,7 +194,6 @@ synthZ z = do
 
 applyAction' :: ActionM m => Action -> Loc -> m Loc
 applyAction' a = case a of
-  SetCursor i -> setCursor i . unfocusLoc
   Delete -> \case
     InExpr ze -> InExpr . flip replace ze <$> emptyHole
     InType zt -> InType . flip replace zt <$> tEmptyHole
@@ -207,7 +208,7 @@ setCursor i e = case focusOn i (unfocusExpr e) of
   Just e' -> pure e'
   Nothing -> throwError $ IDNotFound i
 
-constructArrowL :: ActionM m => TypeZ -> m TypeZ
+constructArrowL :: (IsZipper z Type, MonadFresh Int m) => z -> m z
 constructArrowL zt = flip replace zt <$> tfun (pure (target zt)) tEmptyHole
 
 -- | Convert a high-level 'Available.NoInputAction' to a concrete sequence of 'ProgAction's.
@@ -215,16 +216,16 @@ toProgActionNoInput ::
   Text ->
   Maybe (NodeType, Int) ->
   Available.NoInputAction ->
-  Either Error [ProgAction]
+  Either Error ProgAction
 toProgActionNoInput defName mNodeSel = \case
   Available.MakeFun ->
     -- We arbitrarily choose that the "construct a function type" action places the focused expression
     -- on the domain (left) side of the arrow.
-    toProgAction [ConstructArrowL]
+    toProgAction ConstructArrowL
   Available.DeleteType ->
-    toProgAction [Delete]
+    toProgAction Delete
   Available.DeleteDef ->
-    pure [DeleteDef defName]
+    pure $ DeleteDef defName
   where
     toProgAction actions = toProg' actions defName <$> maybeToEither NoNodeSelection mNodeSel
 
@@ -238,10 +239,7 @@ toProgActionInput ::
 toProgActionInput defName opt = \case
   Available.RenameDef -> pure [RenameDef defName $ Available.option opt]
 
-toProg' :: [Action] -> Text -> (NodeType, Int) -> [ProgAction]
-toProg' actions defName (nt, id) =
-  [ MoveToDef defName
-  , (SetCursor id : actions) & case nt of
-      SigNode -> SigAction
-      BodyNode -> BodyAction
-  ]
+toProg' :: Action -> Text -> (NodeType, Int) -> ProgAction
+toProg' actions defName (nt, id) = case nt of
+    SigNode -> SigAction defName id actions
+    BodyNode -> BodyAction defName id actions
