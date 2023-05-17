@@ -2,7 +2,6 @@ module Primer.TypeDef (
   TypeDef (..),
   ValCon (..),
   TypeDefMap,
-  typeDefAST,
   typeDefKind,
   typeDefParameters,
   ASTTypeDef (..),
@@ -70,9 +69,6 @@ typeDefParameters :: TypeDef b -> [Kind]
 typeDefParameters = \case
   TypeDefPrim t -> primTypeDefParameters t
   TypeDefAST t -> snd <$> astTypeDefParameters t
-typeDefAST :: TypeDef b -> Maybe (ASTTypeDef b)
-typeDefAST = \case
-  TypeDefPrim _ -> Nothing
-  TypeDefAST t -> Just t
+
 typeDefKind :: TypeDef b -> Kind
 typeDefKind = foldr KFun KType . typeDefParameters

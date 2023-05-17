@@ -9,36 +9,30 @@ module Primer.Typecheck.Utils (
   lookupConstructor,
   typeOf,
   _typecache,
-  getGlobalNames,
-  getGlobalBaseNames,
 ) where
 
 import Foreword
 
-import Control.Arrow ((&&&))
 import Control.Monad.Fresh (MonadFresh)
 import Data.Functor.Compose (Compose (Compose, getCompose))
 import Data.Map qualified as M
-import Data.Map qualified as Map
-import Data.Set qualified as S
 import Data.Tuple.Extra (fst3)
 import Optics (Lens', view, (%))
-import Primer.Core (Expr', GlobalName (baseName, qualifiedModule), ModuleName, TypeCache, _exprMetaLens)
+import Primer.Core (Expr', TypeCache, _exprMetaLens)
 import Primer.Core.Meta (Meta, TyConName, ValConName, _type)
 import Primer.Core.Transform (decomposeTAppCon)
 import Primer.Core.Type (Kind, Type' (TEmptyHole, THole))
 import Primer.Core.Type.Utils (forgetTypeMetadata)
-import Primer.Name (Name, NameCounter)
+import Primer.Name (NameCounter)
 import Primer.Subst (substTySimul)
 import Primer.TypeDef (
   ASTTypeDef (astTypeDefConstructors, astTypeDefParameters),
   TypeDef (TypeDefAST, TypeDefPrim),
   TypeDefMap,
   ValCon (valConArgs, valConName),
-  typeDefAST,
   typeDefParameters,
  )
-import Primer.Typecheck.Cxt (Cxt, globalCxt, typeDefs)
+import Primer.Typecheck.Cxt (Cxt, typeDefs)
 
 -- We assume that constructor names are unique, returning the first one we find
 lookupConstructor :: TypeDefMap -> ValConName -> Maybe (ValCon (), TyConName, ASTTypeDef ())
@@ -123,25 +117,3 @@ _typecache = _exprMetaLens % _type
 -- | Get the type of an 'ExprT'
 typeOf :: Expr' (Meta TypeCache) (Meta Kind) -> TypeCache
 typeOf = view _typecache
-
--- Helper to create fresh names
-getGlobalNames :: MonadReader Cxt m => m (S.Set (ModuleName, Name))
-getGlobalNames = do
-  tyDefs <- asks typeDefs
-  topLevel <- asks $ S.fromList . map f . M.keys . globalCxt
-  let ctors =
-        Map.foldMapWithKey
-          ( \t def ->
-              S.fromList $
-                (f t :) $
-                  map (f . valConName) $
-                    maybe [] astTypeDefConstructors $
-                      typeDefAST def
-          )
-          tyDefs
-  pure $ S.union topLevel ctors
-  where
-    f = qualifiedModule &&& baseName
-
-getGlobalBaseNames :: MonadReader Cxt m => m (S.Set Name)
-getGlobalBaseNames = S.map snd <$> getGlobalNames

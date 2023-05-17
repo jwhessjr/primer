@@ -4,7 +4,6 @@ module Primer.Core.Utils (
   forgetTypeMetadata,
   generateIDs,
   forgetMetadata,
-  noHoles,
   _freeVarsTy,
   freeVarsTy,
   alphaEqTy,
@@ -31,7 +30,6 @@ import Primer.Core.Type.Utils (
   alphaEqTy,
   forgetTypeMetadata,
   freeVarsTy,
-  noHoles,
   _freeVarsTy,
  )
 

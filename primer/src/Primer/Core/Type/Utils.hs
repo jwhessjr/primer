@@ -1,6 +1,5 @@
 module Primer.Core.Type.Utils (
   forgetTypeMetadata,
-  noHoles,
   _freeVarsTy,
   traverseFreeVarsTy,
   freeVarsTy,
@@ -9,8 +8,6 @@ module Primer.Core.Type.Utils (
 
 import Foreword
 
-import Data.Data (Data)
-import Data.Generics.Uniplate.Data (universe)
 import Data.Map.Strict qualified as M
 import Data.Set qualified as S
 import Data.Set.Optics (setOf)
@@ -27,7 +24,6 @@ import Primer.Core.Meta (
   TyVarName,
  )
 import Primer.Core.Type (
-  Kind (KHole),
   Type' (..),
   _typeMeta,
  )
@@ -36,17 +32,6 @@ import Primer.Core.Type (
 -- Technically this replaces all annotations, regardless of what they are.
 forgetTypeMetadata :: Type' a -> Type' ()
 forgetTypeMetadata = set _typeMeta ()
-
--- | Test whether an type contains any holes
--- (empty or non-empty, or inside a kind)
-noHoles :: Data a => Type' a -> Bool
-noHoles t = flip all (universe t) $ \case
-  THole{} -> False
-  TEmptyHole{} -> False
-  TForall _ _ k _ -> flip all (universe k) $ \case
-    KHole -> False
-    _ -> True
-  _ -> True
 
 freeVarsTy :: Type' a -> Set TyVarName
 freeVarsTy = setOf (getting _freeVarsTy % _2)
