@@ -91,43 +91,8 @@ type Expr = Expr' ExprMeta TypeMeta
 -- Most of the backend fixes a ~ b ~ ID.
 -- The typechecker produces a ~ (ID, Type' ()), b ~ ID.
 data Expr' a b
-  = Hole a (Expr' a b) -- See Note [Holes and bidirectionality]
-  | EmptyHole a
+  = EmptyHole a
   | Ann a (Expr' a b) (Type' b)
-  | App a (Expr' a b) (Expr' a b)
-  | APP a (Expr' a b) (Type' b)
-  | Lam a LVarName (Expr' a b)
-  | LAM a TyVarName (Expr' a b)
-  | Var a TmVarRef
-  | Let
-      a
-      LVarName
-      -- ^ bound variable
-      (Expr' a b)
-      -- ^ value the variable is bound to
-      (Expr' a b)
-      -- ^ expression the binding scopes over
-  | -- | LetType binds a type to a name in some expression.
-    -- It is currently only constructed automatically during evaluation -
-    -- the student can't directly make it.
-    LetType
-      a
-      TyVarName
-      -- ^ bound variable
-      (Type' b)
-      -- ^ value the variable is bound to
-      (Expr' a b)
-      -- ^ expression the binding scopes over
-  | Letrec
-      a
-      LVarName
-      -- ^ bound variable
-      (Expr' a b)
-      -- ^ value the variable is bound to; the variable itself is in scope, as this is a recursive let
-      (Type' b)
-      -- ^ type of the bound variable (variable is not in scope in this type)
-      (Expr' a b)
-      -- ^ body of the let; binding scopes over this
   | Case a (Expr' a b) [CaseBranch] -- See Note [Case]
   deriving stock (Eq, Show, Read, Data, Generic)
 

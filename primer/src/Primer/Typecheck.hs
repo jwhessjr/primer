@@ -178,27 +178,6 @@ type TypeM e m =
 -- cached types, and @TCSynthed T == typeOf e'@
 synth :: TypeM e m => Expr -> m (Type, ExprT)
 synth = \case
-  Var i x -> do
-    t <- either throwError' pure . lookupVar x =<< ask
-    pure $ annSynth1 t i Var x
-  App i e1 e2 -> do
-    -- Synthesise e1
-    (t1, e1') <- synth e1
-    -- Check that e1 has an arrow type
-    case matchArrowType t1 of
-      Just (t2, t) -> do
-        -- Check e2 against the domain type of e1
-        e2' <- check t2 e2
-        pure $ annSynth2 t i App e1' e2'
-      Nothing -> throwError' $ TypeDoesNotMatchArrow t1
-  APP i e t -> do
-    (et, e') <- synth e
-    matchForallType et >>= \case
-      Just (v, vk, b) -> do
-        t' <- checkKind' vk t
-        bSub <- substTy v (forgetTypeMetadata t') b
-        pure (bSub, APP (annotate (TCSynthed bSub) i) e' t')
-      Nothing -> throwError' $ TypeDoesNotMatchForall et
   Ann i e t -> do
     -- Check that the type is well-formed by synthesising its kind
     t' <- checkKind' KType t
@@ -220,25 +199,6 @@ synth = \case
   -- leaving (? : Nat -> Nat) {? True ?}. This causes holes to jump around
   -- which is bad UX.
   -- See https://github.com/hackworthltd/primer/issues/7
-  Hole i e -> do
-    (_, e') <- synth e
-    pure $ annSynth1 (TEmptyHole ()) i Hole e'
-  Let i x a b -> do
-    -- Synthesise a type for the bound expression
-    (aT, a') <- synth a
-    -- Extend the context with the binding, and synthesise the body
-    (bT, b') <- local (extendLocalCxt (x, aT)) $ synth b
-    pure $ annSynth3 bT i Let x a' b'
-  Letrec i x a tA b -> do
-    -- Check that tA is well-formed
-    tA' <- checkKind' KType tA
-    let t = forgetTypeMetadata tA'
-        ctx' = extendLocalCxt (x, t)
-    -- Check the bound expression against its annotation
-    a' <- local ctx' $ check t a
-    -- Extend the context with the binding, and synthesise the body
-    (bT, b') <- local ctx' $ synth b
-    pure $ annSynth4 bT i Letrec x a' tA' b'
   e -> throwError' $ CannotSynthesiseType e
   where
     -- We could combine these with some type class shenanigans, but it doesn't
@@ -253,43 +213,11 @@ synth = \case
 -- | Similar to synth, but for checking rather than synthesis.
 check :: TypeM e m => Type -> Expr -> m ExprT
 check t = \case
-  Lam i x e -> do
-    case matchArrowType t of
-      Just (t1, t2) -> do
-        e' <- local (extendLocalCxt (x, t1)) $ check t2 e
-        pure (Lam (annotate (TCChkedAt t) i) x e')
-      Nothing -> throwError' $ TypeDoesNotMatchArrow t
-  LAM i n e -> do
-    matchForallType t >>= \case
-      Just (m, k, b) -> do
-        b' <- substTy m (TVar () n) b
-        e' <- local (extendLocalCxtTy (n, k)) $ check b' e
-        pure $ LAM (annotate (TCChkedAt t) i) n e'
-      Nothing -> throwError' $ TypeDoesNotMatchForall t
-  Let i x a b -> do
-    -- Synthesise a type for the bound expression
-    (aT, a') <- synth a
-    -- Extend the context with the binding, and check the body against the type
-    b' <- local (extendLocalCxt (x, aT)) $ check t b
-    -- NB here: if b were synthesisable, we bubble that information up to the
-    -- let, saying @typeOf b'@ rather than @TCChkedAt t@
-    -- TODO: why do we do this?
-    pure $ Let (annotate (typeOf b') i) x a' b'
-  Letrec i x a tA b -> do
-    -- Check that tA is well-formed
-    tA' <- checkKind' KType tA
-    let ctx' = extendLocalCxt (x, forgetTypeMetadata tA')
-    -- Check the bound expression against its annotation
-    a' <- local ctx' $ check (forgetTypeMetadata tA') a
-    -- Extend the context with the binding, and synthesise the body
-    b' <- local ctx' $ check t b
-    pure $ Letrec (annotate (TCChkedAt t) i) x a' tA' b'
   Case i e brs -> do
     (eT, e') <- synth e
     let caseMeta = annotate (TCChkedAt t) i
     let isHoleTy = case eT of
             TEmptyHole{} -> True
-            THole{} -> True
             _ -> False
     if isHoleTy
      then if null brs
@@ -308,7 +236,6 @@ check t = \case
 -- holes on both sides.
 matchArrowType :: Type -> Maybe (Type, Type)
 matchArrowType (TEmptyHole _) = pure (TEmptyHole (), TEmptyHole ())
-matchArrowType (THole _ _) = pure (TEmptyHole (), TEmptyHole ())
 matchArrowType (TFun _ a b) = pure (a, b)
 matchArrowType _ = Nothing
 
@@ -317,8 +244,6 @@ matchArrowType _ = Nothing
 matchForallType :: MonadFresh NameCounter m => Type -> m (Maybe (TyVarName, Kind, Type))
 -- These names will never enter the program, so we don't need to avoid shadowing
 matchForallType (TEmptyHole _) = (\n -> Just (n, KHole, TEmptyHole ())) <$> freshLocalName mempty
-matchForallType (THole _ _) = (\n -> Just (n, KHole, TEmptyHole ())) <$> freshLocalName mempty
-matchForallType (TForall _ a k t) = pure $ Just (a, k, t)
 matchForallType _ = pure Nothing
 
 -- | Two types are consistent if they are equal (up to IDs and alpha) when we
@@ -331,8 +256,6 @@ consistentTypes x y = uncurry eqType $ holepunch x y
     -- obviously different constructors.)
     holepunch (TEmptyHole _) _ = (TEmptyHole (), TEmptyHole ())
     holepunch _ (TEmptyHole _) = (TEmptyHole (), TEmptyHole ())
-    holepunch (THole _ _) _ = (TEmptyHole (), TEmptyHole ())
-    holepunch _ (THole _ _) = (TEmptyHole (), TEmptyHole ())
     holepunch (TFun _ s t) (TFun _ s' t') =
       let (hs, hs') = holepunch s s'
           (ht, ht') = holepunch t t'
@@ -341,10 +264,6 @@ consistentTypes x y = uncurry eqType $ holepunch x y
       let (hs, hs') = holepunch s s'
           (ht, ht') = holepunch t t'
        in (TApp () hs ht, TApp () hs' ht')
-    holepunch (TForall _ n k s) (TForall _ m l t) =
-      let (hs, ht) = holepunch s t
-       in -- Perhaps we need to compare the kinds up to holes also?
-          (TForall () n k hs, TForall () m l ht)
     holepunch s t = (s, t)
 
 -- | Compare two types for alpha equality, ignoring their IDs

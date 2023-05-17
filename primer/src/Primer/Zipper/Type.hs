@@ -35,7 +35,7 @@ import Primer.Core.Meta (
   TyVarName,
  )
 import Primer.Core.Type (
-  Type' (TForall, TLet),
+  Type',
  )
 
 
@@ -98,9 +98,4 @@ data LetTypeBinding' a = LetTypeBind TyVarName (Type' a)
 
 getBoundHereTy' :: Eq a => Type' a -> Maybe (Type' a) -> [Either TyVarName (LetTypeBinding' a)]
 getBoundHereTy' t prev = case t of
-  TForall _ v _ _ -> [Left v]
-  TLet _ v rhs b ->
-    if maybe True (== b) prev
-      then [Right $ LetTypeBind v rhs]
-      else mempty
   _ -> mempty

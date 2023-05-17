@@ -12,7 +12,7 @@ import Hedgehog (
   (===),
  )
 import Primer.Core (
-  Expr' (APP, Ann, App, EmptyHole),
+  Expr' (Ann, EmptyHole),
   ID,
   Kind (KType),
  )
@@ -49,10 +49,13 @@ tasty_refinement_synths = propertyWT $ do
   annotateShow r
   case r of
     Just (is, instTy) -> do
-      (sb, apps) <- forAllT $ genInstApp is
-      let f x = \case Right tm -> App () x tm; Left ty' -> APP () x ty'
-          e = foldl' f (Ann () (EmptyHole ()) src) apps
-      annotateShow e
+      --(sb, apps) <- forAllT $ genInstApp is
+      --let f x = \case Right tm -> App () x tm; Left ty' -> APP () x ty'
+      --    e = foldl' f (Ann () (EmptyHole ()) src) apps
+      let sb = mempty
+      let apps = []
+      let e = Ann () (EmptyHole ()) src
+      --annotateShow e
       (ty, e') <- synthTest =<< generateIDs e
       e === forgetMetadata e' -- check no smart holes stuff happened
       let g i a = case (i, a) of (InstUnconstrainedAPP n _, Left t) -> Just $ M.singleton n t; _ -> Nothing

@@ -21,7 +21,7 @@ import Data.Map qualified as Map
 import Primer.Core.Meta (ID, LocalName (LocalName), Meta (Meta), TyVarName, unLocalName)
 import Primer.Core.Type (
   Kind (KFun, KHole, KType),
-  Type' (TApp, TEmptyHole, TForall, TFun, THole, TLet, TVar),
+  Type' (TApp, TEmptyHole, TFun),
  )
 import Primer.Name (NameCounter)
 import Primer.Typecheck.Cxt (Cxt (localCxt), KindOrType (K, T), Type)
@@ -82,37 +82,17 @@ extendLocalCxtTys x cxt = cxt{localCxt = Map.fromList (bimap unLocalName K <$> x
 synthKind :: KindM e m => Type' (Meta a) -> m (Kind, TypeT)
 synthKind = \case
   TEmptyHole m -> pure (KHole, TEmptyHole (annotate KHole m))
-  THole m t -> do
-    (_, t') <- synthKind t
-    pure (KHole, THole (annotate KHole m) t')
   TFun m a b -> do
     a' <- checkKind KType a
     b' <- checkKind KType b
     pure (KType, TFun (annotate KType m) a' b')
-  TVar m v -> do
-    asks (lookupLocalTy v) >>= \case
-      Right k -> pure (k, TVar (annotate k m) v)
-      Left err -> throwError' err
-  TApp ma (THole mh s) t -> do
-    -- If we didn't have this special case, we might remove this hole (in a
-    -- recursive call), only to reintroduce it again with a different ID
-    -- TODO: ugly and duplicated...
-    (_, s') <- synthKind s
-    checkKind KHole t >>= \t' -> pure (KHole, TApp (annotate KHole ma) (THole (annotate KHole mh) s') t')
   TApp m s t -> do
     (k, s') <- synthKind s
     case matchArrowKind k of
       Nothing -> throwError' $ KindDoesNotMatchArrow k
       Just (k1, k2) -> checkKind k1 t >>= \t' -> pure (k2, TApp (annotate k2 m) s' t')
-  TForall m n k t -> do
-    t' <- local (extendLocalCxtTy (n, k)) $ checkKind KType t
-    pure (KType, TForall (annotate KType m) n k t')
-  TLet{} -> throwError' TLetUnsupported
 
 checkKind :: KindM e m => Kind -> Type' (Meta a) -> m TypeT
-checkKind _ (THole m t) = do
-  (_, t') <- synthKind t
-  pure $ THole (annotate KHole m) t'
 checkKind k t = do
   (k', t') <- synthKind t
   if consistentKinds k k'

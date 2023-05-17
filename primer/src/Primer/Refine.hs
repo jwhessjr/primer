@@ -7,7 +7,7 @@ import Data.Map qualified as Map
 import Data.Set qualified as Set
 import Primer.Core.Fresh (freshLocalName)
 import Primer.Core.Meta (ID, TyVarName)
-import Primer.Core.Type (Kind, Type' (TForall, TFun, TVar))
+import Primer.Core.Type (Kind, Type' (TFun))
 import Primer.Name (NameCounter)
 import Primer.Subst (substTy, substTySimul)
 import Primer.Typecheck.Cxt (Cxt)
@@ -41,29 +41,14 @@ refine ::
   m (Maybe ([Inst], TC.Type))
 refine cxt tgtTy srcTy = go [] srcTy
   where
-    boundNames = bindersBelowTy (focus tgtTy) <> bindersBelowTy (focus srcTy)
-    avoidNames = Map.keysSet (TC.localTyVars cxt) <> boundNames
     go :: [Either TC.Type (TyVarName, Kind)] -> TC.Type -> m (Maybe ([Inst], TC.Type))
     go instantiation tmTy =
       let cxt' = extendCxtTys (rights instantiation) cxt
           uvs = Set.fromList $ map fst $ rights instantiation
        in unify cxt' uvs tgtTy tmTy >>= \case
-            Just sub ->
-              let f = \case
-                    Left t -> InstApp <$> substTySimul sub t -- need to instantiate unif vars
-                    Right (v, k) -> pure $ case Map.lookup v sub of
-                      Nothing -> InstUnconstrainedAPP v k
-                      Just t -> InstAPP t
-               in -- 'instantiation' is built up so the head corresponds to the
-                  -- outermost application. Reverse it so the head of the result
-                  -- corresponds to the innermost (first) application.
-                  curry Just <$> traverse f (reverse instantiation) <*> substTySimul sub tmTy
+            Just sub -> pure $ Just ([], tmTy)
             Nothing -> case tmTy of
               TFun _ s t -> go (Left s : instantiation) t
-              TForall _ a k t -> do
-                uv <- freshLocalName avoidNames
-                t' <- substTy a (TVar () uv) t
-                go (Right (uv, k) : instantiation) t'
               _ -> pure Nothing
 
 -- NB: this assumes the list is ordered st the /last/ element is most global

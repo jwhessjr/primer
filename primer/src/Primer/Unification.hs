@@ -12,7 +12,7 @@ import Primer.Core.Meta (
   trivialMeta,
  )
 import Primer.Core.Type (
-  Type' (TApp, TEmptyHole, TForall, TFun, THole, TVar),
+  Type' (TApp, TEmptyHole, TFun),
   _typeMeta,
  )
 import Primer.Core.Type.Utils (_freeVarsTy)
@@ -152,60 +152,8 @@ lookupSubst = gets . M.lookup
 unify' :: MonadFresh NameCounter m => Type -> Type -> U m ()
 unify' (TEmptyHole _) _ = pure ()
 unify' _ (TEmptyHole _) = pure ()
-unify' (THole _ _) _ = pure ()
-unify' _ (THole _ _) = pure ()
-unify' vx@(TVar _ x) vy@(TVar _ y) = do
-  ux <- isUnifVarL x
-  uy <- isUnifVarR y
-  eq <- isSameVar x y
-  case (ux, uy, eq) of
-    (_, _, True) -> pure ()
-    (True, True, _) -> if x < y then unifyVar x vy else local swapEnv $ unifyVar y vx -- ensure unify S T == unify T S
-    (True, _, _) -> unifyVar x vy
-    (False, True, _) -> local swapEnv $ unifyVar y vx
-    (False, False, False) -> throwError $ NotUnify vx vy
-unify' vx@(TVar _ x) t =
-  isUnifVarL x >>= \case
-    True -> unifyVar x t
-    False -> throwError $ NotUnify vx t
-unify' s vy@(TVar _ _) = local swapEnv $ unify' vy s
 unify' (TFun _ s1 t1) (TFun _ s2 t2) = unify' s1 s2 >> unify' t1 t2
 -- Doing first-order unification, as applications are only constructor-like
 -- (we don't have any bona fide functions at the type level)
 unify' (TApp _ s1 t1) (TApp _ s2 t2) = unify' s1 s2 >> unify' t1 t2
-unify' (TForall _ n1 k1 t1) (TForall _ n2 k2 t2) | consistentKinds k1 k2 = local (bind n1 n2) $ unify' t1 t2
 unify' s t = throwError $ NotUnify s t
-
--- We delay substitution till unifyVar case, so the monadic (>>) can be trivial
--- but we want the substitution to be "grounded"/"idempotent": free of solved unif vars on rhs
---  so: before record, need to subst in soln; after record need to subst new sol'n in every rhs
-unifyVar :: MonadFresh NameCounter m => TyVarName -> Type -> U m ()
-unifyVar v t =
-  lookupSubst v >>= \case
-    Just v' -> unify' v' t
-    Nothing -> do
-      t' <- subst t
-      bound <- asks (M.keysSet . boundVarsR)
-      let f (_, n) = n == v || S.member n bound
-      -- occurs check + check t' does not mention bound variables which wouldn't be in scope for the unifier
-      -- (It is not necessary to check boundVarsL, since such a reference could only occur via the expansion
-      -- of another uv (a uv on the left will get solved by a subterm of the rhs, modulo expanding
-      -- previously-solved uvs), and thus we would have noticed the problem in a previous iteration.
-      if anyOf (getting _freeVarsTy) f t'
-        then throwError $ OccursBoundCheckFail v t'
-        else solve v t'
-
--- We both insert the solution, and substitute it in the RHS of known solutions
-solve :: MonadFresh NameCounter m => TyVarName -> Type -> U m ()
-solve n t = do
-  sb <- get
-  sb' <- traverse (substTy n t) sb
-  let sb'' = M.insert n t sb'
-  put sb''
-
--- applies the substitution to the (unification variables in the) type
-subst :: MonadFresh NameCounter m => Type -> U m Type
-subst t = do
-  sb <- get
-  let f (m, n) = fromMaybe (TVar m n) $ M.lookup n sb
-  pure $ over _freeVarsTy f t
