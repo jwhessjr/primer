@@ -72,10 +72,7 @@ newtype WT a = WT {unWT :: ReaderT Cxt TestM a}
     , MonadFresh ID
     )
 
-instance MonadFresh NameCounter (GenT WT) where
-  fresh = lift fresh
-
-instance MonadFresh ID (GenT WT) where
+instance MonadFresh f m => MonadFresh f (GenT m) where
   fresh = lift fresh
 
 instance MonadFresh NameCounter (PropertyT WT) where
@@ -85,7 +82,7 @@ instance MonadFresh ID (PropertyT WT) where
   fresh = lift fresh
 
 -- genSyns T with cxt Γ should generate (e,S) st Γ |- e ∈ S and S ~ T (i.e. same up to holes and alpha)
-genSyns :: TypeG -> GenT WT (ExprG, TypeG)
+genSyns :: Monad m => TypeG -> GenT m (ExprG, TypeG)
 genSyns ty = do
   Gen.choice [genEmptyHole, genAnn]
   where
@@ -105,7 +102,7 @@ genSyns ty = do
 --   @sub ! a = t@ and @apps !! n = Left t@.
 -- - @sub@ is idempotent, and @apps@ do not refer to these names. I.e. the names
 --   in @InstUnconstrainedAPP@ do not appear free in @apps@ or the rhs of @sub@.
-genInstApp :: [Inst] -> GenT WT (Map TyVarName (Type' ()), [Either TypeG ExprG])
+genInstApp :: MonadFresh NameCounter m => [Inst] -> GenT m (Map TyVarName (Type' ()), [Either TypeG ExprG])
 genInstApp = reify mempty
   where
     reify sb = \case
@@ -114,7 +111,7 @@ genInstApp = reify mempty
       InstAPP t : is -> (\t' -> second (Left t' :)) <$> substTySimul sb t <*> reify sb is
       InstUnconstrainedAPP v k : is -> genWTType k >>= \t' -> second (Left t' :) <$> reify (M.insert v t' sb) is
 
-genChk :: TypeG -> GenT WT ExprG
+genChk :: Monad m => TypeG -> GenT m ExprG
 genChk ty = Gen.choice [emb, pure case_]
   where
     emb = fst <$> genSyns ty
@@ -124,22 +121,20 @@ genChk ty = Gen.choice [emb, pure case_]
 -- | Generates types which infer kinds consistent with the argument
 -- I.e. @genWTType k@ will generate types @ty@ such that @synthKind ty = k'@
 -- with @consistentKinds k k'@. See 'Tests.Gen.Core.Typed.tasty_genTy'
-genWTType :: Kind -> GenT WT TypeG
+genWTType :: Monad m => Kind -> GenT m TypeG
 genWTType k = do
   let rec = app : catMaybes [arrow]
   Gen.recursive Gen.choice [ehole] rec
   where
-    ehole :: GenT WT TypeG
     ehole = pure $ TEmptyHole ()
     app = do k' <- genWTKind; TApp () <$> genWTType (KFun k' k) <*> genWTType k'
-    arrow :: Maybe (GenT WT TypeG)
     arrow =
       if k == KHole || k == KType
         then Just $ TFun () <$> genWTType KType <*> genWTType KType
         else Nothing
 
 -- | Generates an arbitary kind. Note that all kinds are well-formed.
-genWTKind :: GenT WT Kind
+genWTKind :: Monad m => GenT m Kind
 genWTKind = Gen.recursive Gen.choice [pure KType] [KFun <$> genWTKind <*> genWTKind]
 
 hoist' :: Applicative f => Cxt -> WT a -> f a
