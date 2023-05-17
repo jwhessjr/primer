@@ -15,7 +15,6 @@ import Primer.Core (
   Expr' (APP, Ann, App, EmptyHole),
   ID,
   Kind (KType),
-  Type' (TEmptyHole, THole),
  )
 import Primer.Core.Utils (forgetMetadata, generateIDs)
 import Primer.Gen.Core.Typed (
@@ -64,8 +63,3 @@ tasty_refinement_synths = propertyWT [] $ do
       ty === instTy'
       diff ty consistentTypes tgt
     _ -> discard
-
-isHole :: Type' a -> Bool
-isHole (TEmptyHole _) = True
-isHole (THole _ _) = True
-isHole _ = False
