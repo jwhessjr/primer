@@ -1,11 +1,7 @@
 module Primer.Def (
   Def (..),
-  _DefAST,
   DefMap,
   ASTDef (..),
-  _astDefExpr,
-  _astDefType,
-  defAST,
   defType,
 ) where
 
@@ -19,14 +15,11 @@ import Primer.Core (
   Type',
  )
 import Primer.Core.Utils (forgetTypeMetadata)
-import Optics (Lens', lens, iso, Iso')
 
 data Def
   = DefAST ASTDef
   deriving stock (Eq, Show, Read, Data)
 
-_DefAST :: Iso' Def ASTDef
-_DefAST = iso (\(DefAST d) -> d) DefAST
 
 defType :: Def -> Type' ()
 defType = \case
@@ -41,13 +34,3 @@ data ASTDef = ASTDef
   , astDefType :: Type
   }
   deriving stock (Eq, Show, Read, Data)
-
-_astDefExpr :: Lens' ASTDef Expr
-_astDefExpr = lens astDefExpr $ \d e -> d{astDefExpr = e}
-
-_astDefType :: Lens' ASTDef Type
-_astDefType = lens astDefType $ \d t -> d{astDefType = t}
-
-defAST :: Def -> Maybe ASTDef
-defAST = \case
-  DefAST t -> Just t
