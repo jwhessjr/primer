@@ -21,7 +21,6 @@ executable primer-test
     Primer.Core.Transform
     Primer.Core.Utils
     Primer.Def
-    Primer.Def.Utils
     Primer.EvalFull
     Primer.Module
     Primer.Name
