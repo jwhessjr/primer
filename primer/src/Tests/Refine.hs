@@ -9,47 +9,30 @@ import Hedgehog (
   annotateShow,
   diff,
   discard,
-  failure,
-  success,
   (===),
  )
---import Primer.Builtins (tBool, tList, tNat)
 import Primer.Core (
   Expr' (APP, Ann, App, EmptyHole),
   ID,
-  Kind (KFun, KType),
-  Type' (TApp, TCon, TEmptyHole, TForall, TFun, THole, TVar),
+  Kind (KType),
+  Type' (TEmptyHole, THole),
  )
---import Primer.Core.Utils (forgetMetadata, freeVarsTy, generateIDs, noHoles)
 import Primer.Core.Utils (forgetMetadata, generateIDs)
 import Primer.Gen.Core.Typed (
   propertyWT,
    forAllT,
-  -- freshTyVarNameForCxt,
   genInstApp,
-  -- genWTKind,
   genWTType,
   synthTest,
  )
--- import Primer.Module (builtinModule, primitiveModule)
 import Primer.Name (NameCounter)
-import Primer.Refine (Inst (InstAPP, InstApp, InstUnconstrainedAPP), refine)
-import Primer.Subst (substTy, substTySimul)
-import Primer.Test.TestM (evalTestM)
-import Primer.TypeDef (astTypeDefConstructors, astTypeDefParameters, typeDefAST, valConType)
+import Primer.Refine (Inst (InstUnconstrainedAPP), refine)
+import Primer.Subst (substTySimul)
 import Primer.Typecheck (
   Cxt,
-  SmartHoles (NoSmartHoles),
   Type,
-  buildTypingContextFromModules',
   consistentTypes,
-  extendLocalCxtTy,
-  mkTAppCon,
-  typeDefs,
  )
---import Tasty (Property, withDiscards)
---import Test.Tasty.HUnit (Assertion, (@?=))
---import Tests.Gen.Core.Typed (propertyWTInExtendedLocalGlobalCxt, synthTest)
 
 refine' :: (MonadFresh NameCounter m, MonadFresh ID m) => Cxt -> Type -> Type -> m (Maybe ([Inst], Type))
 refine' cxt s t = fmap (either crash identity) $ runExceptT $ refine cxt s t

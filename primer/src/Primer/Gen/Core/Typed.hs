@@ -44,7 +44,6 @@ import Hedgehog.Gen qualified as Gen
 import Hedgehog.Internal.Property (forAllT)
 import Hedgehog.Range qualified as Range
 import Primer.Core (
-  Bind' (Bind),
   CaseBranch' (CaseBranch),
   Expr' (..),
   GVarName,
@@ -52,22 +51,19 @@ import Primer.Core (
   ID (),
   Kind (..),
   LVarName,
-  LocalName (LocalName, unLocalName),
+  LocalName (LocalName),
   ModuleName (),
-  TmVarRef (..),
   TyConName,
   TyVarName,
   Type' (..),
-  ValConName,
   qualifyName, Expr, unsafeMkGlobalName,
  )
 import Primer.Core.DSL (S)
-import Primer.Core.Utils (freeVarsTy)
-import Primer.Gen.Core.Raw (genLVarName, genModuleName, genName, genTyVarName)
+import Primer.Gen.Core.Raw (genModuleName, genName, genTyVarName)
 import Primer.Module (Module (..))
-import Primer.Name (Name, NameCounter, freshName, unName, unsafeMkName)
-import Primer.Refine (Inst (InstAPP, InstApp, InstUnconstrainedAPP), refine)
-import Primer.Subst (substTy, substTySimul)
+import Primer.Name (Name, NameCounter, freshName)
+import Primer.Refine (Inst (InstAPP, InstApp, InstUnconstrainedAPP))
+import Primer.Subst (substTySimul)
 import Primer.Test.TestM (
   TestM,
   evalTestM,
@@ -78,29 +74,20 @@ import Primer.TypeDef (
   TypeDef (..),
   ValCon (..),
   typeDefKind,
-  typeDefParameters,
-  valConType,
  )
 import Primer.Typecheck (
   Cxt (),
   SmartHoles (NoSmartHoles),
-  TypeDefError (TDIHoleType),
   buildTypingContextFromModules',
   consistentKinds,
   extendLocalCxt,
   extendLocalCxtTy,
   extendLocalCxtTys,
-  extendLocalCxts,
   extendTypeDefCxt,
   getGlobalBaseNames,
   globalCxt,
-  instantiateValCons,
   localCxt,
-  localTmVars,
   localTyVars,
-  matchArrowType,
-  matchForallType,
-  mkTAppCon,
   typeDefs, ExprT, TypeError, synth,
  )
 
@@ -163,160 +150,15 @@ freshTyVarNameForCxt = LocalName <$> freshNameForCxt
 freshTyConNameForCxt :: GenT WT TyConName
 freshTyConNameForCxt = qualifyName <$> genModuleName <*> freshNameForCxt
 
--- We try to have a decent distribution of names, where there is a
--- significant chance that the same name is reused (both in disjoint
--- contexts, and with shadowing). However, we need to ensure that our
--- generated terms are well scoped and well typed.  This is mostly
--- handled by carrying around a context and only generating variables
--- from that context. However, there is one place we need to be
--- careful: we may put the aimed-for type verbatim into an
--- annotation. We must ensure that binders do not capture type
--- variable references that are introduced in that way.
--- For this we use 'genLVarNameAvoiding' and 'genTyVarNameAvoiding'.
--- Note that the aimed-for type may change during generation; in
--- particular, it can change to be the type of a non-shadowed term
--- variable (or a subexpression of said type), for example in genApp.
--- Thus we must avoid free variables occuring in the types assigned
--- by the context to term variables as well as those in the aimed-for
--- type.
---
--- NB: the returned name may itself count as one of these term
--- variables in the context; i.e. if this name will be used to make a
--- binding whose scope we enter, we need to avoid names appearing free
--- in the type assigned to the returned name itself. This avoids
--- situations where we have original context "foo : K KType" and then
--- bind a term variable "foo : T foo": if we changed the aimed-for
--- type to the type of the term variable "foo", we would have captured
--- the original type variable "foo" by our new term variable "foo".
-genLVarNameAvoiding :: [TypeG] -> GenT WT LVarName
-genLVarNameAvoiding ty =
-  (\vs -> freshen (foldMap' freeVarsTy ty <> foldMap' freeVarsTy vs) 0)
-    <$> asks localTmVars
-    <*> genLVarName
-
-genTyVarNameAvoiding :: TypeG -> GenT WT TyVarName
-genTyVarNameAvoiding ty =
-  (\vs -> freshen (freeVarsTy ty <> foldMap' freeVarsTy vs) 0)
-    <$> asks localTmVars
-    <*> genTyVarName
-
-freshen :: Set (LocalName k') -> Int -> LocalName k -> LocalName k
-freshen fvs i n =
-  let suffix = if i > 0 then "_" <> show i else ""
-      m = LocalName $ unsafeMkName $ unName (unLocalName n) <> suffix
-   in if m `elem` fvs
-        then freshen fvs (i + 1) n
-        else m
-
 -- genSyns T with cxt Γ should generate (e,S) st Γ |- e ∈ S and S ~ T (i.e. same up to holes and alpha)
 genSyns :: TypeG -> GenT WT (ExprG, TypeG)
 genSyns ty = do
-  --genSpine' <- lift genSpine
-  --Gen.recursive Gen.choice [genEmptyHole, genAnn] $ [genHole, genApp, genAPP, genLet] ++ catMaybes [genSpine']
   Gen.choice [genEmptyHole, genAnn]
   where
     genEmptyHole = pure (EmptyHole (), TEmptyHole ())
     genAnn = do
       t <- genChk ty
       pure (Ann () t ty, ty)
-{-
-    genHole = do
-      (e, _) <- genSyn
-      pure (Hole () e, TEmptyHole ())
-    genSpine :: WT (Maybe (GenT WT (ExprG, TypeG)))
-    genSpine = fmap (fmap Gen.justT) genSpineHeadFirst
-    genSpineHeadFirst :: WT (Maybe (GenT WT (Maybe (ExprG, TypeG))))
-    -- todo: maybe add some lets in as post-processing? I could even add them to the locals for generation in the head
-    genSpineHeadFirst = do
-      localTms <- asks localTmVars
-      let locals' = map (first (Var () . LocalVarRef)) $ M.toList localTms
-      globals <- asks globalCxt
-      let globals' = map (first (Var () . GlobalVarRef)) $ M.toList globals
-      cons <- asks allCons
-      let cons' = map (first (Con ())) $ M.toList cons
-      let hsPure = locals' ++ globals' ++ cons'
-      let hs = map pure hsPure
-      pure $
-        if null hs
-          then Nothing
-          else Just $ do
-            (he, hT) <- Gen.choice hs
-            cxt <- ask
-            runExceptT (refine cxt ty hT) >>= \case
-              -- This error case indicates a bug. Crash and fail loudly!
-              Left err -> panic $ "Internal refine/unify error: " <> show err
-              Right Nothing -> pure Nothing
-              Right (Just (inst, instTy)) -> do
-                (sb, is) <- genInstApp inst
-                let f e = \case Right tm -> App () e tm; Left ty' -> APP () e ty'
-                Just . (foldl' f he is,) <$> substTySimul sb instTy
-    genApp = do
-      s <- genWTType KType
-      (f, fTy) <- genSyns (TFun () s ty)
-      (s', t') <- maybe Gen.discard pure $ matchArrowType fTy -- discard should never happen: fTy should be consistent with (TFun _ s ty)
-      a <- App () f <$> genChk s'
-      pure (a, t')
-    -- APPs are difficult. We take the approach of throwing stuff at the wall and seeing what sticks...
-    genAPP = justT $ do
-      k <- genWTKind
-      n <- genTyVarName
-      (s, sTy) <- genSyns $ TForall () n k $ TEmptyHole ()
-      cxt <- ask
-      runExceptT (refine cxt ty sTy) >>= \case
-        Right (Just ([InstAPP aTy], instTy)) -> pure $ Just (APP () s aTy, instTy)
-        Right (Just ([InstUnconstrainedAPP a ak], instTy)) -> do
-          aTy <- genWTType ak
-          Just . (APP () s aTy,) <$> substTy a aTy instTy
-        _ -> pure Nothing
-    genLet =
-      Gen.choice
-        [ -- let
-          do
-            (e, eTy) <- genSyn
-            x <- genLVarNameAvoiding [ty, eTy]
-            (f, fTy) <- local (extendLocalCxt (x, eTy)) $ genSyns ty
-            pure (Let () x e f, fTy)
-        , -- letrec
-          do
-            eTy <- genWTType KType
-            x <- genLVarNameAvoiding [ty, eTy]
-            (e, (f, fTy)) <- local (extendLocalCxt (x, eTy)) $ do
-              (,) <$> genChk eTy <*> genSyns ty
-            pure (Letrec () x e eTy f, fTy)
-            -- lettype
-            {- TODO: reinstate once the TC handles them! and then be careful to do
-               interesting things where we need to expand the synonym
-               (lettype a = Nat -> Nat in λx.x : a), for instance
-               See https://github.com/hackworthltd/primer/issues/5
-            do
-              x <- genTyVarNameAvoiding ty
-              k <- genWTKind
-              t <- genWTType k
-              (e, eTy) <- local (extendLocalCxtTy (x, k)) $ genSyns ty
-              pure (LetType () x t e, eTy)
-            -}
-        ]
--}
-
--- | Similar to 'Gen.justT', but doesn't resize the generator.
--- (But thus won't make progress if the reason for failure is due to the size being too small.)
--- There is a problem using recursive generators with 'just', e.g. the rather odd
---
--- > gen = Gen.recursive Gen.choice [Gen.int $ Range.linear 0 10] [Gen.just $ gen *> pure Nothing]
---
--- (This basic pattern happens with the @genAPP@ case of 'genSyns'.)
--- One would expect this to behave as
---
--- > Gen.frequency [(p,Gen.int $ Range.linear 0 10),(q,Gen.discard)]
---
--- for some @p@, @q@ but much less efficient.
--- In particular, one would expect the size should decrease on each recursion,
--- limiting the depth of the search tree, and then the recursive cases should
--- eventually all give up. However, 'Gen.just' also scales the size up (by more
--- than recursive scales it down), and this can lead to non-termination, and
--- out-of-memory issues.
-justT :: MonadGen m => m (Maybe a) -> m a
-justT g = Gen.sized $ \s -> Gen.justT $ Gen.resize s g
 
 -- | Given an output of 'refine', e.g. @refine cxt tgtTy srcTy = Just (insts, resTy)@,
 -- generate some concrete types and terms corresponding to the instantiation.
@@ -343,81 +185,15 @@ genSyn :: GenT WT (ExprG, TypeG)
 -- of any type
 genSyn = genSyns (TEmptyHole ())
 
-allCons :: Cxt -> M.Map ValConName (Type' ())
-allCons cxt = M.fromList $ concatMap (uncurry consForTyDef) $ M.assocs $ typeDefs cxt
-  where
-    consForTyDef tc = \case
-      TypeDefAST td -> map (\vc -> (valConName vc, valConType tc td vc)) (astTypeDefConstructors td)
-      TypeDefPrim _ -> []
-
 genChk :: TypeG -> GenT WT ExprG
 genChk ty = do
   cse <- lift case_
-  --abst' <- lift abst
-  --let rec = genLet : catMaybes [lambda, abst', cse]
   let rec = emb : catMaybes [cse]
   Gen.recursive Gen.choice [emb] rec
   where
     emb = fst <$> genSyns ty
-{-
-    lambda =
-      matchArrowType ty <&> \(sTy, tTy) -> do
-        n <- genLVarNameAvoiding [tTy, sTy]
-        Lam () n <$> local (extendLocalCxt (n, sTy)) (genChk tTy)
-    abst = do
-      mfa <- matchForallType ty
-      pure $
-        mfa <&> \(n, k, t) -> do
-          m <- genTyVarNameAvoiding ty
-          ty' <- substTy n (TVar () m) t
-          LAM () m <$> local (extendLocalCxtTy (m, k)) (genChk ty')
-    genLet =
-      Gen.choice
-        [ -- let
-          do
-            (e, eTy) <- genSyn
-            x <- genLVarNameAvoiding [ty, eTy]
-            Let () x e <$> local (extendLocalCxt (x, eTy)) (genChk ty)
-        , -- letrec
-          do
-            eTy <- genWTType KType
-            x <- genLVarNameAvoiding [ty, eTy]
-            (e, f) <- local (extendLocalCxt (x, eTy)) $ (,) <$> genChk eTy <*> genChk ty
-            pure $ Letrec () x e eTy f
-            -- lettype
-            {- TODO: reinstate once the TC handles them! and then be careful to do
-               interesting things where we need to expand the synonym
-               (lettype a = Nat -> Nat in λx.x : a), for instance
-               See https://github.com/hackworthltd/primer/issues/5
-            do
-              x <- genTyVarNameAvoiding ty
-              k <- genWTKind
-              LetType () x <$> genWTType k <*> local (extendLocalCxtTy (x, k)) (genChk ty)
-            -}
-        ]
--}
     case_ :: WT (Maybe (GenT WT ExprG))
     case_ = pure $ Just $ pure $ Case () (EmptyHole ()) [CaseBranch (unsafeMkGlobalName (pure "M","C")) [] $ EmptyHole ()]
-
-{-
-      asks (M.assocs . typeDefs) <&> \adts ->
-        if null adts
-          then Nothing
-          else Just $ do
-            (tc, td) <- Gen.element adts
-            let t = mkTAppCon tc (TEmptyHole () <$ typeDefParameters td)
-            (e, brs) <- Gen.justT $ do
-              (e, eTy) <- genSyns t -- NB: this could return something only consistent with t, e.g. if t=List ?, could get eT=? Nat
-              vcs' <- instantiateValCons eTy
-              fmap (e,) <$> case vcs' of
-                Left TDIHoleType -> pure $ Just []
-                Left _err -> pure Nothing -- if we didn't get an instance of t, try again; TODO: this is rather inefficient, and discards a lot...
-                Right (_, _, vcs) -> fmap Just . for vcs $ \(c, params) -> do
-                  ns <- for params $ \nt -> (,nt) <$> genLVarNameAvoiding [ty, nt]
-                  let binds = map (Bind () . fst) ns
-                  CaseBranch c binds <$> local (extendLocalCxts ns) (genChk ty)
-            pure $ Case () e brs
--}
 
 -- | Generates types which infer kinds consistent with the argument
 -- I.e. @genWTType k@ will generate types @ty@ such that @synthKind ty = k'@
