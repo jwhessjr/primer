@@ -13,7 +13,7 @@ import Data.Aeson (FromJSON (..), ToJSON (..))
 import Primer.Action.Actions (Action)
 import Primer.Action.Available qualified as Available
 import Primer.Action.Movement (Movement)
-import Primer.Core (Expr, GVarName, ID, LVarName, ModuleName, Type)
+import Primer.Core (Expr, GVarName, ID, LVarName, ModuleName, Type', ValConName)
 import Primer.JSON (CustomJSON (..), PrimerJSON)
 import Primer.Typecheck.TypeError (TypeError)
 import Primer.Zipper (SomeNode)
@@ -57,7 +57,7 @@ data ActionError
     -- The extra unit is to avoid having two constructors with a single
     -- TypeError field, breaking our MonadNestedError machinery...
     ImportFailed () TypeError
-  | NeedTFun Type
+  | NeedTFun (Type' ())
   | NeedType SomeNode
   | NeedGlobal Available.Option
   | NeedLocal Available.Option
@@ -71,5 +71,7 @@ data ActionError
   | NeedTypeDefConsFieldSelection
   | NeedTypeDefParamSelection
   | NoNodeSelection
+  | ConNameNotFound ValConName
+  | FieldIndexNameNotFound ValConName Int
   deriving stock (Eq, Show, Read, Generic)
   deriving (FromJSON, ToJSON) via PrimerJSON ActionError
