@@ -1,30 +1,14 @@
--- ApplicativeDo: generators shrink much better if applicative (though much of
--- this module is inherently monadic)
 {-# LANGUAGE ApplicativeDo #-}
 
--- |
--- This module generates well-typed terms and types.
--- It is however, slow and the distribution is not very even.
---
--- For quickly generating non-well-typed-or-scoped terms, see "Primer.Gen.Core.Raw".
 module Primer.Gen.Core.Typed (
   WT,
-  isolateWT,
-  genList,
   genWTType,
   genWTKind,
   genSyns,
-  genSyn,
   genChk,
   genInstApp,
-  genCxtExtendingGlobal,
-  genCxtExtendingLocal,
-  genTypeDefGroup,
   forAllT,
   propertyWT,
-  freshNameForCxt,
-  freshLVarNameForCxt,
-  freshTyVarNameForCxt,
   synthTest,
 ) where
 
@@ -32,47 +16,33 @@ import Foreword hiding (mod)
 
 import Control.Monad.Fresh (MonadFresh, fresh)
 import Control.Monad.Morph (hoist)
-import Control.Monad.Reader (mapReaderT)
 import Data.Map qualified as M
 import Hedgehog (
   Property, property,
   GenT,
-  MonadGen,
   PropertyT, annotateShow, failure,
  )
 import Hedgehog.Gen qualified as Gen
 import Hedgehog.Internal.Property (forAllT)
-import Hedgehog.Range qualified as Range
 import Primer.Core (
   CaseBranch' (CaseBranch),
   Expr' (..),
-  GVarName,
-  GlobalName (qualifiedModule),
   ID (),
   Kind (..),
-  LVarName,
-  LocalName (LocalName),
-  ModuleName (),
-  TyConName,
   TyVarName,
-  Type' (..),
-  qualifyName, Expr, unsafeMkGlobalName,
+  Type' (..), Expr, unsafeMkGlobalName,
  )
 import Primer.Core.DSL (S)
-import Primer.Gen.Core.Raw (genModuleName, genName, genTyVarName)
+import Primer.Gen.Core.Raw (genTyVarName)
 import Primer.Module (Module (..))
-import Primer.Name (Name, NameCounter, freshName)
+import Primer.Name (NameCounter)
 import Primer.Refine (Inst (InstAPP, InstApp, InstUnconstrainedAPP))
 import Primer.Subst (substTySimul)
 import Primer.Test.TestM (
   TestM,
   evalTestM,
-  isolateTestM,
  )
 import Primer.TypeDef (
-  ASTTypeDef (..),
-  TypeDef (..),
-  ValCon (..),
   typeDefKind,
  )
 import Primer.Typecheck (
@@ -80,13 +50,7 @@ import Primer.Typecheck (
   SmartHoles (NoSmartHoles),
   buildTypingContextFromModules',
   consistentKinds,
-  extendLocalCxt,
   extendLocalCxtTy,
-  extendLocalCxtTys,
-  extendTypeDefCxt,
-  getGlobalBaseNames,
-  globalCxt,
-  localCxt,
   localTyVars,
   typeDefs, ExprT, TypeError, synth,
  )
@@ -119,10 +83,6 @@ newtype WT a = WT {unWT :: ReaderT Cxt TestM a}
     , MonadFresh ID
     )
 
--- | Run an action and ignore any effect on the fresh name/id state
-isolateWT :: WT a -> WT a
-isolateWT x = WT $ mapReaderT isolateTestM $ unWT x
-
 instance MonadFresh NameCounter (GenT WT) where
   fresh = lift fresh
 
@@ -134,21 +94,6 @@ instance MonadFresh NameCounter (PropertyT WT) where
 
 instance MonadFresh ID (PropertyT WT) where
   fresh = lift fresh
-
-freshNameForCxt :: GenT WT Name
-freshNameForCxt = do
-  globs <- getGlobalBaseNames
-  locals <- asks $ M.keysSet . localCxt
-  freshName $ globs <> locals
-
-freshLVarNameForCxt :: GenT WT LVarName
-freshLVarNameForCxt = LocalName <$> freshNameForCxt
-
-freshTyVarNameForCxt :: GenT WT TyVarName
-freshTyVarNameForCxt = LocalName <$> freshNameForCxt
-
-freshTyConNameForCxt :: GenT WT TyConName
-freshTyConNameForCxt = qualifyName <$> genModuleName <*> freshNameForCxt
 
 -- genSyns T with cxt Γ should generate (e,S) st Γ |- e ∈ S and S ~ T (i.e. same up to holes and alpha)
 genSyns :: TypeG -> GenT WT (ExprG, TypeG)
@@ -179,11 +124,6 @@ genInstApp = reify mempty
       InstApp t : is -> (\a -> second (Right a :)) <$> (substTySimul sb t >>= genChk) <*> reify sb is
       InstAPP t : is -> (\t' -> second (Left t' :)) <$> substTySimul sb t <*> reify sb is
       InstUnconstrainedAPP v k : is -> genWTType k >>= \t' -> second (Left t' :) <$> reify (M.insert v t' sb) is
-
-genSyn :: GenT WT (ExprG, TypeG)
--- Note that genSyns will generate things consistent with the given type, i.e.
--- of any type
-genSyn = genSyns (TEmptyHole ())
 
 genChk :: TypeG -> GenT WT ExprG
 genChk ty = do
@@ -252,105 +192,6 @@ genWTType k = do
 -- | Generates an arbitary kind. Note that all kinds are well-formed.
 genWTKind :: GenT WT Kind
 genWTKind = Gen.recursive Gen.choice [pure KType] [KFun <$> genWTKind <*> genWTKind]
-
--- NB: we are only generating the context entries, and so don't
--- need definitions for the symbols!
-genGlobalCxtExtension :: GenT WT [(GVarName, TypeG)]
-genGlobalCxtExtension =
-  local forgetLocals $
-    Gen.list (Range.linear 1 5) $
-      (,) <$> (qualifyName <$> genModuleName <*> genName) <*> genWTType KType
-
--- We are careful to not let generated globals depend on whatever
--- locals may be in the cxt
-forgetLocals :: Cxt -> Cxt
-forgetLocals cxt = cxt{localCxt = mempty}
-
--- | Like 'Gen.list', but weighted to produce empty list 10% of time,
--- and length between 1 and argument the rest of the time (linearly
--- scaled with size)
-genList :: MonadGen g => Int -> g a -> g [a]
-genList n g = Gen.frequency [(1, pure []), (9, Gen.list (Range.linear 1 n) g)]
-
--- Generates a group of potentially-mutually-recursive typedefs
--- If given a module name, they will all live in that module,
--- otherwise they may live in disparate modules
-genTypeDefGroup :: Maybe ModuleName -> GenT WT [(TyConName, TypeDef ())]
-genTypeDefGroup mod = local forgetLocals $ do
-  let genParams = Gen.list (Range.linear 0 5) $ (,) <$> freshTyVarNameForCxt <*> genWTKind
-  let tyconName = case mod of
-        Nothing -> freshTyConNameForCxt
-        Just m -> qualifyName m <$> freshNameForCxt
-  nps <- genList 5 $ (,) <$> tyconName <*> genParams
-  -- create empty typedefs to temporarilly extend the context, so can do recursive types
-  let types =
-        map
-          ( \(n, ps) ->
-              ( n
-              , TypeDefAST
-                  ASTTypeDef
-                    { astTypeDefParameters = ps
-                    , astTypeDefConstructors = []
-                    , astTypeDefNameHints = []
-                    }
-              )
-          )
-          nps
-  let genConArgs params = Gen.list (Range.linear 0 5) $ local (extendLocalCxtTys params . addTypeDefs types) $ genWTType KType -- params+types scope...
-  let freshValConNameForCxt tyConName = qualifyName (qualifiedModule tyConName) <$> freshNameForCxt
-  let genCons ty params = Gen.list (Range.linear 0 5) $ ValCon <$> freshValConNameForCxt ty <*> genConArgs params
-  let genTD (n, ps) =
-        ( \cons ->
-            ( n
-            , TypeDefAST
-                ASTTypeDef
-                  { astTypeDefParameters = ps
-                  , astTypeDefConstructors = cons
-                  , astTypeDefNameHints = []
-                  }
-            )
-        )
-          <$> genCons n ps
-  mapM genTD nps
-
-addTypeDefs :: [(TyConName, TypeDef ())] -> Cxt -> Cxt
-addTypeDefs = extendTypeDefCxt . M.fromList
-
-extendGlobals :: [(GVarName, TypeG)] -> Cxt -> Cxt
-extendGlobals nts cxt = cxt{globalCxt = globalCxt cxt <> M.fromList nts}
-
--- Generate an extension of the base context (from the reader monad) with more
--- typedefs and globals.
--- (It is probably worth seeding with some interesting types, to ensure decent
--- coverage)
-genCxtExtendingGlobal :: GenT WT Cxt
-genCxtExtendingGlobal = do
-  tds <- genTypeDefGroup Nothing
-  globals <- local (addTypeDefs tds) genGlobalCxtExtension
-  asks $ extendGlobals globals . addTypeDefs tds
-
--- Generate an extension of the base context (from the reader monad) with more
--- local term and type vars.
--- Note that here we need to generate fresh names, as we test that the
--- whole context typechecks. Since we represent contexts as a 'Map'
--- for efficiency, we do not keep track of scoping, and need to not
--- overwrite previous elements.  For instance, we cannot faithfully
--- represent the context @x : TYPE, y : x, x : TYPE -> TYPE@: we would
--- forget the first @x@, and thus it would appear that @y@ is
--- ill-typed (a term variable must have a type of kind TYPE).
-genCxtExtendingLocal :: GenT WT Cxt
-genCxtExtendingLocal = do
-  n <- Gen.int $ Range.linear 1 10
-  go n
-  where
-    go 0 = ask
-    go n = do
-      cxtE <-
-        Gen.choice
-          [ curry extendLocalCxtTy <$> freshTyVarNameForCxt <*> genWTKind
-          , curry extendLocalCxt <$> freshLVarNameForCxt <*> genWTType KType
-          ]
-      local cxtE $ go (n - 1)
 
 hoist' :: Applicative f => Cxt -> WT a -> f a
 hoist' cxt = pure . evalTestM 0 . flip runReaderT cxt . unWT
