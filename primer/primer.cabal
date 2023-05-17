@@ -23,17 +23,13 @@ executable primer-test
     Primer.Def
     Primer.Def.Utils
     Primer.EvalFull
-    Primer.Log
     Primer.Module
     Primer.Name
-    Primer.Name.Fresh
     Primer.Refine
     Primer.Subst
     Primer.Typecheck
     Primer.TypeDef
     Primer.Unification
-    Primer.Zipper
-    Primer.ZipperCxt
     Control.Monad.NestedError
     Primer.Core.DSL.Meta
     Primer.Core.Fresh
@@ -61,7 +57,6 @@ executable primer-test
     Primer.Gen.Core.Raw
     Primer.Gen.Core.Typed
     Primer.Test.TestM
-    Primer.Test.Util
 
   default-language:   GHC2021
   default-extensions:
