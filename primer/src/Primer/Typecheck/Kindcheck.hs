@@ -25,7 +25,7 @@ import Primer.Core.Type (
  )
 import Primer.Name (NameCounter)
 import Primer.TypeDef (typeDefKind)
-import Primer.Typecheck.Cxt (Cxt (localCxt, smartHoles, typeDefs), KindOrType (K, T), Type)
+import Primer.Typecheck.Cxt (Cxt (localCxt, typeDefs), KindOrType (K, T), Type)
 import Primer.Typecheck.KindError (
   KindError (
     InconsistentKinds,
@@ -36,7 +36,6 @@ import Primer.Typecheck.KindError (
     UnknownTypeVariable
   ),
  )
-import Primer.Typecheck.SmartHoles (SmartHoles (NoSmartHoles))
 
 -- | A shorthand for the constraints needed when kindchecking
 type KindM e m =
@@ -85,10 +84,8 @@ synthKind :: KindM e m => Type' (Meta a) -> m (Kind, TypeT)
 synthKind = \case
   TEmptyHole m -> pure (KHole, TEmptyHole (annotate KHole m))
   THole m t -> do
-    sh <- asks smartHoles
     (_, t') <- synthKind t
-    case sh of
-      NoSmartHoles -> pure (KHole, THole (annotate KHole m) t')
+    pure (KHole, THole (annotate KHole m) t')
   TCon m c -> do
     typeDef <- asks (Map.lookup c . typeDefs)
     case typeDef of
@@ -106,36 +103,27 @@ synthKind = \case
     -- If we didn't have this special case, we might remove this hole (in a
     -- recursive call), only to reintroduce it again with a different ID
     -- TODO: ugly and duplicated...
-    sh <- asks smartHoles
-    (k, s') <- synthKind s
-    case (matchArrowKind k, sh) of
-      (_, NoSmartHoles) -> checkKind KHole t >>= \t' -> pure (KHole, TApp (annotate KHole ma) (THole (annotate KHole mh) s') t')
+    (_, s') <- synthKind s
+    checkKind KHole t >>= \t' -> pure (KHole, TApp (annotate KHole ma) (THole (annotate KHole mh) s') t')
   TApp m s t -> do
-    sh <- asks smartHoles
     (k, s') <- synthKind s
-    case (matchArrowKind k, sh) of
-      (Nothing, NoSmartHoles) -> throwError' $ KindDoesNotMatchArrow k
-      (Just (k1, k2), _) -> checkKind k1 t >>= \t' -> pure (k2, TApp (annotate k2 m) s' t')
+    case matchArrowKind k of
+      Nothing -> throwError' $ KindDoesNotMatchArrow k
+      Just (k1, k2) -> checkKind k1 t >>= \t' -> pure (k2, TApp (annotate k2 m) s' t')
   TForall m n k t -> do
     t' <- local (extendLocalCxtTy (n, k)) $ checkKind KType t
     pure (KType, TForall (annotate KType m) n k t')
   TLet{} -> throwError' TLetUnsupported
 
 checkKind :: KindM e m => Kind -> Type' (Meta a) -> m TypeT
-checkKind k (THole m t) = do
-  -- If we didn't have this special case, we might remove this hole (in a
-  -- recursive call), only to reintroduce it again with a different ID
-  -- TODO: ugly and duplicated...
-  sh <- asks smartHoles
-  (k', t') <- synthKind t
-  case (consistentKinds k k', sh) of
-    (_, NoSmartHoles) -> pure $ THole (annotate KHole m) t'
+checkKind _ (THole m t) = do
+  (_, t') <- synthKind t
+  pure $ THole (annotate KHole m) t'
 checkKind k t = do
-  sh <- asks smartHoles
   (k', t') <- synthKind t
-  case (consistentKinds k k', sh) of
-    (True, _) -> pure t'
-    (False, NoSmartHoles) -> throwError' $ InconsistentKinds k k'
+  if consistentKinds k k'
+    then pure t'
+    else throwError' $ InconsistentKinds k k'
 
 -- | Extend the metadata of an 'Expr' or 'Type'
 -- (usually with a 'TypeCache' or 'Kind')

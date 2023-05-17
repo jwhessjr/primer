@@ -10,7 +10,6 @@ import Primer.Core.Meta
 import Primer.Core.Type (Kind, Type')
 import Primer.Name (Name)
 import Primer.TypeDef (TypeDefMap)
-import Primer.Typecheck.SmartHoles (SmartHoles)
 
 type Type = Type' ()
 
@@ -18,8 +17,7 @@ data KindOrType = K Kind | T Type
   deriving stock (Show, Eq)
 
 data Cxt = Cxt
-  { smartHoles :: SmartHoles
-  , typeDefs :: TypeDefMap
+  { typeDefs :: TypeDefMap
   , localCxt :: Map Name KindOrType
   -- ^ local variables. invariant: the Name comes from a @LocalName k@, and
   -- the tag @k@ should say whether the value is a kind or a type.

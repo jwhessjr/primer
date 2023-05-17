@@ -9,7 +9,6 @@ module Primer.Typecheck (
   Type,
   Expr,
   ExprT,
-  SmartHoles (..),
   synth,
   check,
   synthKind,
@@ -93,7 +92,7 @@ import Primer.TypeDef (
   TypeDefMap,
   valConType,
  )
-import Primer.Typecheck.Cxt (Cxt (Cxt, globalCxt, localCxt, smartHoles, typeDefs))
+import Primer.Typecheck.Cxt (Cxt (Cxt, globalCxt, localCxt, typeDefs))
 import Primer.Typecheck.Kindcheck (
   KindError (..),
   KindOrType (K, T),
@@ -107,7 +106,6 @@ import Primer.Typecheck.Kindcheck (
   localTyVars,
   synthKind,
  )
-import Primer.Typecheck.SmartHoles (SmartHoles (..))
 import Primer.Typecheck.TypeError (TypeError (..))
 import Primer.Typecheck.Utils (
   TypeDefError (TDIHoleType, TDINotADT, TDINotSaturated, TDIUnknown),
@@ -169,20 +167,19 @@ extendTypeDefCxt :: TypeDefMap -> Cxt -> Cxt
 extendTypeDefCxt typedefs cxt = cxt{typeDefs = typedefs <> typeDefs cxt}
 
 -- An empty typing context
-initialCxt :: SmartHoles -> Cxt
-initialCxt sh =
+initialCxt :: Cxt
+initialCxt =
   Cxt
-    { smartHoles = sh
-    , typeDefs = mempty
+    { typeDefs = mempty
     , localCxt = mempty
     , globalCxt = mempty
     }
 
 -- | Construct an initial typing context, with all given definitions in scope as global variables.
-buildTypingContext :: TypeDefMap -> DefMap -> SmartHoles -> Cxt
-buildTypingContext tydefs defs sh =
+buildTypingContext :: TypeDefMap -> DefMap -> Cxt
+buildTypingContext tydefs defs =
   let globals = Map.assocs $ fmap defType defs
-   in extendTypeDefCxt tydefs $ extendGlobalCxt globals $ initialCxt sh
+   in extendTypeDefCxt tydefs $ extendGlobalCxt globals initialCxt
 
 -- | A shorthand for the constraints needed when kindchecking
 type TypeM e m =
@@ -231,9 +228,7 @@ synth = \case
         -- Check e2 against the domain type of e1
         e2' <- check t2 e2
         pure $ annSynth2 t i App e1' e2'
-      Nothing ->
-        asks smartHoles >>= \case
-          NoSmartHoles -> throwError' $ TypeDoesNotMatchArrow t1
+      Nothing -> throwError' $ TypeDoesNotMatchArrow t1
   APP i e t -> do
     (et, e') <- synth e
     matchForallType et >>= \case
@@ -241,9 +236,7 @@ synth = \case
         t' <- checkKind' vk t
         bSub <- substTy v (forgetTypeMetadata t') b
         pure (bSub, APP (annotate (TCSynthed bSub) i) e' t')
-      Nothing ->
-        asks smartHoles >>= \case
-          NoSmartHoles -> throwError' $ TypeDoesNotMatchForall et
+      Nothing -> throwError' $ TypeDoesNotMatchForall et
   Ann i e t -> do
     -- Check that the type is well-formed by synthesising its kind
     t' <- checkKind' KType t
@@ -290,9 +283,7 @@ synth = \case
     -- Extend the context with the binding, and synthesise the body
     (bT, b') <- local ctx' $ synth b
     pure $ annSynth4 bT i Letrec x a' tA' b'
-  e ->
-    asks smartHoles >>= \case
-      NoSmartHoles -> throwError' $ CannotSynthesiseType e
+  e -> throwError' $ CannotSynthesiseType e
   where
     -- We could combine these with some type class shenanigans, but it doesn't
     -- seem worth it. The general scheme is
@@ -311,18 +302,14 @@ check t = \case
       Just (t1, t2) -> do
         e' <- local (extendLocalCxt (x, t1)) $ check t2 e
         pure (Lam (annotate (TCChkedAt t) i) x e')
-      Nothing ->
-        asks smartHoles >>= \case
-          NoSmartHoles -> throwError' $ TypeDoesNotMatchArrow t
+      Nothing -> throwError' $ TypeDoesNotMatchArrow t
   LAM i n e -> do
     matchForallType t >>= \case
       Just (m, k, b) -> do
         b' <- substTy m (TVar () n) b
         e' <- local (extendLocalCxtTy (n, k)) $ check b' e
         pure $ LAM (annotate (TCChkedAt t) i) n e'
-      Nothing ->
-        asks smartHoles >>= \case
-          NoSmartHoles -> throwError' $ TypeDoesNotMatchForall t
+      Nothing -> throwError' $ TypeDoesNotMatchForall t
   Let i x a b -> do
     -- Synthesise a type for the bound expression
     (aT, a') <- synth a
@@ -349,42 +336,25 @@ check t = \case
       Left TDIHoleType ->
         if null brs
           then pure $ Case caseMeta e' []
-          else
-            asks smartHoles >>= \case
-              NoSmartHoles -> throwError' CaseOfHoleNeedsEmptyBranches
-      Left TDINotADT ->
-        asks smartHoles >>= \case
-          NoSmartHoles -> throwError' $ CannotCaseNonADT eT
+          else throwError' CaseOfHoleNeedsEmptyBranches
+      Left TDINotADT -> throwError' $ CannotCaseNonADT eT
       Left (TDIUnknown ty) -> throwError' $ InternalError $ "We somehow synthesised the unknown type " <> show ty <> " for the scrutinee of a case"
-      Left TDINotSaturated ->
-        asks smartHoles >>= \case
-          NoSmartHoles -> throwError' $ CannotCaseNonSaturatedADT eT
+      Left TDINotSaturated -> throwError' $ CannotCaseNonSaturatedADT eT
       Right (tc, _, expected) -> do
         let branchNames = map (\(CaseBranch n _ _) -> n) brs
         let conNames = map fst expected
-        sh <- asks smartHoles
-        brs' <- case (branchNames == conNames, sh) of
-          (False, NoSmartHoles) -> throwError' $ WrongCaseBranches tc branchNames
+        brs' <- if branchNames == conNames
+                then pure brs
+                else throwError' $ WrongCaseBranches tc branchNames
           -- create branches with the correct name but wrong parameters,
           -- they will be fixed up in checkBranch later
-          (True, _) -> pure brs
         brs'' <- zipWithM (checkBranch t) expected brs'
         pure $ Case caseMeta e' brs''
   e -> do
-    sh <- asks smartHoles
-    let default_ = do
-          (t', e') <- synth e
-          if consistentTypes t t'
-            then pure (set _typecache (TCEmb TCBoth{tcChkedAt = t, tcSynthed = t'}) e')
-            else case sh of
-              NoSmartHoles -> throwError' (InconsistentTypes t t')
-    case (e, sh) of
-      -- If the hole can be dropped leaving a type-correct term, do so
-      -- We don't want the recursive call to create a fresh hole though -
-      -- this can lead to the output being the same as the input, but with
-      -- ID of the top hole changed, leading to losing cursor positions etc.
-      -- But we do want to remove nested holes.
-      _ -> default_
+      (t', e') <- synth e
+      if consistentTypes t t'
+        then pure (set _typecache (TCEmb TCBoth{tcChkedAt = t, tcSynthed = t'}) e')
+        else throwError' (InconsistentTypes t t')
 
 -- | Similar to check, but for the RHS of case branches
 -- We assume that the branch is for this constructor
@@ -400,11 +370,10 @@ checkBranch t (vc, args) (CaseBranch nb patterns rhs) =
   do
     -- We check an invariant due to paranoia
     assertCorrectCon
-    sh <- asks smartHoles
-    (fixedPats, fixedRHS) <- case (length args == length patterns, sh) of
-      (False, NoSmartHoles) -> throwError' CaseBranchWrongNumberPatterns
+    (fixedPats, fixedRHS) <- case length args == length patterns of
+      False -> throwError' CaseBranchWrongNumberPatterns
       -- if the branch is nonsense, replace it with a sensible pattern and an empty hole
-      (True, _) ->
+      True ->
         let args' = zipWith (\ty bind -> (over _bindMeta (annotate (TCChkedAt ty)) bind, ty)) args patterns
          in pure (args', rhs)
     rhs' <- local (extendLocalCxts (map (first bindName) fixedPats)) $ check t fixedRHS
