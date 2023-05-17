@@ -1,8 +1,6 @@
 module Primer.Core.Utils (
   freshLocalName,
   freshLocalName',
-  typeIDs,
-  generateTypeIDs,
   forgetTypeMetadata,
   generateIDs,
   forgetMetadata,
@@ -33,9 +31,7 @@ import Primer.Core.Type.Utils (
   alphaEqTy,
   forgetTypeMetadata,
   freeVarsTy,
-  generateTypeIDs,
   noHoles,
-  typeIDs,
   _freeVarsTy,
  )
 

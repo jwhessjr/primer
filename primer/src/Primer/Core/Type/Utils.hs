@@ -1,7 +1,4 @@
 module Primer.Core.Type.Utils (
-  typeIDs,
-  generateTypeIDs,
-  regenerateTypeIDs,
   forgetTypeMetadata,
   noHoles,
   _freeVarsTy,
@@ -12,7 +9,6 @@ module Primer.Core.Type.Utils (
 
 import Foreword
 
-import Control.Monad.Fresh (MonadFresh, fresh)
 import Data.Data (Data)
 import Data.Generics.Uniplate.Data (universe)
 import Data.Map.Strict qualified as M
@@ -20,38 +16,21 @@ import Data.Set qualified as S
 import Data.Set.Optics (setOf)
 import Optics (
   Traversal,
-  Traversal',
   getting,
   set,
   traversalVL,
-  traverseOf,
   (%),
   _2,
  )
 
 import Primer.Core.Meta (
-  HasID (_id),
-  ID,
   TyVarName,
-  trivialMeta,
  )
 import Primer.Core.Type (
   Kind (KHole),
-  Type,
   Type' (..),
   _typeMeta,
  )
-
--- | Regenerate all IDs, not changing any other metadata
-regenerateTypeIDs :: (HasID a, MonadFresh ID m) => Type' a -> m (Type' a)
-regenerateTypeIDs = regenerateTypeIDs' (set _id)
-
-regenerateTypeIDs' :: MonadFresh ID m => (ID -> a -> b) -> Type' a -> m (Type' b)
-regenerateTypeIDs' s = traverseOf _typeMeta (\a -> flip s a <$> fresh)
-
--- | Adds 'ID's and trivial metadata
-generateTypeIDs :: MonadFresh ID m => Type' () -> m Type
-generateTypeIDs = regenerateTypeIDs' $ const . trivialMeta
 
 -- | Replace all 'ID's in a Type with unit.
 -- Technically this replaces all annotations, regardless of what they are.
@@ -120,7 +99,3 @@ alphaEqTy = go (0, mempty, mempty)
       -- binders we have gone under, and is thus the next value free
       -- in the map.
     new (c, p, q) n m = (c + 1 :: Int, M.insert n c p, M.insert m c q)
-
--- | Traverse the 'ID's in a 'Type''.
-typeIDs :: HasID a => Traversal' (Type' a) ID
-typeIDs = _typeMeta % _id
