@@ -27,7 +27,6 @@ executable primer-test
     Primer.Module
     Primer.Name
     Primer.Name.Fresh
-    Primer.Pretty
     Primer.Refine
     Primer.Subst
     Primer.Typecheck
