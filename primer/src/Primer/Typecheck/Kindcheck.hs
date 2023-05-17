@@ -18,7 +18,6 @@ import Foreword
 import Control.Monad.Fresh (MonadFresh)
 import Control.Monad.NestedError (MonadNestedError, throwError')
 import Data.Map qualified as Map
-import Primer.Core.DSL.Meta (meta')
 import Primer.Core.Meta (ID, LocalName (LocalName), Meta (Meta), TyVarName, unLocalName)
 import Primer.Core.Type (
   Kind (KFun, KHole, KType),
@@ -37,7 +36,7 @@ import Primer.Typecheck.KindError (
     UnknownTypeVariable
   ),
  )
-import Primer.Typecheck.SmartHoles (SmartHoles (NoSmartHoles, SmartHoles))
+import Primer.Typecheck.SmartHoles (SmartHoles (NoSmartHoles))
 
 -- | A shorthand for the constraints needed when kindchecking
 type KindM e m =
@@ -87,10 +86,9 @@ synthKind = \case
   TEmptyHole m -> pure (KHole, TEmptyHole (annotate KHole m))
   THole m t -> do
     sh <- asks smartHoles
-    (k, t') <- synthKind t
+    (_, t') <- synthKind t
     case sh of
       NoSmartHoles -> pure (KHole, THole (annotate KHole m) t')
-      SmartHoles -> pure (k, t')
   TCon m c -> do
     typeDef <- asks (Map.lookup c . typeDefs)
     case typeDef of
@@ -112,17 +110,11 @@ synthKind = \case
     (k, s') <- synthKind s
     case (matchArrowKind k, sh) of
       (_, NoSmartHoles) -> checkKind KHole t >>= \t' -> pure (KHole, TApp (annotate KHole ma) (THole (annotate KHole mh) s') t')
-      (Nothing, SmartHoles) -> checkKind KHole t >>= \t' -> pure (KHole, TApp (annotate KHole ma) (THole (annotate KHole mh) s') t')
-      (Just (k1, k2), SmartHoles) -> checkKind k1 t >>= \t' -> pure (k2, TApp (annotate k2 ma) s' t')
   TApp m s t -> do
     sh <- asks smartHoles
     (k, s') <- synthKind s
     case (matchArrowKind k, sh) of
       (Nothing, NoSmartHoles) -> throwError' $ KindDoesNotMatchArrow k
-      (Nothing, SmartHoles) -> do
-        sWrap <- THole <$> meta' KHole <*> pure s'
-        t' <- checkKind KHole t
-        pure (KHole, TApp (annotate KHole m) sWrap t')
       (Just (k1, k2), _) -> checkKind k1 t >>= \t' -> pure (k2, TApp (annotate k2 m) s' t')
   TForall m n k t -> do
     t' <- local (extendLocalCxtTy (n, k)) $ checkKind KType t
@@ -138,15 +130,12 @@ checkKind k (THole m t) = do
   (k', t') <- synthKind t
   case (consistentKinds k k', sh) of
     (_, NoSmartHoles) -> pure $ THole (annotate KHole m) t'
-    (True, SmartHoles) -> pure t'
-    (False, SmartHoles) -> pure $ THole (annotate KHole m) t'
 checkKind k t = do
   sh <- asks smartHoles
   (k', t') <- synthKind t
   case (consistentKinds k k', sh) of
     (True, _) -> pure t'
     (False, NoSmartHoles) -> throwError' $ InconsistentKinds k k'
-    (False, SmartHoles) -> THole <$> meta' KHole <*> pure t'
 
 -- | Extend the metadata of an 'Expr' or 'Type'
 -- (usually with a 'TypeCache' or 'Kind')

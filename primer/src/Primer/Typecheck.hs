@@ -52,13 +52,11 @@ import Control.Monad.Fresh (MonadFresh (..))
 import Control.Monad.NestedError (MonadNestedError (..), modifyError')
 import Data.Map qualified as M
 import Data.Map.Strict qualified as Map
-import Data.Set qualified as S
 import Optics (
   over,
   set,
  )
 import Primer.Core (
-  Bind' (..),
   CaseBranch' (..),
   Expr,
   Expr' (..),
@@ -79,20 +77,17 @@ import Primer.Core (
   unLocalName,
   _bindMeta,
  )
-import Primer.Core.DSL (branch, emptyHole, meta, meta')
 import Primer.Core.Transform (decomposeTAppCon, mkTAppCon)
 import Primer.Core.Utils (
   alphaEqTy,
   forgetTypeMetadata,
   freshLocalName,
-  freshLocalName',
-  noHoles,
  )
 import Primer.Def (
   DefMap,
   defType,
  )
-import Primer.Name (Name, NameCounter)
+import Primer.Name (NameCounter)
 import Primer.Subst (substTy)
 import Primer.TypeDef (
   TypeDefMap,
@@ -239,9 +234,6 @@ synth = \case
       Nothing ->
         asks smartHoles >>= \case
           NoSmartHoles -> throwError' $ TypeDoesNotMatchArrow t1
-          SmartHoles -> do
-            e1Wrap <- Hole <$> meta <*> pure e1
-            synth $ App i e1Wrap e2
   APP i e t -> do
     (et, e') <- synth e
     matchForallType et >>= \case
@@ -252,9 +244,6 @@ synth = \case
       Nothing ->
         asks smartHoles >>= \case
           NoSmartHoles -> throwError' $ TypeDoesNotMatchForall et
-          SmartHoles -> do
-            eWrap <- Hole <$> meta <*> pure e
-            synth $ APP i eWrap t
   Ann i e t -> do
     -- Check that the type is well-formed by synthesising its kind
     t' <- checkKind' KType t
@@ -304,10 +293,6 @@ synth = \case
   e ->
     asks smartHoles >>= \case
       NoSmartHoles -> throwError' $ CannotSynthesiseType e
-      SmartHoles -> do
-        ann <- TEmptyHole <$> meta' (Just KType)
-        eMeta <- meta
-        synth $ Ann eMeta e ann
   where
     -- We could combine these with some type class shenanigans, but it doesn't
     -- seem worth it. The general scheme is
@@ -321,7 +306,7 @@ synth = \case
 -- | Similar to synth, but for checking rather than synthesis.
 check :: TypeM e m => Type -> Expr -> m ExprT
 check t = \case
-  lam@(Lam i x e) -> do
+  Lam i x e -> do
     case matchArrowType t of
       Just (t1, t2) -> do
         e' <- local (extendLocalCxt (x, t1)) $ check t2 e
@@ -329,12 +314,7 @@ check t = \case
       Nothing ->
         asks smartHoles >>= \case
           NoSmartHoles -> throwError' $ TypeDoesNotMatchArrow t
-          SmartHoles -> do
-            -- 'synth' will take care of adding an annotation - no need to do it
-            -- explicitly here
-            (_, lam') <- synth lam
-            Hole <$> meta' (TCEmb TCBoth{tcChkedAt = t, tcSynthed = TEmptyHole ()}) <*> pure lam'
-  lAM@(LAM i n e) -> do
+  LAM i n e -> do
     matchForallType t >>= \case
       Just (m, k, b) -> do
         b' <- substTy m (TVar () n) b
@@ -343,11 +323,6 @@ check t = \case
       Nothing ->
         asks smartHoles >>= \case
           NoSmartHoles -> throwError' $ TypeDoesNotMatchForall t
-          SmartHoles -> do
-            -- 'synth' will take care of adding an annotation - no need to do it
-            -- explicitly here
-            (_, lAM') <- synth lAM
-            Hole <$> meta' (TCEmb TCBoth{tcChkedAt = t, tcSynthed = TEmptyHole ()}) <*> pure lAM'
   Let i x a b -> do
     -- Synthesise a type for the bound expression
     (aT, a') <- synth a
@@ -377,22 +352,13 @@ check t = \case
           else
             asks smartHoles >>= \case
               NoSmartHoles -> throwError' CaseOfHoleNeedsEmptyBranches
-              SmartHoles -> pure $ Case caseMeta e' []
       Left TDINotADT ->
         asks smartHoles >>= \case
           NoSmartHoles -> throwError' $ CannotCaseNonADT eT
-          SmartHoles -> do
-            -- NB: we wrap the scrutinee in a hole and DELETE the branches
-            scrutWrap <- Hole <$> meta' (TCSynthed (TEmptyHole ())) <*> pure e'
-            pure $ Case caseMeta scrutWrap []
       Left (TDIUnknown ty) -> throwError' $ InternalError $ "We somehow synthesised the unknown type " <> show ty <> " for the scrutinee of a case"
       Left TDINotSaturated ->
         asks smartHoles >>= \case
           NoSmartHoles -> throwError' $ CannotCaseNonSaturatedADT eT
-          SmartHoles -> do
-            -- NB: we wrap the scrutinee in a hole and DELETE the branches
-            scrutWrap <- Hole <$> meta' (TCSynthed (TEmptyHole ())) <*> pure e'
-            pure $ Case caseMeta scrutWrap []
       Right (tc, _, expected) -> do
         let branchNames = map (\(CaseBranch n _ _) -> n) brs
         let conNames = map fst expected
@@ -401,7 +367,6 @@ check t = \case
           (False, NoSmartHoles) -> throwError' $ WrongCaseBranches tc branchNames
           -- create branches with the correct name but wrong parameters,
           -- they will be fixed up in checkBranch later
-          (False, SmartHoles) -> traverse (\c -> branch c [] emptyHole) conNames
           (True, _) -> pure brs
         brs'' <- zipWithM (checkBranch t) expected brs'
         pure $ Case caseMeta e' brs''
@@ -413,37 +378,12 @@ check t = \case
             then pure (set _typecache (TCEmb TCBoth{tcChkedAt = t, tcSynthed = t'}) e')
             else case sh of
               NoSmartHoles -> throwError' (InconsistentTypes t t')
-              SmartHoles -> Hole <$> meta' (TCEmb TCBoth{tcChkedAt = t, tcSynthed = TEmptyHole ()}) <*> pure e'
     case (e, sh) of
       -- If the hole can be dropped leaving a type-correct term, do so
       -- We don't want the recursive call to create a fresh hole though -
       -- this can lead to the output being the same as the input, but with
       -- ID of the top hole changed, leading to losing cursor positions etc.
       -- But we do want to remove nested holes.
-      (Hole _ e'@Hole{}, SmartHoles) ->
-        check t e' -- we strip off one layer, and hit this case again.
-      (Hole _ (Ann _ e' TEmptyHole{}), SmartHoles) ->
-        -- We do want to remove (e.g.) {? λx.x : ? ?} to get λx.x,
-        -- if that typechecks. (But only a simple hole annotation, as we do
-        -- not wish to delete any interesting annotations.)
-        flip catchError (const default_) $
-          check t e' >>= \case
-            Hole{} -> default_ -- Don't let the recursive call mint a hole.
-            e'' -> pure e''
-      (Hole _ (Ann _ _ ty), SmartHoles)
-        | not (noHoles ty) ->
-            -- Don't want to, e.g., remove {? λx.x : ? ?} to get λx.x : ?
-            -- Since holey annotations behave like non-empty holes, we will
-            -- not elide non-empty holes if they have a holey annotation.
-            -- (This is needed for idempotency, since we return non-empty
-            -- holes with holey-annotated contents in the case a construction
-            -- cannot typecheck, e.g. Bool ∋ λx.t returns {? λx.t : ? ?}
-            default_
-      (Hole _ e', SmartHoles) ->
-        flip catchError (const default_) $
-          check t e' >>= \case
-            Hole{} -> default_ -- Don't let the recursive call mint a hole.
-            e'' -> pure e''
       _ -> default_
 
 -- | Similar to check, but for the RHS of case branches
@@ -464,25 +404,12 @@ checkBranch t (vc, args) (CaseBranch nb patterns rhs) =
     (fixedPats, fixedRHS) <- case (length args == length patterns, sh) of
       (False, NoSmartHoles) -> throwError' CaseBranchWrongNumberPatterns
       -- if the branch is nonsense, replace it with a sensible pattern and an empty hole
-      (False, SmartHoles) -> do
-        -- Avoid automatically generated names shadowing anything
-        globals <- getGlobalBaseNames
-        locals <- asks $ M.keysSet . localCxt
-        liftA2 (,) (mapM (createBinding (locals <> globals)) args) emptyHole
-      -- otherwise, convert all @Maybe TypeCache@ metadata to @TypeCache@
-      -- otherwise, annotate each binding with its type
       (True, _) ->
         let args' = zipWith (\ty bind -> (over _bindMeta (annotate (TCChkedAt ty)) bind, ty)) args patterns
          in pure (args', rhs)
     rhs' <- local (extendLocalCxts (map (first bindName) fixedPats)) $ check t fixedRHS
     pure $ CaseBranch nb (map fst fixedPats) rhs'
   where
-    createBinding :: S.Set Name -> Type' () -> m (Bind' (Meta TypeCache), Type' ())
-    createBinding namesInScope ty = do
-      -- Avoid automatically generated names shadowing anything
-      name <- freshLocalName' namesInScope
-      bind <- Bind <$> meta' (TCChkedAt ty) <*> pure name
-      pure (bind, ty)
     assertCorrectCon =
       assert (vc == nb) $
         "checkBranch: expected a branch on "

@@ -2,5 +2,5 @@ module Primer.Typecheck.SmartHoles (SmartHoles (..)) where
 
 import Foreword
 
-data SmartHoles = SmartHoles | NoSmartHoles
+data SmartHoles = NoSmartHoles
   deriving stock (Eq, Show, Read)
