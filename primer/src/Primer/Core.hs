@@ -1,10 +1,7 @@
 module Primer.Core (
   Expr,
   Expr' (..),
-  Bind,
-  Bind' (..),
-  CaseBranch,
-  CaseBranch' (..),
+  CaseBranch (..),
   module Primer.Core.Meta,
   module Primer.Core.Type,
   TypeCache (..),
@@ -22,7 +19,6 @@ import Data.Data (Data)
 import Data.Generics.Product
 import Data.Generics.Uniplate.Data ()
 import Optics (
-  Lens,
   Lens',
   Traversal,
  )
@@ -132,7 +128,7 @@ data Expr' a b
       -- ^ type of the bound variable (variable is not in scope in this type)
       (Expr' a b)
       -- ^ body of the let; binding scopes over this
-  | Case a (Expr' a b) [CaseBranch' a b] -- See Note [Case]
+  | Case a (Expr' a b) [CaseBranch] -- See Note [Case]
   deriving stock (Eq, Show, Read, Data, Generic)
 
 -- Note [Holes and bidirectionality]
@@ -233,24 +229,5 @@ _exprMetaLens = position @1
 _exprTypeMeta :: forall a b c. Traversal (Expr' a b) (Expr' a c) b c
 _exprTypeMeta = param @0
 
-type CaseBranch = CaseBranch' ExprMeta TypeMeta
-
-data CaseBranch' a b
-  = CaseBranch
-      ValConName
-      -- ^ constructor
-      [Bind' a]
-      -- ^ constructor parameters.
-      -- Ideally this would be '[Bind' (Meta TypeCache)]' since we always know the types of branch
-      -- bindings. Unfortunately that breaks generic traversals like '_exprMeta'.
-      (Expr' a b)
-      -- ^ right hand side
-  deriving stock (Eq, Show, Read, Data, Generic)
-
--- | Variable bindings
--- These are used in case branches to represent the binding of a variable.
--- They aren't currently used in lambdas or lets, but in the future that may change.
-type Bind = Bind' ExprMeta
-
-data Bind' a = Bind a LVarName
+data CaseBranch = CaseBranch ValConName
   deriving stock (Eq, Show, Read, Data, Generic)

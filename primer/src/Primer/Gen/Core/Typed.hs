@@ -25,7 +25,7 @@ import Hedgehog (
 import Hedgehog.Gen qualified as Gen
 import Hedgehog.Internal.Property (forAllT)
 import Primer.Core (
-  CaseBranch' (CaseBranch),
+  CaseBranch (CaseBranch),
   Expr' (..),
   ID (),
   Kind (..),
@@ -116,7 +116,7 @@ genChk ty = Gen.choice [emb, pure case_]
   where
     emb = fst <$> genSyns ty
     case_ :: ExprG
-    case_ = Case () (EmptyHole ()) [CaseBranch (unsafeMkGlobalName (pure "M","C")) [] $ EmptyHole ()]
+    case_ = Case () (EmptyHole ()) [CaseBranch $ unsafeMkGlobalName (pure "M","C")]
 
 -- | Generates types which infer kinds consistent with the argument
 -- I.e. @genWTType k@ will generate types @ty@ such that @synthKind ty = k'@
