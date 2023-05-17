@@ -3,7 +3,6 @@ module Primer.Core.Meta (
   ModuleName (ModuleName, unModuleName),
   GlobalNameKind (..),
   GlobalName (GlobalName, qualifiedModule, baseName),
-  qualifyName,
   unsafeMkGlobalName,
   TyConName,
   ValConName,
@@ -73,9 +72,6 @@ data GlobalName (k :: GlobalNameKind) = GlobalName
 -- guarantees about whether the name refers to anything that is in scope.
 unsafeMkGlobalName :: (NonEmpty Text, Text) -> GlobalName k
 unsafeMkGlobalName (m, n) = GlobalName (ModuleName $ fmap unsafeMkName m) (unsafeMkName n)
-
-qualifyName :: ModuleName -> Name -> GlobalName k
-qualifyName = GlobalName
 
 type TyConName = GlobalName 'ATyCon
 type ValConName = GlobalName 'AValCon

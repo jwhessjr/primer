@@ -43,7 +43,6 @@ import Primer.Core.Meta (
   TyVarName,
   ValConName,
   Value,
-  qualifyName,
   trivialMeta,
   unsafeMkGlobalName,
  )

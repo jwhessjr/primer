@@ -5,9 +5,6 @@ module Primer.Core.DSL (
   branch,
   meta,
   meta',
-  create,
-  create',
-  S,
 ) where
 
 import Foreword
@@ -24,7 +21,7 @@ import Primer.Core (
   TypeCache,
   ValConName,
  )
-import Primer.Core.DSL.Meta (S, create, create', meta, meta')
+import Primer.Core.DSL.Meta (meta, meta')
 
 emptyHole :: MonadFresh ID m => m Expr
 emptyHole = EmptyHole <$> meta

@@ -18,8 +18,6 @@ module Primer.Typecheck (
   KindOrType (..),
   initialCxt,
   buildTypingContext,
-  buildTypingContextFromModules,
-  buildTypingContextFromModules',
   TypeError (..),
   KindError (..),
   typeOf,
@@ -81,7 +79,7 @@ import Primer.Core (
   unLocalName,
   _bindMeta,
  )
-import Primer.Core.DSL (S, branch, create', emptyHole, meta, meta')
+import Primer.Core.DSL (branch, emptyHole, meta, meta')
 import Primer.Core.Transform (decomposeTAppCon, mkTAppCon)
 import Primer.Core.Utils (
   alphaEqTy,
@@ -93,11 +91,6 @@ import Primer.Core.Utils (
 import Primer.Def (
   DefMap,
   defType,
- )
-import Primer.Module (
-  Module (),
-  moduleDefsQualified,
-  moduleTypesQualified,
  )
 import Primer.Name (Name, NameCounter)
 import Primer.Subst (substTy)
@@ -195,17 +188,6 @@ buildTypingContext :: TypeDefMap -> DefMap -> SmartHoles -> Cxt
 buildTypingContext tydefs defs sh =
   let globals = Map.assocs $ fmap defType defs
    in extendTypeDefCxt tydefs $ extendGlobalCxt globals $ initialCxt sh
-
-buildTypingContextFromModules :: [Module] -> SmartHoles -> Cxt
-buildTypingContextFromModules modules =
-  buildTypingContext
-    (foldMap' moduleTypesQualified modules)
-    (foldMap' moduleDefsQualified modules)
-
-buildTypingContextFromModules' :: [S Module] -> SmartHoles -> Cxt
--- NB: we don't care about IDs/TypeMeta here, since we remove them in
--- buildTypingContextFromModules, thus @create'@ is ok.
-buildTypingContextFromModules' = buildTypingContextFromModules . create' . sequence
 
 -- | A shorthand for the constraints needed when kindchecking
 type TypeM e m =

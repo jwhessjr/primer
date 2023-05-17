@@ -32,9 +32,7 @@ import Primer.Core (
   TyVarName,
   Type' (..), Expr, unsafeMkGlobalName,
  )
-import Primer.Core.DSL (S)
 import Primer.Gen.Core.Raw (genTyVarName)
-import Primer.Module (Module (..))
 import Primer.Name (NameCounter)
 import Primer.Refine (Inst (InstAPP, InstApp, InstUnconstrainedAPP))
 import Primer.Subst (substTySimul)
@@ -48,11 +46,10 @@ import Primer.TypeDef (
 import Primer.Typecheck (
   Cxt (),
   SmartHoles (NoSmartHoles),
-  buildTypingContextFromModules',
   consistentKinds,
   extendLocalCxtTy,
   localTyVars,
-  typeDefs, ExprT, TypeError, synth,
+  typeDefs, ExprT, TypeError, synth, buildTypingContext,
  )
 
 {-
@@ -202,8 +199,8 @@ hoist' cxt = pure . evalTestM 0 . flip runReaderT cxt . unWT
 -- to increase the number of tests run to get decent coverage.
 -- The modules form the 'Cxt' in the environment of the 'WT' monad
 -- (thus the definitions of terms is ignored)
-propertyWT :: [S Module] -> PropertyT WT () -> Property
-propertyWT mods = property . hoist (hoist' $ buildTypingContextFromModules' mods NoSmartHoles)
+propertyWT :: PropertyT WT () -> Property
+propertyWT = property . hoist (hoist' $ buildTypingContext mempty mempty NoSmartHoles)
 
 -- Lift 'synth' into a property
 synthTest :: HasCallStack => Expr -> PropertyT WT (Type' (), ExprT)

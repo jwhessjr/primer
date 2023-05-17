@@ -41,7 +41,7 @@ refine' cxt s t = fmap (either crash identity) $ runExceptT $ refine cxt s t
 
 -- if refine cxt tgt s = Just (is,ty)   =>  (? : s) $ <stuff checking against is>  ∈ ty[instantiation vars substituted appropriately] ~ tgt
 tasty_refinement_synths :: Property
-tasty_refinement_synths = propertyWT [] $ do
+tasty_refinement_synths = propertyWT $ do
   tgt <- forAllT $ genWTType KType
   src <- forAllT $ genWTType KType
   cxt <- ask
