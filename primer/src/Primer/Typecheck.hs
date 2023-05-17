@@ -1,5 +1,4 @@
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE OverloadedLabels #-}
 
 -- | Typechecking for Core expressions.
 -- This closely follows the type system of Hazelnut, but supports arbitrary
@@ -15,9 +14,6 @@ module Primer.Typecheck (
   check,
   synthKind,
   checkKind,
-  checkTypeDefs,
-  CheckEverythingRequest (..),
-  checkEverything,
   Cxt (..),
   KindOrType (..),
   initialCxt,
@@ -39,8 +35,6 @@ module Primer.Typecheck (
   lookupConstructor,
   instantiateValCons,
   instantiateValCons',
-  exprTtoExpr,
-  typeTtoType,
   getGlobalNames,
   getGlobalBaseNames,
   lookupGlobal,
@@ -53,7 +47,6 @@ module Primer.Typecheck (
   extendLocalCxts,
   extendGlobalCxt,
   extendTypeDefCxt,
-  localTmVars,
   localTyVars,
 ) where
 
@@ -65,26 +58,9 @@ import Data.Map qualified as M
 import Data.Map.Strict qualified as Map
 import Data.Set qualified as S
 import Optics (
-  A_Traversal,
-  AppendIndices,
-  IxFold,
-  IxTraversal',
-  JoinKinds,
-  Optic',
-  WithIx,
-  equality,
-  icompose,
-  itoListOf,
-  itraversed,
   over,
-  reindexed,
-  selfIndex,
   set,
-  to,
-  traverseOf,
-  (%),
  )
-import Optics.Traversal (traversed)
 import Primer.Core (
   Bind' (..),
   CaseBranch' (..),
@@ -92,11 +68,9 @@ import Primer.Core (
   Expr' (..),
   ExprMeta,
   GVarName,
-  GlobalName (baseName, qualifiedModule),
   ID,
   Kind (..),
   LVarName,
-  LocalName (LocalName),
   Meta (..),
   TmVarRef (..),
   TyVarName,
@@ -106,12 +80,8 @@ import Primer.Core (
   TypeMeta,
   ValConName,
   bindName,
-  qualifyName,
   unLocalName,
   _bindMeta,
-  _exprMeta,
-  _exprTypeMeta,
-  _typeMeta,
  )
 import Primer.Core.DSL (S, branch, create', emptyHole, meta, meta')
 import Primer.Core.Transform (decomposeTAppCon, mkTAppCon)
@@ -120,32 +90,21 @@ import Primer.Core.Utils (
   forgetTypeMetadata,
   freshLocalName,
   freshLocalName',
-  generateTypeIDs,
   noHoles,
  )
 import Primer.Def (
-  ASTDef (..),
-  _astDefType,
-  Def (..),
-  _DefAST,
   DefMap,
   defType,
  )
 import Primer.Module (
-  Module (
-    moduleName
-  ),
-  _moduleDefs,
+  Module (),
   moduleDefsQualified,
   moduleTypesQualified,
  )
 import Primer.Name (Name, NameCounter)
 import Primer.Subst (substTy)
 import Primer.TypeDef (
-  ASTTypeDef (astTypeDefConstructors, astTypeDefParameters),
   TypeDefMap,
-  ValCon (valConArgs, valConName),
-  typeDefAST,
   valConType,
  )
 import Primer.Typecheck.Cxt (Cxt (Cxt, globalCxt, localCxt, smartHoles, typeDefs))
@@ -225,12 +184,6 @@ extendGlobalCxt globals cxt = cxt{globalCxt = Map.fromList globals <> globalCxt 
 extendTypeDefCxt :: TypeDefMap -> Cxt -> Cxt
 extendTypeDefCxt typedefs cxt = cxt{typeDefs = typedefs <> typeDefs cxt}
 
-localTmVars :: Cxt -> Map LVarName Type
-localTmVars = M.mapKeys LocalName . M.mapMaybe (\case T t -> Just t; K _ -> Nothing) . localCxt
-
-noSmartHoles :: Cxt -> Cxt
-noSmartHoles cxt = cxt{smartHoles = NoSmartHoles}
-
 -- An empty typing context
 initialCxt :: SmartHoles -> Cxt
 initialCxt sh =
@@ -267,145 +220,6 @@ type TypeM e m =
   , MonadFresh NameCounter m
   , MonadNestedError TypeError e m -- can throw type errors
   )
-
--- | Check all type definitions, as one recursive group, in some monadic environment
-checkTypeDefs ::
-  TypeM e m =>
-  TypeDefMap ->
-  m ()
-checkTypeDefs tds = do
-  existingTypes <- asks typeDefs
-  -- NB: we expect the frontend to only submit acceptable typedefs, so all
-  -- errors here are "internal errors" and should never be seen.
-  -- (This is not quite true, see
-  -- https://github.com/hackworthltd/primer/issues/3)
-  assert (Map.disjoint existingTypes tds) "Duplicate-ly-named TypeDefs"
-  -- Note that constructors are synthesisable, so their names must be globally
-  -- unique. We need to be able to work out the type of @TCon "C"@ without any
-  -- extra information.
-  let atds = Map.mapMaybe typeDefAST tds
-  let allAtds = Map.mapMaybe typeDefAST existingTypes <> atds
-  assert
-    (distinct $ concatMap (map valConName . astTypeDefConstructors) allAtds)
-    "Duplicate-ly-named constructor (perhaps in different typedefs)"
-  -- Note that these checks only apply to non-primitives:
-  -- duplicate type names are checked elsewhere, kinds are correct by construction, and there are no constructors.
-  local (extendTypeDefCxt tds) $ traverseWithKey_ checkTypeDef atds
-  where
-    traverseWithKey_ :: Applicative f => (k -> v -> f ()) -> Map k v -> f ()
-    traverseWithKey_ f = void . Map.traverseWithKey f
-    -- In the core, we have many different namespaces, so the only name-clash
-    -- checking we must do is
-    -- - between two constructors (possibly of different types)
-    -- - between two type names
-    -- However, we forbid much more than this for UI and pedagogy purposes. We
-    -- actually check
-    -- - In one typedef
-    --   - parameters are distinct
-    --   - type name is not shadowed by a parameter
-    --   - parameters and constructors do not clash
-    -- - Globally
-    --   - all types have distinct names
-    --   - all constructors have distinct names
-    -- But note that we allow
-    -- - type names clashing with constructor names (possibly in different
-    --   types)
-
-    checkTypeDef tc td = do
-      let params = astTypeDefParameters td
-      let cons = astTypeDefConstructors td
-      assert
-        ( (1 ==) . S.size $
-            S.fromList $
-              qualifiedModule tc : fmap (qualifiedModule . valConName) cons
-        )
-        "Module name of type and all constructors must be the same"
-      assert
-        (distinct $ map (unLocalName . fst) params <> map (baseName . valConName) cons)
-        "Duplicate names in one tydef: between parameter-names and constructor-names"
-      assert
-        (notElem (baseName tc) $ map (unLocalName . fst) params)
-        "Duplicate names in one tydef: between type-def-name and parameter-names"
-      local (noSmartHoles . extendLocalCxtTys params) $
-        mapM_ (checkKind' KType <=< fakeMeta) $
-          concatMap valConArgs cons
-    -- We need metadata to use checkKind, but we don't care about the output,
-    -- just a yes/no answer. In this case it is fine to put nonsense in the
-    -- metadata as it won't be inspected.
-    fakeMeta = generateTypeIDs
-
-distinct :: Ord a => [a] -> Bool
-distinct = go mempty
-  where
-    go _ [] = True
-    go seen (x : xs)
-      | x `S.member` seen = False
-      | otherwise = go (S.insert x seen) xs
-
-data CheckEverythingRequest = CheckEverything
-  { trusted :: [Module]
-  , toCheck :: [Module]
-  }
-
--- | Check a (mutually-recursive set of) module(s), in a given trusted
--- environment of modules.
--- Returns just the modules that were requested 'toCheck', with updated cached
--- type information etc.
---
--- This checks every type definition and every global term definition.
---
--- In particular, this typechecks all the definitions, in one recursive group.
--- This checks that the type signature is well-formed, then checks the body
--- (for an ASTDef) against the signature.
--- (If SmartHoles edits a type, the body of every function is checked in the
--- environment with the updated type)
-checkEverything ::
-  forall e m.
-  (MonadFresh ID m, MonadFresh NameCounter m, MonadNestedError TypeError e (ReaderT Cxt m)) =>
-  SmartHoles ->
-  CheckEverythingRequest ->
-  m [Module]
-checkEverything sh CheckEverything{trusted, toCheck} =
-  let cxt = buildTypingContextFromModules trusted sh
-   in flip runReaderT cxt $ do
-        let newTypes = foldMap' moduleTypesQualified toCheck
-        checkTypeDefs newTypes
-        local (extendTypeDefCxt newTypes) $ do
-          -- Kind check and update (for smartholes) all the types.
-          -- Note that this may give ill-typed definitions if the type changes
-          -- since we have not checked the expressions against the new types.
-          updatedTypes <- traverseOf (traverseDefs % _DefAST % _astDefType) (fmap typeTtoType . checkKind' KType) toCheck
-          -- Now extend the context with the new types
-          let defsUpdatedTypes = itoListOf foldDefTypesWithName updatedTypes
-          local (extendGlobalCxt defsUpdatedTypes) $
-            -- Check the body (of AST definitions) against the new type
-            traverseOf
-              (traverseDefs % _DefAST)
-              ( \def -> do
-                  e <- check (forgetTypeMetadata $ astDefType def) (astDefExpr def)
-                  pure $ def{astDefExpr = exprTtoExpr e}
-              )
-              updatedTypes
-  where
-    -- The first argument of traverseDefs' is intended to either
-    -- - be equality, giving a traveral
-    -- - specify an index (using selfIndex and reindexed), giving a fold
-    traverseDefs' ::
-      ( JoinKinds A_Traversal k l
-      , JoinKinds l A_Traversal l
-      , AppendIndices is (WithIx Name) js
-      ) =>
-      Optic' k is Module Module ->
-      Optic' l js [Module] Def
-    traverseDefs' o = traversed % o % (_moduleDefs % itraversed)
-    traverseDefs :: IxTraversal' Name [Module] Def
-    traverseDefs = traverseDefs' equality
-    foldDefTypesWithName :: IxFold GVarName [Module] Type
-    foldDefTypesWithName =
-      icompose qualifyName $
-        traverseDefs' (reindexed moduleName selfIndex)
-          % to defType
-          % to forgetTypeMetadata
 
 {- HLINT ignore synth "Avoid lambda using `infix`" -}
 -- Note [Let expressions]
@@ -745,14 +559,6 @@ consistentTypes x y = uncurry eqType $ holepunch x y
 -- | Compare two types for alpha equality, ignoring their IDs
 eqType :: Type' a -> Type' b -> Bool
 eqType t1 t2 = forgetTypeMetadata t1 `alphaEqTy` forgetTypeMetadata t2
-
--- | Convert @Expr (Meta Type) (Meta Kind)@ to @Expr (Meta (Maybe Type)) (Meta (Maybe Kind))@
-exprTtoExpr :: ExprT -> Expr
-exprTtoExpr = over _exprTypeMeta (fmap Just) . over _exprMeta (fmap Just)
-
--- | Convert @Type (Meta Kind)@ to @Type (Meta (Maybe Kind))@
-typeTtoType :: TypeT -> Type' TypeMeta
-typeTtoType = over _typeMeta (fmap Just)
 
 checkKind' :: TypeM e m => Kind -> Type' (Meta a) -> m TypeT
 checkKind' k t = modifyError' KindError (checkKind k t)
