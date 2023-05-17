@@ -16,11 +16,6 @@ executable primer-test
   other-modules:
     Control.Monad.Fresh
     Foreword
-    Primer.Action
-    Primer.Action.Available
-    Primer.Action.Priorities
-    Primer.App
-    Primer.App.Base
     Primer.Core
     Primer.Core.DSL
     Primer.Core.Transform
@@ -33,7 +28,6 @@ executable primer-test
     Primer.Name
     Primer.Name.Fresh
     Primer.Pretty
-    Primer.Questions
     Primer.Refine
     Primer.Subst
     Primer.Typecheck
@@ -42,11 +36,6 @@ executable primer-test
     Primer.Zipper
     Primer.ZipperCxt
     Control.Monad.NestedError
-    Primer.Action.Actions
-    Primer.Action.Errors
-    Primer.Action.Movement
-    Primer.Action.ProgAction
-    Primer.Action.ProgError
     Primer.Core.DSL.Meta
     Primer.Core.DSL.Type
     Primer.Core.Fresh
@@ -70,9 +59,7 @@ executable primer-test
     Primer.Typecheck.TypeError
     Primer.Typecheck.Utils
     Primer.Zipper.Type
-    Tests.Typecheck
     Tests.Refine
-    Primer.Gen.App
     Primer.Gen.Core.Raw
     Primer.Gen.Core.Typed
     Primer.Test.TestM
