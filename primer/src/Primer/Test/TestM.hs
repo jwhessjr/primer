@@ -2,7 +2,6 @@
 module Primer.Test.TestM (
   TestM,
   evalTestM,
-  isolateTestM,
 ) where
 
 import Foreword
@@ -15,14 +14,6 @@ import Primer.Name (NameCounter)
 -- If we need other abilities, this will be the base monad.
 newtype TestM a = TestM {unTestM :: State Int a}
   deriving newtype (Functor, Applicative, Monad)
-
--- | Run an action and ignore any effect on the fresh name/id state
-isolateTestM :: TestM a -> TestM a
-isolateTestM m = TestM $ do
-  st <- get
-  x <- unTestM m
-  put st
-  pure x
 
 evalTestM :: ID -> TestM a -> a
 evalTestM (ID id_) = fst . flip runState id_ . unTestM
