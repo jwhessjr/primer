@@ -1,8 +1,3 @@
-{-# LANGUAGE ImpredicativeTypes #-}
-{-# LANGUAGE OverloadedLabels #-}
-
--- This module defines the core AST and some functions for operating on it.
-
 module Primer.Core (
   Expr,
   Expr' (..),
@@ -14,15 +9,12 @@ module Primer.Core (
   module Primer.Core.Type,
   TypeCache (..),
   TypeCacheBoth (..),
-  _chkedAt,
-  _synthed,
   ExprMeta,
   _exprMeta,
   _exprMetaLens,
   _exprTypeMeta,
   bindName,
   _bindMeta,
-  typesInExpr,
 ) where
 
 import Foreword
@@ -32,20 +24,14 @@ import Data.Data (Data)
 import Data.Generics.Product
 import Data.Generics.Uniplate.Data ()
 import Optics (
-  AffineFold,
-  AffineTraversal',
   Lens,
   Lens',
   Traversal,
-  afailing,
-  atraversalVL,
-  (%),
  )
 import Primer.Core.Meta (
   GVarName,
   GlobalName (GlobalName, baseName, qualifiedModule),
   GlobalNameKind (..),
-  HasID (..),
   HasMetadata (_metadata),
   ID (ID),
   LVarName,
@@ -95,18 +81,6 @@ data TypeCache
 -- though, to make it clear what each one is!
 data TypeCacheBoth = TCBoth {tcChkedAt :: Type' (), tcSynthed :: Type' ()}
   deriving stock (Eq, Show, Read, Generic, Data)
-
--- TODO `_chkedAt` and `_synthed` should be `AffineTraversal`s,
--- but there is currently no `failing` for AffineTraversals, only for AffineFolds (`afailing`).
--- See https://github.com/well-typed/optics/pull/393
-
--- | An affine fold getting TCChkedAt or TCEmb's chked-at field
-_chkedAt :: AffineFold TypeCache (Type' ())
-_chkedAt = #_TCChkedAt `afailing` (#_TCEmb % #tcChkedAt)
-
--- | An affine fold getting TCSynthed or TCEmb's synthed field
-_synthed :: AffineFold TypeCache (Type' ())
-_synthed = #_TCSynthed `afailing` (#_TCEmb % #tcSynthed)
 
 -- Expression metadata. Each expression is annotated with a type (populated by
 -- the typechecker). These types aren't part of the program so they themselves
@@ -297,24 +271,3 @@ bindName (Bind _ n) = n
 -- | A type-modifying lens for the metadata of a Bind.
 _bindMeta :: forall a b. Lens (Bind' a) (Bind' b) a b
 _bindMeta = position @1
-
--- | Note that this does not recurse in to sub-expressions or sub-types.
-typesInExpr :: AffineTraversal' (Expr' a b) (Type' b)
-typesInExpr = atraversalVL $ \point f -> \case
-  Ann m e ty -> Ann m e <$> f ty
-  APP m e ty -> APP m e <$> f ty
-  LetType m x ty e -> (\ty' -> LetType m x ty' e) <$> f ty
-  Letrec m x b ty e -> (\ty' -> Letrec m x b ty' e) <$> f ty
-  e -> point e
-
-instance HasID a => HasID (Expr' a b) where
-  _id = position @1 % _id
-
-instance HasID a => HasID (Bind' a) where
-  _id = position @1 % _id
-
-instance HasMetadata (Expr' ExprMeta b) where
-  _metadata = position @1 % typed @(Maybe Value)
-
-instance HasMetadata (Bind' ExprMeta) where
-  _metadata = position @1 % typed @(Maybe Value)
