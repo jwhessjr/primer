@@ -12,15 +12,11 @@ import Data.Data (Data)
 import Data.Generics.Product
 import Optics (
   Traversal,
-  (%),
  )
 import Primer.Core.Meta (
-  HasID (..),
-  HasMetadata (_metadata),
   Meta,
   TyConName,
   TyVarName,
-  Value,
  )
 
 -- | Core types.
@@ -62,9 +58,3 @@ _typeMeta = param @0
 -- | Core kinds.
 data Kind = KHole | KType | KFun Kind Kind
   deriving stock (Eq, Show, Read, Data, Generic)
-
-instance HasID a => HasID (Type' a) where
-  _id = position @1 % _id
-
-instance HasMetadata (Type' TypeMeta) where
-  _metadata = position @1 % typed @(Maybe Value)

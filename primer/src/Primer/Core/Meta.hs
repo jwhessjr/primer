@@ -1,7 +1,4 @@
 module Primer.Core.Meta (
-  HasID (..),
-  getID,
-  HasMetadata (_metadata),
   ID (ID),
   ModuleName (ModuleName, unModuleName),
   GlobalNameKind (..),
@@ -14,7 +11,6 @@ module Primer.Core.Meta (
   LocalNameKind (..),
   LocalName (LocalName, unLocalName),
   TmVarRef (..),
-  unsafeMkLocalName,
   LVarName,
   TyVarName,
   Value,
@@ -29,14 +25,8 @@ import Data.Aeson (Value)
 import Data.Data (Data)
 import Data.Generics.Product
 import Data.Generics.Uniplate.Data ()
-import Data.Generics.Uniplate.Zipper (Zipper, hole, replaceHole)
 import Optics (
   Lens,
-  Lens',
-  equality',
-  lens,
-  set,
-  view,
  )
 import Primer.Name (Name, unsafeMkName)
 
@@ -103,9 +93,6 @@ newtype LocalName (k :: LocalNameKind) = LocalName {unLocalName :: Name}
   deriving stock (Eq, Ord, Show, Read, Data, Generic)
   deriving (IsString) via Name
 
-unsafeMkLocalName :: Text -> LocalName k
-unsafeMkLocalName = LocalName . unsafeMkName
-
 type LVarName = LocalName 'ATmVar
 type TyVarName = LocalName 'ATyVar
 
@@ -114,38 +101,3 @@ data TmVarRef
   = GlobalVarRef GVarName
   | LocalVarRef LVarName
   deriving stock (Eq, Show, Read, Data, Generic)
-
--- | A class for types which have an ID.
--- This makes it easier to change the underlying metadata representation without
--- breaking code that needs to work with IDs, because they use this class
--- instead of hardcoding paths to IDs or using chained 'HasType' instances,
--- which can lead to ambiguity errors.
-class HasID a where
-  _id :: Lens' a ID
-
-instance HasID ID where
-  _id = equality'
-
-instance HasID (Meta a) where
-  _id = position @1
-
--- This instance is used in 'Primer.Zipper', but it would be an orphan if we defined it there.
-instance HasID a => HasID (Zipper a a) where
-  _id = lens getter setter
-    where
-      getter = view _id . hole
-      setter z i =
-        let t = hole z
-         in replaceHole (set _id i t) z
-
--- | Get the ID of the given expression or type
-getID :: HasID a => a -> ID
-getID = view _id
-
--- | A class for types which have metadata.
--- This exists for the same reasons that 'HasID' does
-class HasMetadata a where
-  _metadata :: Lens' a (Maybe Value)
-
-instance HasMetadata (Meta a) where
-  _metadata = position @3

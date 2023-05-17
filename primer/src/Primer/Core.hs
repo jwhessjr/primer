@@ -32,7 +32,6 @@ import Primer.Core.Meta (
   GVarName,
   GlobalName (GlobalName, baseName, qualifiedModule),
   GlobalNameKind (..),
-  HasMetadata (_metadata),
   ID (ID),
   LVarName,
   LocalName (LocalName, unLocalName),
@@ -44,11 +43,9 @@ import Primer.Core.Meta (
   TyVarName,
   ValConName,
   Value,
-  getID,
   qualifyName,
   trivialMeta,
   unsafeMkGlobalName,
-  unsafeMkLocalName,
  )
 import Primer.Core.Type (
   Kind (..),
