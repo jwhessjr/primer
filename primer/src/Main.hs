@@ -62,6 +62,7 @@ import Primer.Typecheck (
   SmartHoles (SmartHoles), TypeError,
  )
 import Tests.Typecheck (TypeCacheAlpha (TypeCacheAlpha))
+import Tests.Refine (tasty_refinement_synths)
 import Primer.TypeDef (ASTTypeDef(..), TypeDef (..))
 import Control.Monad.Fresh (fresh, MonadFresh)
 import Primer.Core.DSL
@@ -96,12 +97,12 @@ runAndRecheck = either identity absurd <$> runExceptT go
    go :: ExceptT RRInfo IO Void
    go = do
     seed <- Seed.random
-    shrink <- ExceptT $ runProp seed tasty_undo_redo <&> \case
+    shrink <- ExceptT $ runProp seed tasty_refinement_synths <&> \case
       Passed -> Left RunPass
       Defeat -> Left RunDefeat
       Fail tc sp -> Right $ SkipToShrink tc sp
     -- This is essentially "recheckAt", with the skip/shrink info from above
-    ExceptT $ fmap Left $ runProp seed (withSkip shrink tasty_undo_redo) <&> \case
+    ExceptT $ fmap Left $ runProp seed (withSkip shrink tasty_refinement_synths) <&> \case
       Passed -> RecheckPass
       Defeat -> RecheckDefeat
       Fail _ _ -> RecheckRefind

@@ -71,6 +71,7 @@ executable primer-test
     Primer.Typecheck.Utils
     Primer.Zipper.Type
     Tests.Typecheck
+    Tests.Refine
     Primer.Gen.App
     Primer.Gen.Core.Raw
     Primer.Gen.Core.Typed
