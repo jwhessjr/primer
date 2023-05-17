@@ -49,15 +49,12 @@ import Primer.Core.Meta (
   trivialMeta,
   unsafeMkGlobalName,
   unsafeMkLocalName,
-  _type,
  )
 import Primer.Core.Type (
   Kind (..),
   Type,
   Type' (..),
   TypeMeta,
-  _typeMeta,
-  _typeMetaLens,
  )
 
 -- | Typechecking will add metadata to each node describing its type.

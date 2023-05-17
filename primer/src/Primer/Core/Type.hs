@@ -4,7 +4,6 @@ module Primer.Core.Type (
   Kind (..),
   TypeMeta,
   _typeMeta,
-  _typeMetaLens,
 ) where
 
 import Foreword
@@ -12,7 +11,6 @@ import Foreword
 import Data.Data (Data)
 import Data.Generics.Product
 import Optics (
-  Lens',
   Traversal,
   (%),
  )
@@ -60,12 +58,6 @@ data Type' a
 -- | A traversal over the metadata of a type
 _typeMeta :: Traversal (Type' a) (Type' b) a b
 _typeMeta = param @0
-
--- | A lens on to the metadata of a type.
--- Note that unlike '_typeMeta', this is shallow i.e. it does not recurse in to sub-expressions.
--- And for this reason, it cannot be type-changing.
-_typeMetaLens :: Lens' (Type' a) a
-_typeMetaLens = position @1
 
 -- | Core kinds.
 data Kind = KHole | KType | KFun Kind Kind
