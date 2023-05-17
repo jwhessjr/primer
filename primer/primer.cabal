@@ -17,7 +17,6 @@ executable primer-test
     Control.Monad.Fresh
     Foreword
     Primer.Core
-    Primer.Core.Transform
     Primer.Core.Utils
     Primer.Def
     Primer.EvalFull
@@ -25,7 +24,6 @@ executable primer-test
     Primer.Refine
     Primer.Subst
     Primer.Typecheck
-    Primer.TypeDef
     Primer.Unification
     Control.Monad.NestedError
     Primer.Core.Fresh

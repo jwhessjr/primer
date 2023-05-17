@@ -15,7 +15,6 @@ import Optics (
  )
 import Primer.Core.Meta (
   Meta,
-  TyConName,
   TyVarName,
  )
 
@@ -33,7 +32,6 @@ type TypeMeta = Meta (Maybe Kind)
 data Type' a
   = TEmptyHole a
   | THole a (Type' a)
-  | TCon a TyConName
   | TFun a (Type' a) (Type' a)
   | TVar a TyVarName
   | TApp a (Type' a) (Type' a)

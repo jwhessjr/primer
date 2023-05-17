@@ -9,7 +9,6 @@ import Foreword
 import Primer.Core.Meta
 import Primer.Core.Type (Kind, Type')
 import Primer.Name (Name)
-import Primer.TypeDef (TypeDefMap)
 
 type Type = Type' ()
 
@@ -17,8 +16,7 @@ data KindOrType = K Kind | T Type
   deriving stock (Show, Eq)
 
 data Cxt = Cxt
-  { typeDefs :: TypeDefMap
-  , localCxt :: Map Name KindOrType
+  { localCxt :: Map Name KindOrType
   -- ^ local variables. invariant: the Name comes from a @LocalName k@, and
   -- the tag @k@ should say whether the value is a kind or a type.
   -- We detect violations of this in 'lookupLocal' (thus we key this map

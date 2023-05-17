@@ -12,7 +12,7 @@ import Primer.Core.Meta (
   trivialMeta,
  )
 import Primer.Core.Type (
-  Type' (TApp, TCon, TEmptyHole, TForall, TFun, THole, TVar),
+  Type' (TApp, TEmptyHole, TForall, TFun, THole, TVar),
   _typeMeta,
  )
 import Primer.Core.Type.Utils (_freeVarsTy)
@@ -169,7 +169,6 @@ unify' vx@(TVar _ x) t =
     True -> unifyVar x t
     False -> throwError $ NotUnify vx t
 unify' s vy@(TVar _ _) = local swapEnv $ unify' vy s
-unify' (TCon _ n) (TCon _ m) | n == m = pure ()
 unify' (TFun _ s1 t1) (TFun _ s2 t2) = unify' s1 s2 >> unify' t1 t2
 -- Doing first-order unification, as applications are only constructor-like
 -- (we don't have any bona fide functions at the type level)

@@ -13,8 +13,6 @@ module Primer.Core (
   _exprMeta,
   _exprMetaLens,
   _exprTypeMeta,
-  bindName,
-  _bindMeta,
 ) where
 
 import Foreword
@@ -102,7 +100,6 @@ data Expr' a b
   | Ann a (Expr' a b) (Type' b)
   | App a (Expr' a b) (Expr' a b)
   | APP a (Expr' a b) (Type' b)
-  | Con a ValConName -- See Note [Synthesisable constructors]
   | Lam a LVarName (Expr' a b)
   | LAM a TyVarName (Expr' a b)
   | Var a TmVarRef
@@ -257,10 +254,3 @@ type Bind = Bind' ExprMeta
 
 data Bind' a = Bind a LVarName
   deriving stock (Eq, Show, Read, Data, Generic)
-
-bindName :: Bind' a -> LVarName
-bindName (Bind _ n) = n
-
--- | A type-modifying lens for the metadata of a Bind.
-_bindMeta :: forall a b. Lens (Bind' a) (Bind' b) a b
-_bindMeta = position @1

@@ -22,14 +22,6 @@ module Primer.Typecheck (
   typeOf,
   matchArrowType,
   matchForallType,
-  decomposeTAppCon,
-  mkTAppCon,
-  TypeDefInfo (..),
-  TypeDefError (..),
-  getTypeDefInfo',
-  lookupConstructor,
-  instantiateValCons,
-  instantiateValCons',
   lookupGlobal,
   lookupVar,
   consistentKinds,
@@ -37,7 +29,6 @@ module Primer.Typecheck (
   extendLocalCxtTy,
   extendLocalCxtTys,
   extendLocalCxt,
-  extendLocalCxts,
   extendGlobalCxt,
   extendTypeDefCxt,
   localTyVars,
@@ -50,14 +41,11 @@ import Control.Monad.NestedError (MonadNestedError (..), modifyError')
 import Data.Map qualified as M
 import Data.Map.Strict qualified as Map
 import Optics (
-  over,
   set,
  )
 import Primer.Core (
-  CaseBranch' (..),
   Expr,
   Expr' (..),
-  ExprMeta,
   GVarName,
   ID,
   Kind (..),
@@ -68,13 +56,8 @@ import Primer.Core (
   Type' (..),
   TypeCache (..),
   TypeCacheBoth (..),
-  TypeMeta,
-  ValConName,
-  bindName,
   unLocalName,
-  _bindMeta,
  )
-import Primer.Core.Transform (decomposeTAppCon, mkTAppCon)
 import Primer.Core.Utils (
   alphaEqTy,
   forgetTypeMetadata,
@@ -86,11 +69,7 @@ import Primer.Def (
  )
 import Primer.Name (NameCounter)
 import Primer.Subst (substTy)
-import Primer.TypeDef (
-  TypeDefMap,
-  valConType,
- )
-import Primer.Typecheck.Cxt (Cxt (Cxt, globalCxt, localCxt, typeDefs))
+import Primer.Typecheck.Cxt (Cxt (Cxt, globalCxt, localCxt))
 import Primer.Typecheck.Kindcheck (
   KindError (..),
   KindOrType (K, T),
@@ -106,12 +85,6 @@ import Primer.Typecheck.Kindcheck (
  )
 import Primer.Typecheck.TypeError (TypeError (..))
 import Primer.Typecheck.Utils (
-  TypeDefError (TDIHoleType, TDINotADT, TDINotSaturated, TDIUnknown),
-  TypeDefInfo (TypeDefInfo),
-  getTypeDefInfo',
-  instantiateValCons,
-  instantiateValCons',
-  lookupConstructor,
   typeOf,
   _typecache,
  )
@@ -127,9 +100,6 @@ import Primer.Typecheck.Utils (
 -- @Int -> ?@ accepts @\x . x@, we record that the variable node has type
 -- @Int@, rather than @?@.
 type ExprT = Expr' (Meta TypeCache) (Meta Kind)
-
-assert :: MonadNestedError TypeError e m => Bool -> Text -> m ()
-assert b s = unless b $ throwError' (InternalError s)
 
 lookupLocal :: LVarName -> Cxt -> Either TypeError Type
 lookupLocal v cxt = case M.lookup (unLocalName v) $ localCxt cxt of
@@ -153,26 +123,22 @@ lookupVar v cxt = case v of
 extendLocalCxt :: (LVarName, Type) -> Cxt -> Cxt
 extendLocalCxt (name, ty) cxt = cxt{localCxt = Map.insert (unLocalName name) (T ty) (localCxt cxt)}
 
-extendLocalCxts :: [(LVarName, Type)] -> Cxt -> Cxt
-extendLocalCxts x cxt = cxt{localCxt = Map.fromList (bimap unLocalName T <$> x) <> localCxt cxt}
-
 extendGlobalCxt :: [(GVarName, Type)] -> Cxt -> Cxt
 extendGlobalCxt globals cxt = cxt{globalCxt = Map.fromList globals <> globalCxt cxt}
 
-extendTypeDefCxt :: TypeDefMap -> Cxt -> Cxt
-extendTypeDefCxt typedefs cxt = cxt{typeDefs = typedefs <> typeDefs cxt}
+extendTypeDefCxt :: x -> Cxt -> Cxt
+extendTypeDefCxt _ cxt = cxt
 
 -- An empty typing context
 initialCxt :: Cxt
 initialCxt =
   Cxt
-    { typeDefs = mempty
-    , localCxt = mempty
+    { localCxt = mempty
     , globalCxt = mempty
     }
 
 -- | Construct an initial typing context, with all given definitions in scope as global variables.
-buildTypingContext :: TypeDefMap -> DefMap -> Cxt
+buildTypingContext :: x -> DefMap -> Cxt
 buildTypingContext tydefs defs =
   let globals = Map.assocs $ fmap defType defs
    in extendTypeDefCxt tydefs $ extendGlobalCxt globals initialCxt
@@ -242,12 +208,6 @@ synth = \case
     -- Annotate the Ann with the same type as e
     pure $ annSynth2 t'' i Ann e' t'
   EmptyHole i -> pure $ annSynth0 (TEmptyHole ()) i EmptyHole
-  -- We assume that constructor names are unique
-  -- See Note [Synthesisable constructors] in Core.hs
-  Con i c -> do
-    asks (flip lookupConstructor c . typeDefs) >>= \case
-      Just (vc, tc, td) -> let t = valConType tc td vc in pure $ annSynth1 t i Con c
-      Nothing -> throwError' $ UnknownConstructor c
   -- When synthesising a hole, we first check that the expression inside it
   -- synthesises a type successfully (see Note [Holes and bidirectionality]).
   -- TODO: we would like to remove this hole (leaving e) if possible, but I
@@ -327,60 +287,21 @@ check t = \case
   Case i e brs -> do
     (eT, e') <- synth e
     let caseMeta = annotate (TCChkedAt t) i
-    instantiateValCons eT >>= \case
-      -- we allow 'case' on a thing of type TEmptyHole iff we have zero branches
-      Left TDIHoleType ->
-        if null brs
+    let isHoleTy = case eT of
+            TEmptyHole{} -> True
+            THole{} -> True
+            _ -> False
+    if isHoleTy
+     then if null brs
           then pure $ Case caseMeta e' []
           else throwError' CaseOfHoleNeedsEmptyBranches
-      Left TDINotADT -> throwError' $ CannotCaseNonADT eT
-      Left (TDIUnknown ty) -> throwError' $ InternalError $ "We somehow synthesised the unknown type " <> show ty <> " for the scrutinee of a case"
-      Left TDINotSaturated -> throwError' $ CannotCaseNonSaturatedADT eT
-      Right (tc, _, expected) -> do
-        let branchNames = map (\(CaseBranch n _ _) -> n) brs
-        let conNames = map fst expected
-        brs' <- if branchNames == conNames
-                then pure brs
-                else throwError' $ WrongCaseBranches tc branchNames
-          -- create branches with the correct name but wrong parameters,
-          -- they will be fixed up in checkBranch later
-        brs'' <- zipWithM (checkBranch t) expected brs'
-        pure $ Case caseMeta e' brs''
+     else throwError' $ CannotCaseNonADT eT
   e -> do
       (t', e') <- synth e
       if consistentTypes t t'
         then pure (set _typecache (TCEmb TCBoth{tcChkedAt = t, tcSynthed = t'}) e')
         else throwError' (InconsistentTypes t t')
 
--- | Similar to check, but for the RHS of case branches
--- We assume that the branch is for this constructor
--- The passed in 'ValCon' is assumed to be a constructor of the passed in 'TypeDef'
-checkBranch ::
-  forall e m.
-  TypeM e m =>
-  Type ->
-  (ValConName, [Type' ()]) -> -- The constructor and its instantiated parameter types
-  CaseBranch' ExprMeta TypeMeta ->
-  m (CaseBranch' (Meta TypeCache) (Meta Kind))
-checkBranch t (vc, args) (CaseBranch nb patterns rhs) =
-  do
-    -- We check an invariant due to paranoia
-    assertCorrectCon
-    (fixedPats, fixedRHS) <- case length args == length patterns of
-      False -> throwError' CaseBranchWrongNumberPatterns
-      -- if the branch is nonsense, replace it with a sensible pattern and an empty hole
-      True ->
-        let args' = zipWith (\ty bind -> (over _bindMeta (annotate (TCChkedAt ty)) bind, ty)) args patterns
-         in pure (args', rhs)
-    rhs' <- local (extendLocalCxts (map (first bindName) fixedPats)) $ check t fixedRHS
-    pure $ CaseBranch nb (map fst fixedPats) rhs'
-  where
-    assertCorrectCon =
-      assert (vc == nb) $
-        "checkBranch: expected a branch on "
-          <> show vc
-          <> " but found branch on "
-          <> show nb
 
 -- | Checks if a type can be unified with a function (arrow) type. Returns the
 -- arrowised version - i.e. if it's a hole then it returns an arrow type with

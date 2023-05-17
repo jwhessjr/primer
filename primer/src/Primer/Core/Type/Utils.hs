@@ -47,7 +47,6 @@ traverseFreeVarsTy = go
     go bound f = \case
       t@TEmptyHole{} -> pure t
       THole m t -> THole m <$> go bound f t
-      t@TCon{} -> pure t
       TFun m s t -> TFun m <$> go bound f s <*> go bound f t
       v@(TVar m a)
         | S.member a bound -> pure v
@@ -69,7 +68,6 @@ alphaEqTy = go (0, mempty, mempty)
   where
     go _ (TEmptyHole _) (TEmptyHole _) = True
     go bs (THole _ s) (THole _ t) = go bs s t
-    go _ (TCon _ n) (TCon _ m) = n == m
     go bs (TFun _ a b) (TFun _ c d) = go bs a c && go bs b d
     go (_, p, q) (TVar _ n) (TVar _ m) = p ! n == q ! m
     go bs (TApp _ a b) (TApp _ c d) = go bs a c && go bs b d

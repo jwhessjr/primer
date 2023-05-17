@@ -147,7 +147,7 @@ hoist' cxt = pure . evalTestM 0 . flip runReaderT cxt . unWT
 -- The modules form the 'Cxt' in the environment of the 'WT' monad
 -- (thus the definitions of terms is ignored)
 propertyWT :: PropertyT WT () -> Property
-propertyWT = property . hoist (hoist' $ buildTypingContext mempty mempty)
+propertyWT = property . hoist (hoist' $ buildTypingContext () mempty)
 
 -- Lift 'synth' into a property
 synthTest :: HasCallStack => Expr -> PropertyT WT (Type' (), ExprT)

@@ -21,11 +21,10 @@ import Data.Map qualified as Map
 import Primer.Core.Meta (ID, LocalName (LocalName), Meta (Meta), TyVarName, unLocalName)
 import Primer.Core.Type (
   Kind (KFun, KHole, KType),
-  Type' (TApp, TCon, TEmptyHole, TForall, TFun, THole, TLet, TVar),
+  Type' (TApp, TEmptyHole, TForall, TFun, THole, TLet, TVar),
  )
 import Primer.Name (NameCounter)
-import Primer.TypeDef (typeDefKind)
-import Primer.Typecheck.Cxt (Cxt (localCxt, typeDefs), KindOrType (K, T), Type)
+import Primer.Typecheck.Cxt (Cxt (localCxt), KindOrType (K, T), Type)
 import Primer.Typecheck.KindError (
   KindError (
     InconsistentKinds,
@@ -86,11 +85,6 @@ synthKind = \case
   THole m t -> do
     (_, t') <- synthKind t
     pure (KHole, THole (annotate KHole m) t')
-  TCon m c -> do
-    typeDef <- asks (Map.lookup c . typeDefs)
-    case typeDef of
-      Nothing -> throwError' $ UnknownTypeConstructor c
-      Just def -> let k = typeDefKind def in pure (k, TCon (annotate k m) c)
   TFun m a b -> do
     a' <- checkKind KType a
     b' <- checkKind KType b
