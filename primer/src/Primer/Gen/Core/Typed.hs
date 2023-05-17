@@ -32,7 +32,6 @@ import Primer.Core (
   TyVarName,
   Type' (..), Expr, unsafeMkGlobalName,
  )
-import Primer.Gen.Core.Raw (genTyVarName)
 import Primer.Name (NameCounter)
 import Primer.Refine (Inst (InstAPP, InstApp, InstUnconstrainedAPP))
 import Primer.Subst (substTySimul)
@@ -40,15 +39,9 @@ import Primer.Test.TestM (
   TestM,
   evalTestM,
  )
-import Primer.TypeDef (
-  typeDefKind,
- )
 import Primer.Typecheck (
   Cxt (),
-  consistentKinds,
-  extendLocalCxtTy,
-  localTyVars,
-  typeDefs, ExprT, TypeError, synth, buildTypingContext,
+  ExprT, TypeError, synth, buildTypingContext,
  )
 
 {-
@@ -122,67 +115,27 @@ genInstApp = reify mempty
       InstUnconstrainedAPP v k : is -> genWTType k >>= \t' -> second (Left t' :) <$> reify (M.insert v t' sb) is
 
 genChk :: TypeG -> GenT WT ExprG
-genChk ty = do
-  cse <- lift case_
-  let rec = emb : catMaybes [cse]
-  Gen.recursive Gen.choice [emb] rec
+genChk ty = Gen.choice [emb, pure case_]
   where
     emb = fst <$> genSyns ty
-    case_ :: WT (Maybe (GenT WT ExprG))
-    case_ = pure $ Just $ pure $ Case () (EmptyHole ()) [CaseBranch (unsafeMkGlobalName (pure "M","C")) [] $ EmptyHole ()]
+    case_ :: ExprG
+    case_ = Case () (EmptyHole ()) [CaseBranch (unsafeMkGlobalName (pure "M","C")) [] $ EmptyHole ()]
 
 -- | Generates types which infer kinds consistent with the argument
 -- I.e. @genWTType k@ will generate types @ty@ such that @synthKind ty = k'@
 -- with @consistentKinds k k'@. See 'Tests.Gen.Core.Typed.tasty_genTy'
 genWTType :: Kind -> GenT WT TypeG
 genWTType k = do
-  vars <- lift vari
-  cons <- lift constr
-  let nonrec = ehole : catMaybes [vars, cons]
-  let rec = hole : app : catMaybes [arrow, poly]
-  Gen.recursive Gen.choice nonrec rec
+  let rec = app : catMaybes [arrow]
+  Gen.recursive Gen.choice [ehole] rec
   where
     ehole :: GenT WT TypeG
     ehole = pure $ TEmptyHole ()
-    hole :: GenT WT TypeG
-    hole = THole () <$> genWTType KHole
     app = do k' <- genWTKind; TApp () <$> genWTType (KFun k' k) <*> genWTType k'
-    vari :: WT (Maybe (GenT WT TypeG))
-    vari = do
-      goodVars <- filter (consistentKinds k . snd) . M.toList <$> asks localTyVars
-      pure $
-        if null goodVars
-          then Nothing
-          else Just $ Gen.element $ map (TVar () . fst) goodVars
-    constr :: WT (Maybe (GenT WT TypeG))
-    constr = do
-      tds <- asks $ M.assocs . typeDefs
-      let goodTCons = filter (consistentKinds k . typeDefKind . snd) tds
-      pure $
-        if null goodTCons
-          then Nothing
-          else Just $ Gen.element $ map (TCon () . fst) goodTCons
     arrow :: Maybe (GenT WT TypeG)
     arrow =
       if k == KHole || k == KType
         then Just $ TFun () <$> genWTType KType <*> genWTType KType
-        else Nothing
-    {- TODO: reinstate once the TC handles them! and then be careful to do
-               interesting things where we need to expand the synonym
-               See https://github.com/hackworthltd/primer/issues/5
-    tlet :: GenT WT TypeG
-    tlet = do
-      k' <- genWTKind
-      n <- genTyVarName
-      TLet () n <$> genWTType k' <*> local (extendLocalCxtTy (n,k')) (genWTType k)
-    -}
-    poly :: Maybe (GenT WT TypeG)
-    poly =
-      if k == KHole || k == KType
-        then Just $ do
-          k' <- genWTKind
-          n <- genTyVarName
-          TForall () n k' <$> local (extendLocalCxtTy (n, k')) (genWTType KType)
         else Nothing
 
 -- | Generates an arbitary kind. Note that all kinds are well-formed.
