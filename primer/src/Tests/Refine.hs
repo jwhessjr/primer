@@ -39,12 +39,8 @@ data Type
 data Kind = KType | KFun Kind Kind
   deriving stock (Eq, Show)
 
-consistentTypes :: Type -> Type -> Bool
-consistentTypes = (==)
-
-
 refine :: Type -> Type -> Maybe Type
-refine tgtTy tmTy = if consistentTypes tgtTy tmTy
+refine tgtTy tmTy = if tgtTy == tmTy
           then Just tmTy
           else case tmTy of
                  TFun _ t -> refine tgtTy t
