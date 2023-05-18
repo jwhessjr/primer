@@ -2,13 +2,16 @@ module Tests.Refine where
 
 import Prelude
 
+import Data.Maybe (catMaybes)
 import Hedgehog (
+  Gen,
   Property,
   discard,
-  (===), property, forAll, Gen,
+  forAll,
+  property,
+  (===),
  )
-import qualified Hedgehog.Gen as Gen
-import Data.Maybe (catMaybes)
+import Hedgehog.Gen qualified as Gen
 
 tasty_replay_broken :: Property
 tasty_replay_broken = property $ do
@@ -40,8 +43,9 @@ data Kind = KType | KFun Kind Kind
   deriving stock (Eq, Show)
 
 stripArgs :: Type -> Type -> Maybe Type
-stripArgs tgt ty = if tgt == ty
-          then Just ty
-          else case ty of
-                 TFun _ t -> stripArgs tgt t
-                 _ -> Nothing
+stripArgs tgt ty =
+  if tgt == ty
+    then Just ty
+    else case ty of
+      TFun _ t -> stripArgs tgt t
+      _ -> Nothing
