@@ -5,14 +5,10 @@ import Prelude
 import Hedgehog (
   Property,
   discard,
-  (===), property, forAll,
+  (===), property, forAll, GenT,
  )
-import Primer.Gen.Core.Typed (
-  genWTType,
- )
-import Primer.Typecheck (
-  Kind (KType),refine
- )
+import qualified Hedgehog.Gen as Gen
+import Data.Maybe (catMaybes)
 
 tasty_refinement_synths :: Property
 tasty_refinement_synths = property $ do
@@ -22,3 +18,39 @@ tasty_refinement_synths = property $ do
     Just instTy -> do
       src === instTy
     _ -> discard
+
+genWTType :: Monad m => Kind -> GenT m Type
+genWTType k = do
+  let rec = app : catMaybes [arrow]
+  Gen.recursive Gen.choice [ehole] rec
+  where
+    ehole = pure $ TEmptyHole
+    app = do TApp <$> genWTType (KFun KType k) <*> genWTType KType
+    arrow =
+      if k == KHole || k == KType
+        then Just $ TFun <$> genWTType KType <*> genWTType KType
+        else Nothing
+
+data Type
+  = TEmptyHole
+  | TFun Type Type
+  | TApp Type Type
+  deriving stock (Eq, Show)
+
+data Kind = KHole | KType | KFun Kind Kind
+  deriving stock (Eq, Show)
+
+consistentTypes :: Type -> Type -> Bool
+consistentTypes TEmptyHole _ = True
+consistentTypes _ TEmptyHole = True
+consistentTypes (TFun s1 t1) (TFun s2 t2) = consistentTypes s1 s2 && consistentTypes t1 t2
+consistentTypes (TApp s1 t1) (TApp s2 t2) = consistentTypes s1 s2 && consistentTypes t1 t2
+consistentTypes _ _ = False
+
+
+refine :: Type -> Type -> Maybe Type
+refine tgtTy tmTy = if consistentTypes tgtTy tmTy
+          then Just tmTy
+          else case tmTy of
+                 TFun _ t -> refine tgtTy t
+                 _ -> Nothing

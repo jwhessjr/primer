@@ -14,8 +14,6 @@ executable primer-test
   main-is:            Main.hs
   hs-source-dirs:     src
   other-modules:
-    Primer.Gen.Core.Typed
-    Primer.Typecheck
     Tests.Refine
 
   default-language:   GHC2021
