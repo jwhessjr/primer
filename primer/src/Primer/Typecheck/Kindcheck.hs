@@ -17,7 +17,7 @@ import Primer.Core.Type (
   Kind (KFun, KHole, KType),
   Type' (TApp, TEmptyHole, TFun),
  )
-import Primer.Name (Name, NameCounter)
+import Primer.Name (Name)
 import Primer.Typecheck.Cxt (Cxt , KindOrType (K, T), Type)
 
 
@@ -34,7 +34,6 @@ type KindM m =
   , MonadReader Cxt m -- has access to a typing context, and SmartHoles option
   , MonadFresh ID m -- can generate fresh IDs
   -- can generate fresh names (needed for "smart holes" and polymorphism)
-  , MonadFresh NameCounter m
   , MonadError KindError m -- can throw kind errors
   )
 

@@ -55,7 +55,6 @@ import Primer.Def (
   DefMap,
   defType,
  )
-import Primer.Name (NameCounter)
 import Primer.Typecheck.Cxt (Cxt (Cxt, globalCxt, localCxt))
 import Primer.Typecheck.Kindcheck (
   KindError (..),
@@ -120,7 +119,6 @@ type TypeM m =
   , MonadReader Cxt m -- has access to a typing context, and SmartHoles option
   , MonadFresh ID m -- can generate fresh IDs
   -- can generate fresh names (needed for "smart holes" and polymorphism)
-  , MonadFresh NameCounter m
   , MonadError TypeError m -- can throw type errors
   )
 

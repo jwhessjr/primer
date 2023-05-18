@@ -25,7 +25,6 @@ import Primer.Core (
   Kind (..),
   Type' (..), Expr,
  )
-import Primer.Name (NameCounter)
 import Primer.Test.TestM (
   TestM,
   evalTestM,
@@ -57,7 +56,6 @@ newtype WT a = WT {unWT :: ReaderT Cxt TestM a}
     , Applicative
     , Monad
     , MonadReader Cxt
-    , MonadFresh NameCounter
     , MonadFresh ID
     )
 

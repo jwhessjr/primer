@@ -1,13 +1,11 @@
 module Primer.Name (
   Name (),
-  NameCounter,
   unName,
 ) where
 
 import Foreword
 
 import Data.Data (Data)
-import Numeric.Natural (Natural)
 
 -- | This module contains the type of names in the Core AST.
 
@@ -16,7 +14,3 @@ import Numeric.Natural (Natural)
 newtype Name = Name {unName :: Text}
   deriving stock (Eq, Ord, Generic, Data)
   deriving newtype (Show, Read, IsString)
-
-newtype NameCounter = NC Natural
-  deriving stock (Eq, Show, Read, Data)
-  deriving newtype (Enum)
