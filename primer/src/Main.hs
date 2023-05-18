@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
+
 module Main (main) where
 
 import Control.Monad (replicateM, unless)
@@ -10,8 +11,18 @@ import qualified Data.Map.Strict as M
 import Data.Void (Void, absurd)
 import Hedgehog (Property, Seed, withSkip) -- , check, recheckAt )
 -- import Hedgehog.Main (defaultMain)
-import Hedgehog.Internal.Property (Property (propertyConfig, propertyTest), ShrinkPath, Skip (SkipToShrink), TestCount)
-import Hedgehog.Internal.Report (FailureReport (failureShrinkPath), Report (reportSeed, reportTests), Result (..), reportStatus)
+import Hedgehog.Internal.Property (
+  Property (propertyConfig, propertyTest),
+  ShrinkPath,
+  Skip (SkipToShrink),
+  TestCount,
+ )
+import Hedgehog.Internal.Report (
+  FailureReport (failureShrinkPath),
+  Report (reportSeed, reportTests),
+  Result (..),
+  reportStatus,
+ )
 import Hedgehog.Internal.Runner (checkReport)
 import qualified Hedgehog.Internal.Seed as Seed
 import Numeric (showFFloat)
