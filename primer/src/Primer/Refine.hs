@@ -2,11 +2,9 @@ module Primer.Refine (refine, Inst (..)) where
 
 import Foreword
 
-import Control.Monad.Fresh (MonadFresh)
 import Data.Set qualified as Set
-import Primer.Core.Meta (ID, TyVarName)
+import Primer.Core.Meta (TyVarName)
 import Primer.Core.Type (Kind, Type' (TFun))
-import Primer.Name (NameCounter)
 import Primer.Typecheck.Cxt (Cxt)
 import Primer.Typecheck.Kindcheck qualified as TC
 import Primer.Unification (unify)
@@ -29,7 +27,7 @@ data Inst
 -- the @Inst@s to the right, as well as the returned @Type@.
 refine ::
   forall m.
-  (MonadFresh ID m, MonadFresh NameCounter m) =>
+  Monad m =>
   -- | only care about local type vars and typedefs
   Cxt ->
   TC.Type ->

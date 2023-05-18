@@ -2,7 +2,6 @@ module Tests.Refine where
 
 import Foreword hiding (diff)
 
-import Control.Monad.Fresh (MonadFresh)
 import Data.Map qualified as M
 import Hedgehog (
   Property,
@@ -13,7 +12,6 @@ import Hedgehog (
  )
 import Primer.Core (
   Expr' (Ann, EmptyHole),
-  ID,
   Kind (KType),
  )
 import Primer.Core.Utils (forgetMetadata, generateIDs)
@@ -23,7 +21,6 @@ import Primer.Gen.Core.Typed (
   genWTType,
   synthTest,
  )
-import Primer.Name (NameCounter)
 import Primer.Refine (Inst (InstUnconstrainedAPP), refine)
 import Primer.Subst (substTySimul)
 import Primer.Typecheck (
@@ -32,7 +29,7 @@ import Primer.Typecheck (
   consistentTypes,
  )
 
-refine' :: (MonadFresh NameCounter m, MonadFresh ID m) => Cxt -> Type -> Type -> m (Maybe ([Inst], Type))
+refine' :: Monad m => Cxt -> Type -> Type -> m (Maybe ([Inst], Type))
 refine' cxt s t = refine cxt s t
 
 -- if refine cxt tgt s = Just (is,ty)   =>  (? : s) $ <stuff checking against is>  ∈ ty[instantiation vars substituted appropriately] ~ tgt

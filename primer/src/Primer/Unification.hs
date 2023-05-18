@@ -2,17 +2,14 @@ module Primer.Unification (unify) where
 
 import Foreword
 
-import Control.Monad.Fresh (MonadFresh)
 import Data.Map qualified as M
 import Data.Set qualified as S
 import Primer.Core.Meta (
-  ID,
   TyVarName,
  )
 import Primer.Core.Type (
   Type' (TApp, TEmptyHole, TFun),
  )
-import Primer.Name (NameCounter)
 import Primer.Typecheck.Cxt (Cxt)
 import Primer.Typecheck.Kindcheck (
   Type,
@@ -34,7 +31,7 @@ import Primer.Typecheck.Kindcheck (
 --     unification problem with different names may choose the "other" solution.
 --  )
 unify ::
-  (MonadFresh ID m, MonadFresh NameCounter m) =>
+  (Applicative m) =>
   -- | We only care about local type vars and typedefs, for kind-checking our unifier
   Cxt ->
   -- | Which type variables should be considered as unification variables? This should be a subset of the @Cxt@.
@@ -44,10 +41,7 @@ unify ::
   Type ->
   m (Maybe (M.Map TyVarName Type))
 unify _cxt _unificationVars s t = do
-  result <-
-    runExceptT $
-          unU $
-            unify' s t
+  let result = unU $ unify' s t
   case result of
     Left _err -> pure Nothing
     Right _ -> pure $ Just mempty
@@ -55,7 +49,7 @@ unify _cxt _unificationVars s t = do
 data UnifError
   = NotUnify Type Type
 
-newtype U m a = U {unU :: (ExceptT UnifError m) a}
+newtype U a = U {unU :: Either UnifError a}
   deriving newtype
     ( Functor
     , Applicative
@@ -63,10 +57,8 @@ newtype U m a = U {unU :: (ExceptT UnifError m) a}
     , MonadError UnifError
     )
 
-deriving newtype instance MonadFresh NameCounter m => MonadFresh NameCounter (U m)
-
 -- We assume (both empty and non-empty) holes can unify with anything!
-unify' :: MonadFresh NameCounter m => Type -> Type -> U m ()
+unify' :: Type -> Type -> U ()
 unify' (TEmptyHole _) _ = pure ()
 unify' _ (TEmptyHole _) = pure ()
 unify' (TFun _ s1 t1) (TFun _ s2 t2) = unify' s1 s2 >> unify' t1 t2
