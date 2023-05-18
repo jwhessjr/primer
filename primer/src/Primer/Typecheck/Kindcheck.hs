@@ -5,13 +5,12 @@ module Primer.Typecheck.Kindcheck (
   Type,
   KindOrType (..),
   consistentKinds,
-  annotate,
 ) where
 
 import Foreword
 
 import Control.Monad.Fresh (MonadFresh)
-import Primer.Core.Meta (ID, Meta (Meta))
+import Primer.Core.Meta (ID)
 import Primer.Core.Type (
   Kind (KFun, KHole, KType),
   Type (TApp, TEmptyHole, TFun),
@@ -70,11 +69,6 @@ checkKind k t = do
   if consistentKinds k k'
     then pure t'
     else throwError $ InconsistentKinds k k'
-
--- | Extend the metadata of an 'Expr' or 'Type'
--- (usually with a 'TypeCache' or 'Kind')
-annotate :: b -> Meta a -> Meta b
-annotate t (Meta _) = Meta t
 
 matchArrowKind :: Kind -> Maybe (Kind, Kind)
 matchArrowKind KHole = pure (KHole, KHole)
