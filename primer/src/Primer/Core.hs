@@ -2,8 +2,6 @@ module Primer.Core (
   Expr,
   Expr' (..),
   CaseBranch (..),
-  module Primer.Core.Meta,
-  module Primer.Core.Type,
   TypeCache (..),
   TypeCacheBoth (..),
   ExprMeta,
@@ -14,7 +12,6 @@ module Primer.Core (
 
 import Foreword
 
-import Data.Aeson (Value)
 import Data.Data (Data)
 import Data.Generics.Product
 import Data.Generics.Uniplate.Data ()
@@ -23,25 +20,10 @@ import Optics (
   Traversal,
  )
 import Primer.Core.Meta (
-  GVarName,
-  GlobalName (GlobalName, baseName, qualifiedModule),
-  GlobalNameKind (..),
-  ID (ID),
-  LVarName,
-  LocalName (LocalName, unLocalName),
-  LocalNameKind (..),
-  Meta (Meta),
-  ModuleName (ModuleName, unModuleName),
-  TmVarRef (..),
-  TyConName,
-  TyVarName,
+  Meta,
   ValConName,
-  Value,
-  trivialMeta,
  )
 import Primer.Core.Type (
-  Kind (..),
-  Type,
   Type' (..),
   TypeMeta,
  )

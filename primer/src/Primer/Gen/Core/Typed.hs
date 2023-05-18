@@ -21,9 +21,14 @@ import Hedgehog (
 import Hedgehog.Gen qualified as Gen
 import Hedgehog.Internal.Property (forAllT)
 import Primer.Core (
+  Expr,
+ )
+import Primer.Core.Meta (
   ID (),
+ )
+import Primer.Core.Type (
   Kind (..),
-  Type' (..), Expr,
+  Type' (..)
  )
 import Primer.Test.TestM (
   TestM,

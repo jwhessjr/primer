@@ -11,6 +11,8 @@ import Hedgehog (
  )
 import Primer.Core (
   Expr' (Ann, EmptyHole),
+ )
+import Primer.Core.Type (
   Kind (KType),
  )
 import Primer.Core.Utils (forgetMetadata, generateIDs)

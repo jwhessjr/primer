@@ -16,10 +16,12 @@ import Optics (
 import Primer.Core (
   Expr,
   Expr' (..),
-  ID,
-  trivialMeta,
   _exprMeta,
   _exprTypeMeta,
+ )
+import Primer.Core.Meta (
+  ID,
+  trivialMeta,
  )
 import Primer.Core.Type.Utils (
   alphaEqTy,

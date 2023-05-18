@@ -37,14 +37,18 @@ import Optics (
 import Primer.Core (
   Expr,
   Expr' (..),
-  GVarName,
-  ID,
-  Kind (..),
-  Meta (..),
-  Type' (..),
   TypeCache (..),
   TypeCacheBoth (..),
   _exprMetaLens,
+ )
+import Primer.Core.Meta (
+  GVarName,
+  Meta (..),
+  ID,
+ )
+import Primer.Core.Type (
+  Kind (..),
+  Type' (..),
  )
 import Primer.Core.Meta (_type,)
 import Primer.Core.Utils (

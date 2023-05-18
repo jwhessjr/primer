@@ -7,7 +7,7 @@ module Primer.Test.TestM (
 import Foreword
 
 import Control.Monad.Fresh
-import Primer.Core (ID (..))
+import Primer.Core.Meta (ID (..))
 
 -- This monad is responsible for generating fresh IDs and names in tests.
 -- If we need other abilities, this will be the base monad.

@@ -10,7 +10,11 @@ import Foreword
 import Data.Data (Data)
 import Primer.Core (
   Expr,
+ )
+import Primer.Core.Meta (
   GVarName,
+ )
+import Primer.Core.Type (
   Type,
   Type',
  )
