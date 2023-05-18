@@ -12,7 +12,7 @@ module Primer.Typecheck.Kindcheck (
 import Foreword
 
 import Control.Monad.Fresh (MonadFresh)
-import Primer.Core.Meta (ID, Meta (Meta), TyVarName)
+import Primer.Core.Meta (ID, Meta (Meta))
 import Primer.Core.Type (
   Kind (KFun, KHole, KType),
   Type' (TApp, TEmptyHole, TFun),
@@ -22,8 +22,7 @@ import Primer.Typecheck.Cxt (Cxt , KindOrType (K, T), Type)
 
 
 data KindError
-  = UnknownTypeVariable TyVarName
-  | TyVarWrongSort Name -- term var instead of type var
+  = TyVarWrongSort Name -- term var instead of type var
   | InconsistentKinds Kind Kind
   | KindDoesNotMatchArrow Kind
   deriving stock (Eq, Show, Read)
