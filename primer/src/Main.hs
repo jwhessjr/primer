@@ -1,7 +1,7 @@
 module Main (main) where
 
 import Prelude
-import Hedgehog ( Property, withSkip, Seed )
+import Hedgehog ( Property, withSkip, Seed) --, check, recheckAt )
 import Tests.Refine (tasty_replay_broken)
 import Hedgehog.Internal.Runner (checkReport)
 import Hedgehog.Internal.Property (Property(propertyConfig, propertyTest), Skip(SkipToShrink), TestCount, ShrinkPath)
@@ -17,8 +17,11 @@ import Data.Functor (void, (<&>))
 import Control.Monad (replicateM, unless)
 import System.Exit (die)
 import Numeric (showFFloat)
+--import Hedgehog.Main (defaultMain)
 
 main :: IO ()
+--main = defaultMain [check tasty_replay_broken]
+--main = recheckAt (Seed.Seed 8526138666940619920 4855804592240481311) "4:cA" tasty_replay_broken
 main = do
   let n = 1000
   rs <- replicateM (fromIntegral n) runAndRecheck
