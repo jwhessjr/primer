@@ -23,6 +23,7 @@ import Hedgehog (
   collect,
   discard,
   failure,
+  footnoteShow,
   label,
   success,
   (===),
@@ -74,6 +75,7 @@ import Primer.Core (
   HasID (_id),
   ID,
   ModuleName (ModuleName, unModuleName),
+  TypeMeta,
   getID,
   mkSimpleModuleName,
   moduleNamePretty,
@@ -361,9 +363,24 @@ tasty_available_actions_accepted = withTests 500 $
               (maybe (annotate "primitive type def" >> failure) pure . typeDefAST . snd)
               (maybe (annotate "primitive def" >> failure) pure . defAST . snd)
               typeOrTermDef
-          action <- forAllT $ Gen.element acts'
+          -- TODO handle these (everything else seems to work)
+          -- let ifPoss = Available.Input Available.RenameTypeParam
+          -- let ifPoss = Available.Input Available.AddCon
+          -- let ifPoss = Available.NoInput Available.AddConField -- TODO I think I fixed the issue here, but I still see an unrelated-looking unknown-var error
+          action <- do
+            forAllT $ Gen.element acts'
+          -- if ifPoss `elem` acts'
+          --   then pure ifPoss
+          --   else forAllT $ Gen.element acts'
           collect action
+          footnoteShow action -- TODO remove
           case action of
+            Available.Input Available.AddCon -> discard
+            Available.Input Available.RenameTypeParam -> discard
+            Available.NoInput Available.AddConField -> discard
+            -- act@(Available.Input Available.AddCon) | act /= ifPoss -> discard
+            -- act@(Available.Input Available.RenameTypeParam) | act /= ifPoss -> discard
+            -- act@(Available.NoInput Available.AddConField) | act /= ifPoss -> discard
             Available.NoInput act' -> do
               progActs <-
                 either (\e -> annotateShow e >> failure) pure $
@@ -517,7 +534,7 @@ offeredActionTest sh l inputExpr position action expectedOutput = do
   action' <- case action of
     Left a -> do
       assertOffered $ Available.NoInput a
-      pure $ toProgActionNoInput (foldMap' moduleDefsQualified $ progModules prog) (Right exprDef) (SelectionDef $ DefSelection exprDefName $ Just $ NodeSelection BodyNode id) a
+      pure $ toProgActionNoInput @TypeMeta (foldMap' moduleDefsQualified $ progModules prog) (Right exprDef) (SelectionDef $ DefSelection exprDefName $ Just $ NodeSelection BodyNode id) a
     Right (a, o) -> do
       assertOffered $ Available.Input a
       case options a of

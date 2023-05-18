@@ -1,5 +1,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE OverloadedLabels #-}
+{-# OPTIONS_GHC -Wno-unused-imports #-}
+{-# OPTIONS_GHC -Wno-unused-top-binds #-}
 
 -- | Typechecking for Core expressions.
 -- This closely follows the type system of Hazelnut, but supports arbitrary
@@ -347,8 +349,11 @@ checkTypeDefs tds = do
         )
         "Module name of type and all constructors must be the same"
       assert
-        (distinct $ map (unLocalName . fst) params <> map (baseName . valConName) cons)
-        "Duplicate names in one tydef: between parameter-names and constructor-names"
+        (distinct $ map (unLocalName . fst) params)
+        "Duplicate parameter names in one tydef"
+      -- assert
+      --     (distinct $ map (unLocalName . fst) params <> map (baseName . valConName) cons)
+      --     "Duplicate names in one tydef: between parameter-names and constructor-names"
       assert
         (notElem (baseName tc) $ map (unLocalName . fst) params)
         "Duplicate names in one tydef: between type-def-name and parameter-names"

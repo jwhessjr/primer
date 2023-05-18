@@ -65,6 +65,7 @@ import Foreword hiding (mod)
 import Control.Monad.Fresh (MonadFresh (..))
 import Control.Monad.Log (MonadLog, WithSeverity)
 import Control.Monad.NestedError (MonadNestedError, throwError')
+import Data.Data (Data)
 import Data.Generics.Uniplate.Operations (transform, transformM)
 import Data.Generics.Uniplate.Zipper (
   fromZipper,
@@ -135,7 +136,8 @@ import Primer.Core (
   TyConName,
   Type,
   Type' (..),
-  TypeCache (TCSynthed),
+  TypeCache (TCChkedAt, TCEmb, TCSynthed),
+  TypeCacheBoth (TCBoth),
   TypeMeta,
   ValConName,
   getID,
@@ -146,8 +148,10 @@ import Primer.Core (
   unsafeMkGlobalName,
   unsafeMkLocalName,
   _chkedAt,
+  _exprMeta,
   _exprMetaLens,
   _synthed,
+  _type,
   _typeMetaLens,
  )
 import Primer.Core.DSL (S, ann, create, emptyHole, hole, tEmptyHole, tvar)
@@ -667,21 +671,26 @@ applyProgAction prog mdefName = \case
       updateRefsInTypes =
         over
           (traversed % #_TypeDefAST % #astTypeDefConstructors % traversed % #valConArgs % traversed)
-          $ transform
-          $ over (#_TCon % _2) updateName
-      updateDefType =
-        over
-          #astDefType
-          $ transform
-          $ over (#_TCon % _2) updateName
+          updateType'
+      updateDefType = over #astDefType updateType'
       updateDefBody =
         over
           #astDefExpr
           $ transform
-          $ over typesInExpr
-          $ transform
-          $ over (#_TCon % _2) updateName
+            ( over typesInExpr updateType'
+                . over
+                  (_exprMeta % _type % _Just)
+                  ( \case
+                      -- TODO is there a better way to do this? maybe I should define a getter
+                      TCSynthed t -> TCSynthed $ updateType' t
+                      TCChkedAt t -> TCChkedAt $ updateType' t
+                      TCEmb (TCBoth t1 t2) -> TCEmb (TCBoth (updateType' t1) (updateType' t2))
+                  )
+            )
       updateName n = if n == old then new else n
+      -- TODO rename `updateType` to `updateTypeDef` and this to `updateType`? in all branches?
+      updateType' :: Data a => Type' a -> Type' a
+      updateType' = transform $ over (#_TCon % _2) updateName
   RenameCon type_ old (unsafeMkGlobalName . (fmap unName (unModuleName (qualifiedModule type_)),) -> new) ->
     editModuleCross (qualifiedModule type_) prog $ \(m, ms) -> do
       when (new `elem` allValConNames prog) $ throwError $ ConAlreadyExists new
@@ -706,6 +715,7 @@ applyProgAction prog mdefName = \case
             over (#_Con % _2) updateName
               . over (#_Case % _3 % traversed % #_CaseBranch % _1) updateName
       updateName n = if n == old then new else n
+  --
   RenameTypeParam type_ old (unsafeMkLocalName -> new) ->
     editModule (qualifiedModule type_) prog $ \m -> do
       m' <- updateType m
@@ -721,6 +731,8 @@ applyProgAction prog mdefName = \case
       updateParam def = do
         when (new `elem` map fst (astTypeDefParameters def)) $ throwError $ ParamAlreadyExists new
         let nameRaw = unLocalName new
+        -- TODO we may as welll remove these, since we don't consistently check this sort of thing
+        -- as evidenced by code I've just commented out elsewhere
         when (nameRaw == baseName type_) $ throwError $ TyConParamClash nameRaw
         when (nameRaw `elem` map (baseName . valConName) (astTypeDefConstructors def)) $ throwError $ ValConParamClash nameRaw
         def
@@ -737,6 +749,7 @@ applyProgAction prog mdefName = \case
               % traversed
           )
           $ traverseOf _freeVarsTy
+          -- TODO respect scope i.e. avoid capture by not going under forall
           $ \(_, v) -> tvar $ updateName v
       updateName n = if n == old then new else n
   AddCon type_ index (unsafeMkGlobalName . (fmap unName (unModuleName (qualifiedModule type_)),) -> con) ->
@@ -753,6 +766,27 @@ applyProgAction prog mdefName = \case
         , Just $ SelectionTypeDef $ TypeDefSelection type_ $ Just $ TypeDefConsNodeSelection $ TypeDefConsSelection con Nothing
         )
     where
+      -- transformCaseBranches' ::
+      --   MonadEdit m ProgError =>
+      --   Prog ->
+      --   TyConName ->
+      --   Maybe TypeCache ->
+      --   ([CaseBranch] -> m [CaseBranch]) ->
+      --   Expr ->
+      --   m Expr
+      -- transformCaseBranches' prog type_ t f = transformM $ \case
+      --   Case m scrut bs -> do
+      --     scrutType <-
+      --       fst
+      --         <$> runReaderT
+      --           (liftError (ActionError . TypeError) $ synth scrut)
+      --           (progCxt prog)
+      --     Case (m & _type .~ t) scrut
+      --       <$> if fst (unfoldTApp scrutType) == TCon () type_
+      --         then f bs
+      --         else pure bs
+      --   e -> pure e
+      -- updateDefs = transformCaseBranches' prog type_ (Just (TCChkedAt $ TApp () (TEmptyHole ()) (TEmptyHole ()))) $ \bs -> do
       updateDefs = transformCaseBranches prog type_ $ \bs -> do
         m' <- DSL.meta
         maybe (throwError $ IndexOutOfRange index) pure $ insertAt index (CaseBranch con [] (EmptyHole m')) bs
@@ -923,7 +957,8 @@ applyProgAction prog mdefName = \case
     let smartHoles = progSmartHoles prog
     applyActionsToField smartHoles (progImports prog) ms (defName, con, index, def) actions >>= \case
       Left err -> throwError $ ActionError err
-      Right (mod', zt) ->
+      Right (mod', _zt) ->
+        -- Right (mod', zt) ->
         pure
           ( mod'
           , Just $
@@ -936,11 +971,13 @@ applyProgAction prog mdefName = \case
                           TypeDefConsSelection
                             { con
                             , field =
-                                Just
-                                  TypeDefConsFieldSelection
-                                    { index
-                                    , meta = Right $ zt ^. _target % _typeMetaLens
-                                    }
+                                -- TODO if we set selection, we get weird metadata errors
+                                Nothing
+                                -- Just
+                                --   TypeDefConsFieldSelection
+                                --     { index
+                                --     , meta = Right $ zt ^. _target % _typeMetaLens
+                                --     }
                             }
                   }
           )
