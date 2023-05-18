@@ -15,7 +15,7 @@ import Foreword
 
 import Control.Monad.Fresh (MonadFresh)
 import Data.Map qualified as Map
-import Primer.Core.Meta (ID, Meta (Meta), TyConName,TyVarName, unLocalName)
+import Primer.Core.Meta (ID, Meta (Meta), TyVarName, unLocalName)
 import Primer.Core.Type (
   Kind (KFun, KHole, KType),
   Type' (TApp, TEmptyHole, TFun),
@@ -27,12 +27,8 @@ import Primer.Typecheck.Cxt (Cxt (localCxt), KindOrType (K, T), Type)
 data KindError
   = UnknownTypeVariable TyVarName
   | TyVarWrongSort Name -- term var instead of type var
-  | UnknownTypeConstructor TyConName
   | InconsistentKinds Kind Kind
   | KindDoesNotMatchArrow Kind
-  | -- | We currently cannot typecheck a let inside a type,
-    -- they should only transiently appear in evaluation, as explicit substitutions.
-    TLetUnsupported
   deriving stock (Eq, Show, Read)
 
 -- | A shorthand for the constraints needed when kindchecking
