@@ -120,22 +120,11 @@ check t = \case
 -- | Two types are consistent if they are equal (up to IDs and alpha) when we
 -- also count holes as being equal to anything.
 consistentTypes :: Type -> Type -> Bool
-consistentTypes x y = uncurry (==) $ holepunch x y
-  where
-    -- We punch holes in each type so they "match" in the sense that
-    -- they have holes in the same places. (At least, until we find
-    -- obviously different constructors.)
-    holepunch TEmptyHole _ = (TEmptyHole, TEmptyHole)
-    holepunch _ TEmptyHole = (TEmptyHole, TEmptyHole)
-    holepunch (TFun s t) (TFun s' t') =
-      let (hs, hs') = holepunch s s'
-          (ht, ht') = holepunch t t'
-       in (TFun hs ht, TFun hs' ht')
-    holepunch (TApp s t) (TApp s' t') =
-      let (hs, hs') = holepunch s s'
-          (ht, ht') = holepunch t t'
-       in (TApp hs ht, TApp hs' ht')
-    holepunch s t = (s, t)
+consistentTypes TEmptyHole _ = True
+consistentTypes _ TEmptyHole = True
+consistentTypes (TFun s1 t1) (TFun s2 t2) = consistentTypes s1 s2 && consistentTypes t1 t2
+consistentTypes (TApp s1 t1) (TApp s2 t2) = consistentTypes s1 s2 && consistentTypes t1 t2
+consistentTypes _ _ = False
 
 checkKind' :: TypeM m => Kind -> Type -> m Type
 checkKind' k t = modifyError KindError (checkKind k t)
