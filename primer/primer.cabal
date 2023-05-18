@@ -18,7 +18,6 @@ executable primer-test
     Primer.Core
     Primer.Core.Type
     Primer.Gen.Core.Typed
-    Primer.Name
     Primer.Refine
     Primer.Typecheck
     Primer.Typecheck.Kindcheck
