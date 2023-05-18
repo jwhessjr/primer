@@ -16,16 +16,16 @@ executable primer-test
   other-modules:
     Foreword
     Primer.Core
+    Primer.Core.Meta
+    Primer.Core.Type
     Primer.Def
+    Primer.Gen.Core.Typed
     Primer.Name
     Primer.Refine
     Primer.Typecheck
-    Primer.Core.Meta
-    Primer.Core.Type
     Primer.Typecheck.Cxt
     Primer.Typecheck.Kindcheck
     Tests.Refine
-    Primer.Gen.Core.Typed
 
   default-language:   GHC2021
   default-extensions:
