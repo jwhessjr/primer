@@ -11,7 +11,7 @@ import Hedgehog (
   property,
   (===),
  )
-import Hedgehog.Gen qualified as Gen
+import qualified Hedgehog.Gen as Gen
 
 tasty_replay_broken :: Property
 tasty_replay_broken = property $ do
@@ -37,10 +37,10 @@ data Type
   = TBase
   | TFun Type Type
   | TApp Type Type
-  deriving stock (Eq, Show)
+  deriving (Eq, Show)
 
 data Kind = KType | KFun Kind Kind
-  deriving stock (Eq, Show)
+  deriving (Eq, Show)
 
 stripArgs :: Type -> Type -> Maybe Type
 stripArgs tgt ty =

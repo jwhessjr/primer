@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 module Main (main) where
 
 import Control.Monad (replicateM, unless)
@@ -5,14 +6,14 @@ import Control.Monad.Trans.Except (ExceptT (ExceptT), runExceptT)
 import Data.Functor (void, (<&>))
 import Data.List.Extra (enumerate)
 import Data.Map.Strict (Map)
-import Data.Map.Strict qualified as M
+import qualified Data.Map.Strict as M
 import Data.Void (Void, absurd)
 import Hedgehog (Property, Seed, withSkip) -- , check, recheckAt )
 -- import Hedgehog.Main (defaultMain)
 import Hedgehog.Internal.Property (Property (propertyConfig, propertyTest), ShrinkPath, Skip (SkipToShrink), TestCount)
 import Hedgehog.Internal.Report (FailureReport (failureShrinkPath), Report (reportSeed, reportTests), Result (..), reportStatus)
 import Hedgehog.Internal.Runner (checkReport)
-import Hedgehog.Internal.Seed qualified as Seed
+import qualified Hedgehog.Internal.Seed as Seed
 import Numeric (showFFloat)
 import Numeric.Natural (Natural)
 import System.Exit (die)
@@ -28,7 +29,7 @@ main = do
   let cs = count rs
   void $ M.traverseWithKey (\ri c -> putStrLn $ showPad ri <> " : " <> show c) cs
   let t = (cs M.! RecheckPass) + (cs M.! RecheckDefeat)
-  let p :: Double = 100 * fromIntegral t / fromIntegral n
+  let p = (100 :: Double) * fromIntegral t / fromIntegral n
   if t > n `div` 4
     then putStrLn $ "This tickled non-replay bug " <> showFFloat (Just 2) p "% > 25%"
     else die "This did not tickle non-replay bug much"
@@ -66,7 +67,7 @@ data RRInfo
   | RecheckPass
   | RecheckDefeat
   | RecheckRefind -- rechecking finds /an/ error, not asserted /the same/ error
-  deriving stock (Show, Eq, Ord, Enum, Bounded)
+  deriving (Show, Eq, Ord, Enum, Bounded)
 
 showPad :: RRInfo -> String
 showPad ri = let s = show ri in s <> replicate (13 - length s) ' '
