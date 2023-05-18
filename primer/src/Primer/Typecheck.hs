@@ -36,8 +36,7 @@ import Primer.Typecheck.Kindcheck (
 
 
 data TypeError
-  = InternalError Text
-  | CannotSynthesiseType Expr
+  = CannotSynthesiseType Expr
   | InconsistentTypes Type Type
   | CaseOfHoleNeedsEmptyBranches
   | CannotCaseNonADT Type

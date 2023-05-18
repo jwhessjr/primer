@@ -12,11 +12,9 @@ import Primer.Core.Type (
   Kind (KFun, KHole, KType),
   Type (TApp, TEmptyHole, TFun),
  )
-import Primer.Name (Name)
 
 data KindError
-  = TyVarWrongSort Name -- term var instead of type var
-  | InconsistentKinds Kind Kind
+  = InconsistentKinds Kind Kind
   | KindDoesNotMatchArrow Kind
   deriving stock (Eq, Show, Read)
 
