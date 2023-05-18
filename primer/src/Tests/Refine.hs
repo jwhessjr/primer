@@ -5,7 +5,7 @@ import Prelude
 import Hedgehog (
   Property,
   discard,
-  (===), property, forAll, GenT,
+  (===), property, forAll, Gen,
  )
 import qualified Hedgehog.Gen as Gen
 import Data.Maybe (catMaybes)
@@ -19,7 +19,7 @@ tasty_refinement_synths = property $ do
       src === instTy
     _ -> discard
 
-genWTType :: Monad m => Kind -> GenT m Type
+genWTType :: Kind -> Gen Type
 genWTType k = do
   let rec = app : catMaybes [arrow]
   Gen.recursive Gen.choice [ehole] rec
