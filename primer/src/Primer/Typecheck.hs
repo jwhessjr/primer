@@ -21,7 +21,6 @@ module Primer.Typecheck (
   KindError (..),
   consistentKinds,
   consistentTypes,
-  extendLocalCxtTys,
   extendGlobalCxt,
   extendTypeDefCxt,
 ) where
@@ -66,7 +65,6 @@ import Primer.Typecheck.Kindcheck (
   annotate,
   checkKind,
   consistentKinds,
-  extendLocalCxtTys,
   synthKind,
  )
 

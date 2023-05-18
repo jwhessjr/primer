@@ -5,8 +5,6 @@ module Primer.Typecheck.Kindcheck (
   Type,
   TypeT,
   KindOrType (..),
-  extendLocalCxtTys,
-  lookupLocalTy,
   consistentKinds,
   annotate,
 ) where
@@ -14,14 +12,13 @@ module Primer.Typecheck.Kindcheck (
 import Foreword
 
 import Control.Monad.Fresh (MonadFresh)
-import Data.Map qualified as Map
-import Primer.Core.Meta (ID, Meta (Meta), TyVarName, unLocalName)
+import Primer.Core.Meta (ID, Meta (Meta), TyVarName)
 import Primer.Core.Type (
   Kind (KFun, KHole, KType),
   Type' (TApp, TEmptyHole, TFun),
  )
 import Primer.Name (Name, NameCounter)
-import Primer.Typecheck.Cxt (Cxt (localCxt), KindOrType (K, T), Type)
+import Primer.Typecheck.Cxt (Cxt , KindOrType (K, T), Type)
 
 
 data KindError
@@ -42,15 +39,6 @@ type KindM m =
   )
 
 type TypeT = Type' (Meta Kind)
-
-lookupLocalTy :: TyVarName -> Cxt -> Either KindError Kind
-lookupLocalTy v cxt = case Map.lookup (unLocalName v) $ localCxt cxt of
-  Just (K k) -> Right k
-  Just (T _) -> Left $ TyVarWrongSort (unLocalName v)
-  Nothing -> Left $ UnknownTypeVariable v
-
-extendLocalCxtTys :: [(TyVarName, Kind)] -> Cxt -> Cxt
-extendLocalCxtTys x cxt = cxt{localCxt = Map.fromList (bimap unLocalName K <$> x) <> localCxt cxt}
 
 -- Synthesise a kind for the given type
 -- TypeHoles are always considered to have kind KHole - a kind hole.
