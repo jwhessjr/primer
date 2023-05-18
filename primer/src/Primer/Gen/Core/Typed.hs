@@ -1,6 +1,5 @@
 module Primer.Gen.Core.Typed (
   genWTType,
-  genWTKind,
   forAllT,
 ) where
 
@@ -23,11 +22,8 @@ genWTType k = do
   Gen.recursive Gen.choice [ehole] rec
   where
     ehole = pure $ TEmptyHole
-    app = do k' <- genWTKind; TApp <$> genWTType (KFun k' k) <*> genWTType k'
+    app = do TApp <$> genWTType (KFun KType k) <*> genWTType KType
     arrow =
       if k == KHole || k == KType
         then Just $ TFun <$> genWTType KType <*> genWTType KType
         else Nothing
-
-genWTKind :: Monad m => GenT m Kind
-genWTKind = Gen.recursive Gen.choice [pure KType] [KFun <$> genWTKind <*> genWTKind]
