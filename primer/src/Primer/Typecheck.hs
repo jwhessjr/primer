@@ -1,9 +1,6 @@
 module Primer.Typecheck (
-  Expr (..),
   Kind (..),
   Type (..),
-  TypeError (..),
-  KindError (..),
   consistentTypes,
   refine,
 ) where
@@ -16,31 +13,7 @@ data Type
   | TApp Type Type
   deriving stock (Eq, Show)
 
--- | Core kinds.
 data Kind = KHole | KType | KFun Kind Kind
-  deriving stock (Eq, Show)
-
-data Expr
-  = EmptyHole
-  | Ann Expr Type
-  | Case Expr [CaseBranch]
-  deriving stock (Eq, Show)
-
-data CaseBranch = CaseBranch
-  deriving stock (Eq, Show)
-
-data KindError
-  = InconsistentKinds Kind Kind
-  | KindDoesNotMatchArrow Kind
-  deriving stock (Eq, Show)
-
-
-data TypeError
-  = CannotSynthesiseType Expr
-  | InconsistentTypes Type Type
-  | CaseOfHoleNeedsEmptyBranches
-  | CannotCaseNonADT Type
-  | KindError KindError
   deriving stock (Eq, Show)
 
 consistentTypes :: Type -> Type -> Bool
