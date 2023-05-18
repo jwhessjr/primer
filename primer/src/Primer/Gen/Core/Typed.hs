@@ -14,7 +14,7 @@ module Primer.Gen.Core.Typed (
 
 import Foreword hiding (mod)
 
-import Control.Monad.Fresh (MonadFresh, fresh)
+import Control.Monad.Fresh (MonadFresh)
 import Control.Monad.Morph (hoist)
 import Data.Map qualified as M
 import Hedgehog (
@@ -71,12 +71,6 @@ newtype WT a = WT {unWT :: ReaderT Cxt TestM a}
     , MonadFresh NameCounter
     , MonadFresh ID
     )
-
-instance MonadFresh f m => MonadFresh f (GenT m) where
-  fresh = lift fresh
-
-instance MonadFresh f m => MonadFresh f (PropertyT m) where
-  fresh = lift fresh
 
 -- genSyns T with cxt Γ should generate (e,S) st Γ |- e ∈ S and S ~ T (i.e. same up to holes and alpha)
 genSyns :: Monad m => TypeG -> GenT m (ExprG, TypeG)

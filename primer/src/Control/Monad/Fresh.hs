@@ -7,6 +7,7 @@ import Control.Monad.Log (
   LoggingT,
   PureLoggingT,
  )
+import Hedgehog (GenT, PropertyT)
 
 -- | This class gives access to a method @fresh@ which generates a new, unique
 --  value of type i.
@@ -32,4 +33,10 @@ instance MonadFresh i m => MonadFresh i (PureLoggingT l m) where
   fresh = lift fresh
 
 instance MonadFresh i m => MonadFresh i (DiscardLoggingT l m) where
+  fresh = lift fresh
+
+instance MonadFresh f m => MonadFresh f (GenT m) where
+  fresh = lift fresh
+
+instance MonadFresh f m => MonadFresh f (PropertyT m) where
   fresh = lift fresh
