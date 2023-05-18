@@ -21,7 +21,7 @@ import Primer.Core (
  )
 import Primer.Core.Meta (
   ID,
-  trivialMeta,
+  Meta (Meta),
  )
 import Primer.Core.Type.Utils (
   alphaEqTy,
@@ -35,7 +35,7 @@ regenerateExprIDs' se st =
 
 -- | Like 'generateTypeIDs', but for expressions
 generateIDs :: MonadFresh ID m => Expr' () () -> m Expr
-generateIDs = regenerateExprIDs' (const . trivialMeta) (const . trivialMeta)
+generateIDs = regenerateExprIDs' (const . const (Meta ())) (const . const (Meta ()))
 
 -- | Like 'forgetTypeMetadata', but for expressions
 forgetMetadata :: Expr' a b -> Expr' () ()

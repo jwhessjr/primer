@@ -3,7 +3,6 @@ module Primer.Core.Meta (
   ValConName,
   GVarName,
   Meta (Meta),
-  trivialMeta,
   _type,
 ) where
 
@@ -35,9 +34,6 @@ data Meta a = Meta a
 -- work for any 'a'.
 _type :: Lens (Meta a) (Meta b) a b
 _type = position @1
-
-trivialMeta :: ID -> Meta (Maybe a)
-trivialMeta _ = Meta Nothing
 
 type ValConName = Name
 type GVarName = Name
