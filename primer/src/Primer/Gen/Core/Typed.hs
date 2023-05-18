@@ -1,38 +1,23 @@
 {-# LANGUAGE ApplicativeDo #-}
 
 module Primer.Gen.Core.Typed (
-  WT,
   genWTType,
   genWTKind,
   forAllT,
-  propertyWT,
-  synthTest,
 ) where
 
 import Prelude
 
-import Control.Monad.Morph (hoist)
 import Hedgehog (
-  Property, property,
   GenT,
-  PropertyT, annotateShow, failure,
  )
 import Hedgehog.Gen qualified as Gen
 import Hedgehog.Internal.Property (forAllT)
-import Primer.Core (
-  Expr,
- )
 import Primer.Core.Type (
   Kind (..),
   Type (..)
  )
-import Primer.Typecheck (
-  TypeError, synth
- )
-import Data.Functor.Identity (Identity (runIdentity))
 import Data.Maybe (catMaybes)
-import Control.Monad.Trans.Except (runExceptT)
-import Control.Monad.Trans.Class (lift)
 
 {-
 Generate well scoped and typed expressions.
@@ -47,13 +32,6 @@ backend (especially the typechecker) work in terms of annotated
 types/expressions, but it is easy to have a post-processing step of adding IDs
 and empty TypeCaches to everything.
 -}
-
-newtype WT a = WT {unWT :: Identity a}
-  deriving newtype
-    ( Functor
-    , Applicative
-    , Monad
-    )
 
 -- | Generates types which infer kinds consistent with the argument
 -- I.e. @genWTType k@ will generate types @ty@ such that @synthKind ty = k'@
@@ -73,23 +51,3 @@ genWTType k = do
 -- | Generates an arbitary kind. Note that all kinds are well-formed.
 genWTKind :: Monad m => GenT m Kind
 genWTKind = Gen.recursive Gen.choice [pure KType] [KFun <$> genWTKind <*> genWTKind]
-
-hoist' :: Applicative f => WT a -> f a
-hoist' = pure . runIdentity . unWT
-
--- | Convert a @PropertyT WT ()@ into a @Property@, which Hedgehog can test.
--- It is recommended to do more than default number of tests when using this module.
--- That is to say, generating well-typed syntax is hard, and you probably want
--- to increase the number of tests run to get decent coverage.
--- The modules form the 'Cxt' in the environment of the 'WT' monad
--- (thus the definitions of terms is ignored)
-propertyWT :: PropertyT WT () -> Property
-propertyWT = property . hoist hoist'
-
--- Lift 'synth' into a property
-synthTest :: Expr -> PropertyT WT (Type, Expr)
-synthTest e = do
-  x <- lift $ runExceptT @TypeError $ synth e
-  case x of
-    Left err -> annotateShow err >> failure
-    Right y -> pure y
