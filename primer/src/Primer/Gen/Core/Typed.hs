@@ -1,6 +1,5 @@
 module Primer.Gen.Core.Typed (
   genWTType,
-  forAllT,
 ) where
 
 import Prelude
@@ -9,7 +8,6 @@ import Hedgehog (
   GenT,
  )
 import Hedgehog.Gen qualified as Gen
-import Hedgehog.Internal.Property (forAllT)
 import Primer.Typecheck (
   Kind (..),
   Type (..)

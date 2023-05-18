@@ -7,10 +7,9 @@ import Hedgehog (
   annotateShow,
   diff,
   discard,
-  (===), property, failure,
+  (===), property, failure, forAll,
  )
 import Primer.Gen.Core.Typed (
-   forAllT,
   genWTType,
  )
 import Primer.Typecheck (
@@ -23,8 +22,8 @@ import Control.Monad.Trans.Except (runExceptT)
 
 tasty_refinement_synths :: Property
 tasty_refinement_synths = property $ do
-  tgt <- forAllT $ genWTType KType
-  src <- forAllT $ genWTType KType
+  tgt <- forAll $ genWTType KType
+  src <- forAll $ genWTType KType
   case refine tgt src of
     Just instTy -> do
       let e = Ann EmptyHole src
