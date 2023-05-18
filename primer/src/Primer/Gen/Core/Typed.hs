@@ -75,10 +75,7 @@ newtype WT a = WT {unWT :: ReaderT Cxt TestM a}
 instance MonadFresh f m => MonadFresh f (GenT m) where
   fresh = lift fresh
 
-instance MonadFresh NameCounter (PropertyT WT) where
-  fresh = lift fresh
-
-instance MonadFresh ID (PropertyT WT) where
+instance MonadFresh f m => MonadFresh f (PropertyT m) where
   fresh = lift fresh
 
 -- genSyns T with cxt Γ should generate (e,S) st Γ |- e ∈ S and S ~ T (i.e. same up to holes and alpha)
