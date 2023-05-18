@@ -2,7 +2,6 @@ module Tests.Refine where
 
 import Foreword hiding (diff)
 
-import Data.Map qualified as M
 import Hedgehog (
   Property,
   annotateShow,
@@ -21,7 +20,7 @@ import Primer.Gen.Core.Typed (
   genWTType,
   synthTest,
  )
-import Primer.Refine (Inst (InstUnconstrainedAPP), refine)
+import Primer.Refine (refine)
 import Primer.Subst (substTySimul)
 import Primer.Typecheck (
   consistentTypes,
@@ -35,18 +34,16 @@ tasty_refinement_synths = propertyWT $ do
   let r = refine tgt src
   annotateShow r
   case r of
-    Just (is, instTy) -> do
+    Just instTy -> do
       --(sb, apps) <- forAllT $ genInstApp is
       --let f x = \case Right tm -> App () x tm; Left ty' -> APP () x ty'
       --    e = foldl' f (Ann () (EmptyHole ()) src) apps
       let sb = mempty
-      let apps = []
       let e = Ann () (EmptyHole ()) src
       --annotateShow e
       (ty, e') <- synthTest =<< generateIDs e
       e === forgetMetadata e' -- check no smart holes stuff happened
-      let g i a = case (i, a) of (InstUnconstrainedAPP n _, Left t) -> Just $ M.singleton n t; _ -> Nothing
-          sb' = mconcat $ catMaybes $ zipWith g is apps
+      let sb' = mempty
       -- Check some invariants from @genInstApp@
       sb === sb'
       instTy' <- substTySimul sb instTy
