@@ -156,7 +156,7 @@ check t = \case
 -- | Two types are consistent if they are equal (up to IDs and alpha) when we
 -- also count holes as being equal to anything.
 consistentTypes :: Type -> Type -> Bool
-consistentTypes x y = uncurry eqType $ holepunch x y
+consistentTypes x y = uncurry (==) $ holepunch x y
   where
     -- We punch holes in each type so they "match" in the sense that
     -- they have holes in the same places. (At least, until we find
@@ -172,10 +172,6 @@ consistentTypes x y = uncurry eqType $ holepunch x y
           (ht, ht') = holepunch t t'
        in (TApp hs ht, TApp hs' ht')
     holepunch s t = (s, t)
-
--- | Compare two types for alpha equality, ignoring their IDs
-eqType :: Type -> Type -> Bool
-eqType = (==)
 
 checkKind' :: TypeM m => Kind -> Type -> m Type
 checkKind' k t = modifyError KindError (checkKind k t)
