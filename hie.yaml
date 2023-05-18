@@ -9,28 +9,7 @@ cradle:
     - path: "primer/src/Foreword.hs"
       component: "primer:exe:primer-test"
 
-    - path: "primer/src/Primer/Action.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Action/Available.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Action/Priorities.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/App.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/App/Base.hs"
-      component: "primer:exe:primer-test"
-
     - path: "primer/src/Primer/Core.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Core/DSL.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Core/Transform.hs"
       component: "primer:exe:primer-test"
 
     - path: "primer/src/Primer/Core/Utils.hs"
@@ -39,28 +18,10 @@ cradle:
     - path: "primer/src/Primer/Def.hs"
       component: "primer:exe:primer-test"
 
-    - path: "primer/src/Primer/Def/Utils.hs"
-      component: "primer:exe:primer-test"
-
     - path: "primer/src/Primer/EvalFull.hs"
       component: "primer:exe:primer-test"
 
-    - path: "primer/src/Primer/Log.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Module.hs"
-      component: "primer:exe:primer-test"
-
     - path: "primer/src/Primer/Name.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Name/Fresh.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Pretty.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Questions.hs"
       component: "primer:exe:primer-test"
 
     - path: "primer/src/Primer/Refine.hs"
@@ -72,40 +33,10 @@ cradle:
     - path: "primer/src/Primer/Typecheck.hs"
       component: "primer:exe:primer-test"
 
-    - path: "primer/src/Primer/TypeDef.hs"
-      component: "primer:exe:primer-test"
-
     - path: "primer/src/Primer/Unification.hs"
       component: "primer:exe:primer-test"
 
-    - path: "primer/src/Primer/Zipper.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/ZipperCxt.hs"
-      component: "primer:exe:primer-test"
-
     - path: "primer/src/Control/Monad/NestedError.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Action/Actions.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Action/Errors.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Action/Movement.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Action/ProgAction.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Action/ProgError.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Core/DSL/Meta.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Core/DSL/Type.hs"
       component: "primer:exe:primer-test"
 
     - path: "primer/src/Primer/Core/Fresh.hs"
@@ -159,9 +90,6 @@ cradle:
     - path: "primer/src/Primer/Typecheck/KindError.hs"
       component: "primer:exe:primer-test"
 
-    - path: "primer/src/Primer/Typecheck/SmartHoles.hs"
-      component: "primer:exe:primer-test"
-
     - path: "primer/src/Primer/Typecheck/TypeError.hs"
       component: "primer:exe:primer-test"
 
@@ -171,23 +99,11 @@ cradle:
     - path: "primer/src/Primer/Zipper/Type.hs"
       component: "primer:exe:primer-test"
 
-    - path: "primer/src/Tests/Typecheck.hs"
-      component: "primer:exe:primer-test"
-
     - path: "primer/src/Tests/Refine.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Gen/App.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Gen/Core/Raw.hs"
       component: "primer:exe:primer-test"
 
     - path: "primer/src/Primer/Gen/Core/Typed.hs"
       component: "primer:exe:primer-test"
 
     - path: "primer/src/Primer/Test/TestM.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Test/Util.hs"
       component: "primer:exe:primer-test"
