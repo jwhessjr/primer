@@ -23,7 +23,6 @@ executable primer-test
     Primer.Refine
     Primer.Subst
     Primer.Typecheck
-    Primer.Unification
     Primer.Core.Meta
     Primer.Core.Type
     Primer.Core.Type.Utils
