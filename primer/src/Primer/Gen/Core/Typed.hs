@@ -26,10 +26,6 @@ import Primer.Core.Type (
   Kind (..),
   Type (..)
  )
-import Primer.Test.TestM (
-  TestM,
-  evalTestM,
- )
 import Primer.Typecheck (
   Cxt (),
   TypeError, synth, buildTypingContext,
@@ -49,7 +45,7 @@ types/expressions, but it is easy to have a post-processing step of adding IDs
 and empty TypeCaches to everything.
 -}
 
-newtype WT a = WT {unWT :: ReaderT Cxt TestM a}
+newtype WT a = WT {unWT :: Reader Cxt a}
   deriving newtype
     ( Functor
     , Applicative
@@ -77,7 +73,7 @@ genWTKind :: Monad m => GenT m Kind
 genWTKind = Gen.recursive Gen.choice [pure KType] [KFun <$> genWTKind <*> genWTKind]
 
 hoist' :: Applicative f => Cxt -> WT a -> f a
-hoist' cxt = pure . evalTestM . flip runReaderT cxt . unWT
+hoist' cxt = pure . flip runReader cxt . unWT
 
 -- | Convert a @PropertyT WT ()@ into a @Property@, which Hedgehog can test.
 -- It is recommended to do more than default number of tests when using this module.
