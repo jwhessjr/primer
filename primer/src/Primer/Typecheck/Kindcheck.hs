@@ -77,7 +77,7 @@ checkKind k t = do
 -- | Extend the metadata of an 'Expr' or 'Type'
 -- (usually with a 'TypeCache' or 'Kind')
 annotate :: b -> Meta a -> Meta b
-annotate t (Meta i _ v) = Meta i t v
+annotate t (Meta _) = Meta t
 
 matchArrowKind :: Kind -> Maybe (Kind, Kind)
 matchArrowKind KHole = pure (KHole, KHole)
