@@ -1,5 +1,4 @@
 module Primer.Subst (
-  substTy,
   substTySimul,
 ) where
 
@@ -24,9 +23,3 @@ substTySimul sub
       t@TEmptyHole{} -> pure t
       TFun _ s t -> TFun () <$> go s <*> go t
       TApp _ s t -> TApp () <$> go s <*> go t
-
--- | Simple and inefficient capture-avoiding substitution.
--- @substTy n a t@  is @t[a/n]@
--- We restrict to '()', i.e. no metadata as we don't want to duplicate IDs etc
-substTy :: MonadFresh NameCounter m => TyVarName -> Type' () -> Type' () -> m (Type' ())
-substTy n a = substTySimul $ M.singleton n a

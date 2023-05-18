@@ -4,9 +4,6 @@ module Primer.Gen.Core.Typed (
   WT,
   genWTType,
   genWTKind,
-  genSyns,
-  genChk,
-  genInstApp,
   forAllT,
   propertyWT,
   synthTest,
@@ -16,7 +13,6 @@ import Foreword hiding (mod)
 
 import Control.Monad.Fresh (MonadFresh)
 import Control.Monad.Morph (hoist)
-import Data.Map qualified as M
 import Hedgehog (
   Property, property,
   GenT,
@@ -25,16 +21,11 @@ import Hedgehog (
 import Hedgehog.Gen qualified as Gen
 import Hedgehog.Internal.Property (forAllT)
 import Primer.Core (
-  CaseBranch (CaseBranch),
-  Expr' (..),
   ID (),
   Kind (..),
-  TyVarName,
-  Type' (..), Expr, unsafeMkGlobalName,
+  Type' (..), Expr,
  )
 import Primer.Name (NameCounter)
-import Primer.Refine (Inst (InstAPP, InstApp, InstUnconstrainedAPP))
-import Primer.Subst (substTySimul)
 import Primer.Test.TestM (
   TestM,
   evalTestM,
@@ -60,8 +51,6 @@ and empty TypeCaches to everything.
 
 type TypeG = Type' ()
 
-type ExprG = Expr' () ()
-
 newtype WT a = WT {unWT :: ReaderT Cxt TestM a}
   deriving newtype
     ( Functor
@@ -71,43 +60,6 @@ newtype WT a = WT {unWT :: ReaderT Cxt TestM a}
     , MonadFresh NameCounter
     , MonadFresh ID
     )
-
--- genSyns T with cxt Γ should generate (e,S) st Γ |- e ∈ S and S ~ T (i.e. same up to holes and alpha)
-genSyns :: Monad m => TypeG -> GenT m (ExprG, TypeG)
-genSyns ty = do
-  Gen.choice [genEmptyHole, genAnn]
-  where
-    genEmptyHole = pure (EmptyHole (), TEmptyHole ())
-    genAnn = do
-      t <- genChk ty
-      pure (Ann () t ty, ty)
-
--- | Given an output of 'refine', e.g. @refine cxt tgtTy srcTy = Just (insts, resTy)@,
--- generate some concrete types and terms corresponding to the instantiation.
--- If @genInstApp insts = (sub, apps)@, then:
--- - @apps@ is the same length as @insts@, and the entries correspond in the way
---   documented by 'refine'.
--- - the size of @sub@ is the number of 'InstUnconstrainedApp' in @inst@, and
---   these entries correspond (by name).
--- - thus if @insts !! n = InstUnconstrainedAPP a k@, then (for some type @t@ of kind @k@)
---   @sub ! a = t@ and @apps !! n = Left t@.
--- - @sub@ is idempotent, and @apps@ do not refer to these names. I.e. the names
---   in @InstUnconstrainedAPP@ do not appear free in @apps@ or the rhs of @sub@.
-genInstApp :: MonadFresh NameCounter m => [Inst] -> GenT m (Map TyVarName (Type' ()), [Either TypeG ExprG])
-genInstApp = reify mempty
-  where
-    reify sb = \case
-      [] -> pure (sb, [])
-      InstApp t : is -> (\a -> second (Right a :)) <$> (substTySimul sb t >>= genChk) <*> reify sb is
-      InstAPP t : is -> (\t' -> second (Left t' :)) <$> substTySimul sb t <*> reify sb is
-      InstUnconstrainedAPP v k : is -> genWTType k >>= \t' -> second (Left t' :) <$> reify (M.insert v t' sb) is
-
-genChk :: Monad m => TypeG -> GenT m ExprG
-genChk ty = Gen.choice [emb, pure case_]
-  where
-    emb = fst <$> genSyns ty
-    case_ :: ExprG
-    case_ = Case () (EmptyHole ()) [CaseBranch $ unsafeMkGlobalName (pure "M","C")]
 
 -- | Generates types which infer kinds consistent with the argument
 -- I.e. @genWTType k@ will generate types @ty@ such that @synthKind ty = k'@

@@ -3,7 +3,6 @@ module Primer.Core.Meta (
   ModuleName (ModuleName, unModuleName),
   GlobalNameKind (..),
   GlobalName (GlobalName, qualifiedModule, baseName),
-  unsafeMkGlobalName,
   TyConName,
   ValConName,
   GVarName,
@@ -27,7 +26,7 @@ import Data.Generics.Uniplate.Data ()
 import Optics (
   Lens,
  )
-import Primer.Name (Name, unsafeMkName)
+import Primer.Name (Name)
 
 -- | An identifier for an expression. Every node of the AST has an ID.
 --
@@ -67,11 +66,6 @@ data GlobalName (k :: GlobalNameKind) = GlobalName
   , baseName :: Name
   }
   deriving stock (Eq, Ord, Generic, Data, Show, Read)
-
--- | Construct a name from a Text. This is called unsafe because there are no
--- guarantees about whether the name refers to anything that is in scope.
-unsafeMkGlobalName :: (NonEmpty Text, Text) -> GlobalName k
-unsafeMkGlobalName (m, n) = GlobalName (ModuleName $ fmap unsafeMkName m) (unsafeMkName n)
 
 type TyConName = GlobalName 'ATyCon
 type ValConName = GlobalName 'AValCon

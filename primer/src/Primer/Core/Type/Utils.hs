@@ -1,26 +1,14 @@
 module Primer.Core.Type.Utils (
   forgetTypeMetadata,
-  _freeVarsTy,
-  traverseFreeVarsTy,
-  freeVarsTy,
   alphaEqTy,
 ) where
 
 import Foreword
 
-import Data.Set.Optics (setOf)
 import Optics (
-  Traversal,
-  getting,
   set,
-  traversalVL,
-  (%),
-  _2,
  )
 
-import Primer.Core.Meta (
-  TyVarName,
- )
 import Primer.Core.Type (
   Type' (..),
   _typeMeta,
@@ -30,22 +18,6 @@ import Primer.Core.Type (
 -- Technically this replaces all annotations, regardless of what they are.
 forgetTypeMetadata :: Type' a -> Type' ()
 forgetTypeMetadata = set _typeMeta ()
-
-freeVarsTy :: Type' a -> Set TyVarName
-freeVarsTy = setOf (getting _freeVarsTy % _2)
-
-_freeVarsTy :: Traversal (Type' a) (Type' a) (a, TyVarName) (Type' a)
-_freeVarsTy = traversalVL $ traverseFreeVarsTy mempty
-
--- Helper for _freeVarsTy and _freeTyVars
--- Takes a set of considered-to-be-bound variables
-traverseFreeVarsTy :: Applicative f => Set TyVarName -> ((a, TyVarName) -> f (Type' a)) -> Type' a -> f (Type' a)
-traverseFreeVarsTy = go
-  where
-    go bound f = \case
-      t@TEmptyHole{} -> pure t
-      TFun m s t -> TFun m <$> go bound f s <*> go bound f t
-      TApp m s t -> TApp m <$> go bound f s <*> go bound f t
 
 -- Check two types for alpha equality
 --

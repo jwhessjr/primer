@@ -19,26 +19,17 @@ module Primer.Typecheck (
   buildTypingContext,
   TypeError (..),
   KindError (..),
-  typeOf,
-  matchArrowType,
-  matchForallType,
-  lookupGlobal,
-  lookupVar,
   consistentKinds,
   consistentTypes,
-  extendLocalCxtTy,
   extendLocalCxtTys,
-  extendLocalCxt,
   extendGlobalCxt,
   extendTypeDefCxt,
-  localTyVars,
 ) where
 
 import Foreword
 
 import Control.Monad.Fresh (MonadFresh (..))
 import Control.Monad.NestedError (MonadNestedError (..), modifyError')
-import Data.Map qualified as M
 import Data.Map.Strict qualified as Map
 import Optics (
   set,
@@ -49,19 +40,14 @@ import Primer.Core (
   GVarName,
   ID,
   Kind (..),
-  LVarName,
   Meta (..),
-  TmVarRef (..),
-  TyVarName,
   Type' (..),
   TypeCache (..),
   TypeCacheBoth (..),
-  unLocalName,
  )
 import Primer.Core.Utils (
   alphaEqTy,
   forgetTypeMetadata,
-  freshLocalName,
  )
 import Primer.Def (
   DefMap,
@@ -77,14 +63,11 @@ import Primer.Typecheck.Kindcheck (
   annotate,
   checkKind,
   consistentKinds,
-  extendLocalCxtTy,
   extendLocalCxtTys,
-  localTyVars,
   synthKind,
  )
 import Primer.Typecheck.TypeError (TypeError (..))
 import Primer.Typecheck.Utils (
-  typeOf,
   _typecache,
  )
 
@@ -99,28 +82,6 @@ import Primer.Typecheck.Utils (
 -- @Int -> ?@ accepts @\x . x@, we record that the variable node has type
 -- @Int@, rather than @?@.
 type ExprT = Expr' (Meta TypeCache) (Meta Kind)
-
-lookupLocal :: LVarName -> Cxt -> Either TypeError Type
-lookupLocal v cxt = case M.lookup (unLocalName v) $ localCxt cxt of
-  Just (T t) -> Right t
-  Just (K _) -> Left $ TmVarWrongSort (unLocalName v)
-  Nothing -> Left $ UnknownVariable $ LocalVarRef v
-
-lookupGlobal :: GVarName -> Cxt -> Maybe Type
-lookupGlobal v cxt = M.lookup v $ globalCxt cxt
-
-lookupVar :: TmVarRef -> Cxt -> Either TypeError Type
-lookupVar v cxt = case v of
-  LocalVarRef name -> lookupLocal name cxt
-  GlobalVarRef name ->
-    ( \case
-        Just t -> Right t
-        Nothing -> Left $ UnknownVariable v
-    )
-      (lookupGlobal name cxt)
-
-extendLocalCxt :: (LVarName, Type) -> Cxt -> Cxt
-extendLocalCxt (name, ty) cxt = cxt{localCxt = Map.insert (unLocalName name) (T ty) (localCxt cxt)}
 
 extendGlobalCxt :: [(GVarName, Type)] -> Cxt -> Cxt
 extendGlobalCxt globals cxt = cxt{globalCxt = Map.fromList globals <> globalCxt cxt}
@@ -226,22 +187,6 @@ check t = \case
       if consistentTypes t t'
         then pure (set _typecache (TCEmb TCBoth{tcChkedAt = t, tcSynthed = t'}) e')
         else throwError' (InconsistentTypes t t')
-
-
--- | Checks if a type can be unified with a function (arrow) type. Returns the
--- arrowised version - i.e. if it's a hole then it returns an arrow type with
--- holes on both sides.
-matchArrowType :: Type -> Maybe (Type, Type)
-matchArrowType (TEmptyHole _) = pure (TEmptyHole (), TEmptyHole ())
-matchArrowType (TFun _ a b) = pure (a, b)
-matchArrowType _ = Nothing
-
--- | Checks if a type can be hole-refined to a forall, and if so returns the
--- forall'd version.
-matchForallType :: MonadFresh NameCounter m => Type -> m (Maybe (TyVarName, Kind, Type))
--- These names will never enter the program, so we don't need to avoid shadowing
-matchForallType (TEmptyHole _) = (\n -> Just (n, KHole, TEmptyHole ())) <$> freshLocalName mempty
-matchForallType _ = pure Nothing
 
 -- | Two types are consistent if they are equal (up to IDs and alpha) when we
 -- also count holes as being equal to anything.

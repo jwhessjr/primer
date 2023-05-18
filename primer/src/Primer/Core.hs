@@ -38,7 +38,6 @@ import Primer.Core.Meta (
   ValConName,
   Value,
   trivialMeta,
-  unsafeMkGlobalName,
  )
 import Primer.Core.Type (
   Kind (..),

@@ -1,11 +1,7 @@
 module Primer.Core.Utils (
-  freshLocalName,
-  freshLocalName',
   forgetTypeMetadata,
   generateIDs,
   forgetMetadata,
-  _freeVarsTy,
-  freeVarsTy,
   alphaEqTy,
 ) where
 
@@ -25,12 +21,9 @@ import Primer.Core (
   _exprMeta,
   _exprTypeMeta,
  )
-import Primer.Core.Fresh (freshLocalName, freshLocalName')
 import Primer.Core.Type.Utils (
   alphaEqTy,
   forgetTypeMetadata,
-  freeVarsTy,
-  _freeVarsTy,
  )
 
 regenerateExprIDs' :: MonadFresh ID m => (ID -> a -> a') -> (ID -> b -> b') -> Expr' a b -> m (Expr' a' b')
