@@ -4,20 +4,15 @@ import Prelude
 
 import Hedgehog (
   Property,
-  annotateShow,
   discard,
-  (===), property, failure, forAll,
+  (===), property, forAll,
  )
 import Primer.Gen.Core.Typed (
   genWTType,
  )
 import Primer.Typecheck (
-  Expr (Ann, EmptyHole),
-  Kind (KType),
-  TypeError,
-  synth,refine
+  Kind (KType),refine
  )
-import Control.Monad.Trans.Except (runExceptT)
 
 tasty_refinement_synths :: Property
 tasty_refinement_synths = property $ do
@@ -25,8 +20,5 @@ tasty_refinement_synths = property $ do
   src <- forAll $ genWTType KType
   case refine tgt src of
     Just instTy -> do
-      (ty, _) <- runExceptT @TypeError (synth $ Ann EmptyHole src) >>= \case
-        Left err -> annotateShow err >> failure
-        Right y -> pure y
-      ty === instTy
+      src === instTy
     _ -> discard
