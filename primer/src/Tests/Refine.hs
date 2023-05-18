@@ -23,7 +23,7 @@ genWTType :: Kind -> Gen Type
 genWTType k = do
   Gen.recursive Gen.choice [ehole] $ app : catMaybes [arrow]
   where
-    ehole = pure TEmptyHole
+    ehole = pure TBase
     app = do TApp <$> genWTType (KFun KType k) <*> genWTType KType
     arrow =
       if k == KHole || k == KType
@@ -31,7 +31,7 @@ genWTType k = do
         else Nothing
 
 data Type
-  = TEmptyHole
+  = TBase
   | TFun Type Type
   | TApp Type Type
   deriving stock (Eq, Show)
@@ -40,8 +40,8 @@ data Kind = KHole | KType | KFun Kind Kind
   deriving stock (Eq, Show)
 
 consistentTypes :: Type -> Type -> Bool
-consistentTypes TEmptyHole _ = True
-consistentTypes _ TEmptyHole = True
+consistentTypes TBase _ = True
+consistentTypes _ TBase = True
 consistentTypes (TFun s1 t1) (TFun s2 t2) = consistentTypes s1 s2 && consistentTypes t1 t2
 consistentTypes (TApp s1 t1) (TApp s2 t2) = consistentTypes s1 s2 && consistentTypes t1 t2
 consistentTypes _ _ = False
