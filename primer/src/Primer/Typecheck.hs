@@ -32,6 +32,8 @@ import Control.Monad.Fresh (MonadFresh (..))
 import Control.Monad.NestedError (MonadNestedError (..), modifyError')
 import Data.Map.Strict qualified as Map
 import Optics (
+  Lens',
+  (%),
   set,
  )
 import Primer.Core (
@@ -44,7 +46,9 @@ import Primer.Core (
   Type' (..),
   TypeCache (..),
   TypeCacheBoth (..),
+  _exprMetaLens,
  )
+import Primer.Core.Meta (_type)
 import Primer.Core.Utils (
   alphaEqTy,
   forgetTypeMetadata,
@@ -67,9 +71,11 @@ import Primer.Typecheck.Kindcheck (
   synthKind,
  )
 import Primer.Typecheck.TypeError (TypeError (..))
-import Primer.Typecheck.Utils (
-  _typecache,
- )
+
+
+-- | A lens for the type annotation of an 'Expr' or 'ExprT'
+_typecache :: Lens' (Expr' (Meta a) b) a
+_typecache = _exprMetaLens % _type
 
 -- | Typechecking takes as input an Expr with 'Maybe Type' annotations and
 -- produces an Expr with 'Type' annotations - i.e. every node in the output is

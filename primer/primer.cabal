@@ -32,7 +32,6 @@ executable primer-test
     Primer.Typecheck.Kindcheck
     Primer.Typecheck.KindError
     Primer.Typecheck.TypeError
-    Primer.Typecheck.Utils
     Tests.Refine
     Primer.Gen.Core.Typed
     Primer.Test.TestM
