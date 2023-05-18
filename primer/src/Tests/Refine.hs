@@ -10,11 +10,11 @@ import Hedgehog (
 import qualified Hedgehog.Gen as Gen
 import Data.Maybe (catMaybes)
 
-tasty_refinement_synths :: Property
-tasty_refinement_synths = property $ do
+tasty_replay_broken :: Property
+tasty_replay_broken = property $ do
   tgt <- forAll $ genWTType KType
   src <- forAll $ genWTType KType
-  case refine tgt src of
+  case stripArgs tgt src of
     Just instTy -> do
       src === instTy
     _ -> discard
@@ -39,9 +39,9 @@ data Type
 data Kind = KType | KFun Kind Kind
   deriving stock (Eq, Show)
 
-refine :: Type -> Type -> Maybe Type
-refine tgtTy tmTy = if tgtTy == tmTy
-          then Just tmTy
-          else case tmTy of
-                 TFun _ t -> refine tgtTy t
+stripArgs :: Type -> Type -> Maybe Type
+stripArgs tgt ty = if tgt == ty
+          then Just ty
+          else case ty of
+                 TFun _ t -> stripArgs tgt t
                  _ -> Nothing

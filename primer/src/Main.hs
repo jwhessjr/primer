@@ -2,7 +2,7 @@ module Main (main) where
 
 import Prelude
 import Hedgehog ( Property, withSkip, Seed )
-import Tests.Refine (tasty_refinement_synths)
+import Tests.Refine (tasty_replay_broken)
 import Hedgehog.Internal.Runner (checkReport)
 import Hedgehog.Internal.Property (Property(propertyConfig, propertyTest), Skip(SkipToShrink), TestCount, ShrinkPath)
 import qualified Hedgehog.Internal.Seed as Seed
@@ -43,12 +43,12 @@ runAndRecheck = either id absurd <$> runExceptT go
    go :: ExceptT RRInfo IO Void
    go = do
     seed <- Seed.random
-    shrink <- ExceptT $ runProp seed tasty_refinement_synths <&> \case
+    shrink <- ExceptT $ runProp seed tasty_replay_broken <&> \case
       Passed -> Left RunPass
       Defeat -> Left RunDefeat
       Fail tc sp -> Right $ SkipToShrink tc sp
     -- This is essentially "recheckAt", with the skip/shrink info from above
-    ExceptT $ fmap Left $ runProp seed (withSkip shrink tasty_refinement_synths) <&> \case
+    ExceptT $ fmap Left $ runProp seed (withSkip shrink tasty_replay_broken) <&> \case
       Passed -> RecheckPass
       Defeat -> RecheckDefeat
       Fail _ _ -> RecheckRefind
