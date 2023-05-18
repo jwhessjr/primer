@@ -3,107 +3,26 @@ cradle:
     - path: "primer/src/Main.hs"
       component: "primer:exe:primer-test"
 
-    - path: "primer/src/Control/Monad/Fresh.hs"
-      component: "primer:exe:primer-test"
-
     - path: "primer/src/Foreword.hs"
       component: "primer:exe:primer-test"
 
     - path: "primer/src/Primer/Core.hs"
       component: "primer:exe:primer-test"
 
-    - path: "primer/src/Primer/Core/Utils.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Def.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/EvalFull.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Name.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Refine.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Subst.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Typecheck.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Unification.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Control/Monad/NestedError.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Core/Fresh.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Core/Meta.hs"
-      component: "primer:exe:primer-test"
-
     - path: "primer/src/Primer/Core/Type.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Core/Type/Utils.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Eval/Ann.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Eval/Beta.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Eval/Bind.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Eval/Case.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Eval/Detail.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Eval/EvalError.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Eval/Inline.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Eval/Let.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Eval/Prim.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Eval/Redex.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Typecheck/Cxt.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Typecheck/Kindcheck.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Typecheck/KindError.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Typecheck/TypeError.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Typecheck/Utils.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Primer/Zipper/Type.hs"
-      component: "primer:exe:primer-test"
-
-    - path: "primer/src/Tests/Refine.hs"
       component: "primer:exe:primer-test"
 
     - path: "primer/src/Primer/Gen/Core/Typed.hs"
       component: "primer:exe:primer-test"
 
-    - path: "primer/src/Primer/Test/TestM.hs"
+    - path: "primer/src/Primer/Refine.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Primer/Typecheck.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Primer/Typecheck/Kindcheck.hs"
+      component: "primer:exe:primer-test"
+
+    - path: "primer/src/Tests/Refine.hs"
       component: "primer:exe:primer-test"
