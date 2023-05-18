@@ -27,8 +27,7 @@ import Primer.Core.Type (
   Type (..)
  )
 import Primer.Typecheck (
-  Cxt (),
-  TypeError, synth, initialCxt,
+  TypeError, synth
  )
 
 {-
@@ -45,12 +44,11 @@ types/expressions, but it is easy to have a post-processing step of adding IDs
 and empty TypeCaches to everything.
 -}
 
-newtype WT a = WT {unWT :: Reader Cxt a}
+newtype WT a = WT {unWT :: Identity a}
   deriving newtype
     ( Functor
     , Applicative
     , Monad
-    , MonadReader Cxt
     )
 
 -- | Generates types which infer kinds consistent with the argument
@@ -72,8 +70,8 @@ genWTType k = do
 genWTKind :: Monad m => GenT m Kind
 genWTKind = Gen.recursive Gen.choice [pure KType] [KFun <$> genWTKind <*> genWTKind]
 
-hoist' :: Applicative f => Cxt -> WT a -> f a
-hoist' cxt = pure . flip runReader cxt . unWT
+hoist' :: Applicative f => WT a -> f a
+hoist' = pure . runIdentity . unWT
 
 -- | Convert a @PropertyT WT ()@ into a @Property@, which Hedgehog can test.
 -- It is recommended to do more than default number of tests when using this module.
@@ -82,7 +80,7 @@ hoist' cxt = pure . flip runReader cxt . unWT
 -- The modules form the 'Cxt' in the environment of the 'WT' monad
 -- (thus the definitions of terms is ignored)
 propertyWT :: PropertyT WT () -> Property
-propertyWT = property . hoist (hoist' initialCxt)
+propertyWT = property . hoist hoist'
 
 -- Lift 'synth' into a property
 synthTest :: HasCallStack => Expr -> PropertyT WT (Type, Expr)

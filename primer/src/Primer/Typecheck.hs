@@ -12,9 +12,6 @@ module Primer.Typecheck (
   check,
   synthKind,
   checkKind,
-  Cxt (..),
-  KindOrType (..),
-  initialCxt,
   TypeError (..),
   KindError (..),
   consistentKinds,
@@ -30,10 +27,8 @@ import Primer.Core.Type (
   Kind (..),
   Type (..),
  )
-import Primer.Typecheck.Cxt (Cxt (Cxt, globalCxt, localCxt))
 import Primer.Typecheck.Kindcheck (
   KindError (..),
-  KindOrType (K, T),
   checkKind,
   consistentKinds,
   synthKind,
@@ -49,18 +44,9 @@ data TypeError
   | KindError KindError
   deriving stock (Eq, Show, Read)
 
--- An empty typing context
-initialCxt :: Cxt
-initialCxt =
-  Cxt
-    { localCxt = mempty
-    , globalCxt = mempty
-    }
-
 -- | A shorthand for the constraints needed when kindchecking
 type TypeM m =
   ( Monad m
-  , MonadReader Cxt m -- has access to a typing context, and SmartHoles option
   , MonadError TypeError m -- can throw type errors
   )
 

@@ -3,7 +3,6 @@ module Primer.Typecheck.Kindcheck (
   checkKind,
   synthKind,
   Type,
-  KindOrType (..),
   consistentKinds,
 ) where
 
@@ -14,8 +13,6 @@ import Primer.Core.Type (
   Type (TApp, TEmptyHole, TFun),
  )
 import Primer.Name (Name)
-import Primer.Typecheck.Cxt (Cxt , KindOrType (K, T))
-
 
 data KindError
   = TyVarWrongSort Name -- term var instead of type var
@@ -26,7 +23,6 @@ data KindError
 -- | A shorthand for the constraints needed when kindchecking
 type KindM m =
   ( Monad m
-  , MonadReader Cxt m -- has access to a typing context, and SmartHoles option
   , MonadError KindError m -- can throw kind errors
   )
 
