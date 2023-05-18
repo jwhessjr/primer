@@ -16,7 +16,6 @@ import Primer.Core.Meta (
  )
 import Primer.Core.Type (
   Type,
-  Type',
  )
 import Primer.Core.Utils (forgetTypeMetadata)
 
@@ -25,7 +24,7 @@ data Def
   deriving stock (Eq, Show, Read, Data)
 
 
-defType :: Def -> Type' ()
+defType :: Def -> Type
 defType = \case
   DefAST d -> forgetTypeMetadata $ astDefType d
 

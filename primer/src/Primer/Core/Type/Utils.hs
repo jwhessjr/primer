@@ -5,19 +5,12 @@ module Primer.Core.Type.Utils (
 
 import Foreword
 
-import Optics (
-  set,
- )
-
 import Primer.Core.Type (
-  Type' (..),
-  _typeMeta,
+  Type (..),
  )
 
--- | Replace all 'ID's in a Type with unit.
--- Technically this replaces all annotations, regardless of what they are.
-forgetTypeMetadata :: Type' a -> Type' ()
-forgetTypeMetadata = set _typeMeta ()
+forgetTypeMetadata :: Type -> Type
+forgetTypeMetadata = identity
 
 -- Check two types for alpha equality
 --
@@ -27,10 +20,10 @@ forgetTypeMetadata = set _typeMeta ()
 --
 -- Note that we do not expand TLets, they must be structurally
 -- the same (perhaps with a different named binding)
-alphaEqTy :: Type' () -> Type' () -> Bool
+alphaEqTy :: Type -> Type -> Bool
 alphaEqTy = go
   where
-    go (TEmptyHole _) (TEmptyHole _) = True
-    go (TFun _ a b) (TFun _ c d) = go a c && go b d
-    go (TApp _ a b) (TApp _ c d) = go a c && go b d
+    go TEmptyHole TEmptyHole = True
+    go (TFun a b) (TFun c d) = go a c && go b d
+    go (TApp a b) (TApp c d) = go a c && go b d
     go _ _ = False

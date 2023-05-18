@@ -28,7 +28,7 @@ import Primer.Core.Meta (
  )
 import Primer.Core.Type (
   Kind (..),
-  Type' (..)
+  Type (..)
  )
 import Primer.Test.TestM (
   TestM,
@@ -36,7 +36,7 @@ import Primer.Test.TestM (
  )
 import Primer.Typecheck (
   Cxt (),
-  ExprT, TypeError, synth, buildTypingContext,
+  TypeError, synth, buildTypingContext,
  )
 
 {-
@@ -53,8 +53,6 @@ types/expressions, but it is easy to have a post-processing step of adding IDs
 and empty TypeCaches to everything.
 -}
 
-type TypeG = Type' ()
-
 newtype WT a = WT {unWT :: ReaderT Cxt TestM a}
   deriving newtype
     ( Functor
@@ -67,16 +65,16 @@ newtype WT a = WT {unWT :: ReaderT Cxt TestM a}
 -- | Generates types which infer kinds consistent with the argument
 -- I.e. @genWTType k@ will generate types @ty@ such that @synthKind ty = k'@
 -- with @consistentKinds k k'@. See 'Tests.Gen.Core.Typed.tasty_genTy'
-genWTType :: Monad m => Kind -> GenT m TypeG
+genWTType :: Monad m => Kind -> GenT m Type
 genWTType k = do
   let rec = app : catMaybes [arrow]
   Gen.recursive Gen.choice [ehole] rec
   where
-    ehole = pure $ TEmptyHole ()
-    app = do k' <- genWTKind; TApp () <$> genWTType (KFun k' k) <*> genWTType k'
+    ehole = pure $ TEmptyHole
+    app = do k' <- genWTKind; TApp <$> genWTType (KFun k' k) <*> genWTType k'
     arrow =
       if k == KHole || k == KType
-        then Just $ TFun () <$> genWTType KType <*> genWTType KType
+        then Just $ TFun <$> genWTType KType <*> genWTType KType
         else Nothing
 
 -- | Generates an arbitary kind. Note that all kinds are well-formed.
@@ -96,7 +94,7 @@ propertyWT :: PropertyT WT () -> Property
 propertyWT = property . hoist (hoist' $ buildTypingContext () mempty)
 
 -- Lift 'synth' into a property
-synthTest :: HasCallStack => Expr -> PropertyT WT (Type' (), ExprT)
+synthTest :: HasCallStack => Expr -> PropertyT WT (Type, Expr)
 synthTest e = do
   x <- lift $ runExceptT @TypeError $ synth e
   case x of

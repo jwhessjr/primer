@@ -3,7 +3,6 @@ module Primer.Typecheck.Kindcheck (
   checkKind,
   synthKind,
   Type,
-  TypeT,
   KindOrType (..),
   consistentKinds,
   annotate,
@@ -15,10 +14,10 @@ import Control.Monad.Fresh (MonadFresh)
 import Primer.Core.Meta (ID, Meta (Meta))
 import Primer.Core.Type (
   Kind (KFun, KHole, KType),
-  Type' (TApp, TEmptyHole, TFun),
+  Type (TApp, TEmptyHole, TFun),
  )
 import Primer.Name (Name)
-import Primer.Typecheck.Cxt (Cxt , KindOrType (K, T), Type)
+import Primer.Typecheck.Cxt (Cxt , KindOrType (K, T))
 
 
 data KindError
@@ -36,8 +35,6 @@ type KindM m =
   , MonadError KindError m -- can throw kind errors
   )
 
-type TypeT = Type' (Meta Kind)
-
 -- Synthesise a kind for the given type
 -- TypeHoles are always considered to have kind KHole - a kind hole.
 -- When SmartHoles is on, we essentially remove all holes, and re-insert where
@@ -54,20 +51,20 @@ type TypeT = Type' (Meta Kind)
 -- A similar thing would happen with
 --   synthKind $ TApp 0 (TCon 1 List) (THole 2 (TCon 3 List))
 -- because we do not have checkKind KType List
-synthKind :: KindM m => Type' (Meta a) -> m (Kind, TypeT)
+synthKind :: KindM m => Type -> m (Kind, Type)
 synthKind = \case
-  TEmptyHole m -> pure (KHole, TEmptyHole (annotate KHole m))
-  TFun m a b -> do
+  TEmptyHole -> pure (KHole, TEmptyHole)
+  TFun a b -> do
     a' <- checkKind KType a
     b' <- checkKind KType b
-    pure (KType, TFun (annotate KType m) a' b')
-  TApp m s t -> do
+    pure (KType, TFun a' b')
+  TApp s t -> do
     (k, s') <- synthKind s
     case matchArrowKind k of
       Nothing -> throwError $ KindDoesNotMatchArrow k
-      Just (k1, k2) -> checkKind k1 t >>= \t' -> pure (k2, TApp (annotate k2 m) s' t')
+      Just (k1, k2) -> checkKind k1 t >>= \t' -> pure (k2, TApp s' t')
 
-checkKind :: KindM m => Kind -> Type' (Meta a) -> m TypeT
+checkKind :: KindM m => Kind -> Type -> m Type
 checkKind k t = do
   (k', t') <- synthKind t
   if consistentKinds k k'

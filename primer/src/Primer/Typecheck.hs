@@ -8,7 +8,6 @@
 module Primer.Typecheck (
   Type,
   Expr,
-  ExprT,
   synth,
   check,
   synthKind,
@@ -29,28 +28,17 @@ import Foreword
 
 import Control.Monad.Fresh (MonadFresh (..))
 import Data.Map.Strict qualified as Map
-import Optics (
-  Lens',
-  (%),
-  set,
- )
 import Primer.Core (
-  Expr,
-  Expr' (..),
-  TypeCache (..),
-  TypeCacheBoth (..),
-  _exprMetaLens,
+  Expr (..),
  )
 import Primer.Core.Meta (
   GVarName,
-  Meta (..),
   ID,
  )
 import Primer.Core.Type (
   Kind (..),
-  Type' (..),
+  Type (..),
  )
-import Primer.Core.Meta (_type,)
 import Primer.Core.Utils (
   alphaEqTy,
   forgetTypeMetadata,
@@ -63,9 +51,6 @@ import Primer.Typecheck.Cxt (Cxt (Cxt, globalCxt, localCxt))
 import Primer.Typecheck.Kindcheck (
   KindError (..),
   KindOrType (K, T),
-  Type,
-  TypeT,
-  annotate,
   checkKind,
   consistentKinds,
   synthKind,
@@ -75,27 +60,11 @@ import Primer.Typecheck.Kindcheck (
 data TypeError
   = InternalError Text
   | CannotSynthesiseType Expr
-  | InconsistentTypes (Type' ()) (Type' ())
+  | InconsistentTypes Type Type
   | CaseOfHoleNeedsEmptyBranches
-  | CannotCaseNonADT (Type' ())
+  | CannotCaseNonADT Type
   | KindError KindError
   deriving stock (Eq, Show, Read)
-
--- | A lens for the type annotation of an 'Expr' or 'ExprT'
-_typecache :: Lens' (Expr' (Meta a) b) a
-_typecache = _exprMetaLens % _type
-
--- | Typechecking takes as input an Expr with 'Maybe Type' annotations and
--- produces an Expr with 'Type' annotations - i.e. every node in the output is
--- given a type. The type annotation isn't itself part of the editable program
--- so it has no metadata - hence the '()' argument inside 'TypeCache'.
---
--- The 'Type' annotations cache the type which a term synthesised/was checked
--- at. For "embeddings" where typechecking defers to synthesis, we record the
--- synthesised type, not the checked one. For example, when checking that
--- @Int -> ?@ accepts @\x . x@, we record that the variable node has type
--- @Int@, rather than @?@.
-type ExprT = Expr' (Meta TypeCache) (Meta Kind)
 
 extendGlobalCxt :: [(GVarName, Type)] -> Cxt -> Cxt
 extendGlobalCxt globals cxt = cxt{globalCxt = Map.fromList globals <> globalCxt cxt}
@@ -149,17 +118,17 @@ type TypeM m =
 -- the cached type in the output being TCSynthed.
 -- INVARIANT: if @synth e@ gives @(T,e')@, then @e@ and @e'@ agree up to their
 -- cached types, and @TCSynthed T == typeOf e'@
-synth :: TypeM m => Expr -> m (Type, ExprT)
+synth :: TypeM m => Expr -> m (Type, Expr)
 synth = \case
-  Ann i e t -> do
+  Ann e t -> do
     -- Check that the type is well-formed by synthesising its kind
     t' <- checkKind' KType t
     let t'' = forgetTypeMetadata t'
     -- Check e against the annotation
     e' <- check t'' e
     -- Annotate the Ann with the same type as e
-    pure $ annSynth2 t'' i Ann e' t'
-  EmptyHole i -> pure $ annSynth0 (TEmptyHole ()) i EmptyHole
+    pure (t'', Ann e' t')
+  EmptyHole -> pure (TEmptyHole, EmptyHole)
   -- When synthesising a hole, we first check that the expression inside it
   -- synthesises a type successfully (see Note [Holes and bidirectionality]).
   -- TODO: we would like to remove this hole (leaving e) if possible, but I
@@ -173,32 +142,24 @@ synth = \case
   -- which is bad UX.
   -- See https://github.com/hackworthltd/primer/issues/7
   e -> throwError $ CannotSynthesiseType e
-  where
-    -- We could combine these with some type class shenanigans, but it doesn't
-    -- seem worth it. The general scheme is
-    -- annSynthN t i c x1 ... xn = (t,c (annotate (TCSynthed t) i) x1 ... xn)
-    annSynth0 t i x = (t, x $ annotate (TCSynthed t) i)
-    annSynth1 t i c = annSynth0 t i . flip c
-    annSynth2 t i c = annSynth1 t i . flip c
 
 -- | Similar to synth, but for checking rather than synthesis.
-check :: TypeM m => Type -> Expr -> m ExprT
+check :: TypeM m => Type -> Expr -> m Expr
 check t = \case
-  Case i e brs -> do
+  Case e brs -> do
     (eT, e') <- synth e
-    let caseMeta = annotate (TCChkedAt t) i
     let isHoleTy = case eT of
             TEmptyHole{} -> True
             _ -> False
     if isHoleTy
      then if null brs
-          then pure $ Case caseMeta e' []
+          then pure $ Case e' []
           else throwError CaseOfHoleNeedsEmptyBranches
      else throwError $ CannotCaseNonADT eT
   e -> do
       (t', e') <- synth e
       if consistentTypes t t'
-        then pure (set _typecache (TCEmb TCBoth{tcChkedAt = t, tcSynthed = t'}) e')
+        then pure e'
         else throwError (InconsistentTypes t t')
 
 -- | Two types are consistent if they are equal (up to IDs and alpha) when we
@@ -209,23 +170,23 @@ consistentTypes x y = uncurry eqType $ holepunch x y
     -- We punch holes in each type so they "match" in the sense that
     -- they have holes in the same places. (At least, until we find
     -- obviously different constructors.)
-    holepunch (TEmptyHole _) _ = (TEmptyHole (), TEmptyHole ())
-    holepunch _ (TEmptyHole _) = (TEmptyHole (), TEmptyHole ())
-    holepunch (TFun _ s t) (TFun _ s' t') =
+    holepunch TEmptyHole _ = (TEmptyHole, TEmptyHole)
+    holepunch _ TEmptyHole = (TEmptyHole, TEmptyHole)
+    holepunch (TFun s t) (TFun s' t') =
       let (hs, hs') = holepunch s s'
           (ht, ht') = holepunch t t'
-       in (TFun () hs ht, TFun () hs' ht')
-    holepunch (TApp _ s t) (TApp _ s' t') =
+       in (TFun hs ht, TFun hs' ht')
+    holepunch (TApp s t) (TApp s' t') =
       let (hs, hs') = holepunch s s'
           (ht, ht') = holepunch t t'
-       in (TApp () hs ht, TApp () hs' ht')
+       in (TApp hs ht, TApp hs' ht')
     holepunch s t = (s, t)
 
 -- | Compare two types for alpha equality, ignoring their IDs
-eqType :: Type' a -> Type' b -> Bool
+eqType :: Type -> Type -> Bool
 eqType t1 t2 = forgetTypeMetadata t1 `alphaEqTy` forgetTypeMetadata t2
 
-checkKind' :: TypeM m => Kind -> Type' (Meta a) -> m TypeT
+checkKind' :: TypeM m => Kind -> Type -> m Type
 checkKind' k t = modifyError KindError (checkKind k t)
 
 modifyError :: MonadError e' m => (e -> e') -> ExceptT e m a -> m a

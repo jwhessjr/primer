@@ -7,10 +7,8 @@ module Primer.Typecheck.Cxt (
 import Foreword
 
 import Primer.Core.Meta
-import Primer.Core.Type (Kind, Type')
+import Primer.Core.Type (Kind, Type)
 import Primer.Name (Name)
-
-type Type = Type' ()
 
 data KindOrType = K Kind | T Type
   deriving stock (Show, Eq)

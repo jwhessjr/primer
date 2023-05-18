@@ -1,80 +1,23 @@
 module Primer.Core (
-  Expr,
-  Expr' (..),
+  Expr (..),
   CaseBranch (..),
-  TypeCache (..),
-  TypeCacheBoth (..),
-  ExprMeta,
-  _exprMeta,
-  _exprMetaLens,
-  _exprTypeMeta,
 ) where
 
 import Foreword
 
 import Data.Data (Data)
-import Data.Generics.Product
 import Data.Generics.Uniplate.Data ()
-import Optics (
-  Lens',
-  Traversal,
- )
 import Primer.Core.Meta (
-  Meta,
   ValConName,
  )
 import Primer.Core.Type (
-  Type' (..),
-  TypeMeta,
+  Type (..),
  )
 
--- | Typechecking will add metadata to each node describing its type.
--- Some nodes are purely synthesised, some are purely checked, and some
--- (the "embeddings") are both. These embeddings are synthesisable but in a
--- checkable context, like 'x' in 'f x'.
---
--- Since with type holes the synthesised and checked-at types for embeddings
--- may differ, we record both of them, so downstream consumers can choose which
--- one is better for their needs, rather than having the choice forced upon
--- them.
-data TypeCache
-  = TCSynthed (Type' ())
-  | TCChkedAt (Type' ())
-  | TCEmb TypeCacheBoth
-  deriving stock (Eq, Show, Read, Generic, Data)
-
--- We were checking at the first, but term was synthesisable and synth'd the
--- second We don't inline this into TypeCache because then we would get partial
--- functions from tcChkedAt and tcSynthed. We really want to name these fields
--- though, to make it clear what each one is!
-data TypeCacheBoth = TCBoth {tcChkedAt :: Type' (), tcSynthed :: Type' ()}
-  deriving stock (Eq, Show, Read, Generic, Data)
-
--- Expression metadata. Each expression is annotated with a type (populated by
--- the typechecker). These types aren't part of the program so they themselves
--- have no metadata - we indicate this with the '()' argument.
--- They're optional (i.e. in a 'Maybe') because when
--- modifying the AST in an action we aren't necessarily sure of the type of the
--- nodes we're inserting.
-type ExprMeta = Meta ()
-
--- | The core AST.
---  This is the canonical representation of Primer programs.  It is similar to
---  System F, but with support for empty and non-empty holes.  Each node holds a
---  tuple '(ID, Maybe Value)'. The first element is the ID of the node, and the
---  second element is an optional JSON object of metadata owned by the frontend,
---  which we treat as opaque.
-type Expr = Expr' ExprMeta TypeMeta
-
--- | The generic expression type.
--- a is the type of annotations that are placed on every expression node.
--- b is the type of annotations that are placed on every type node.
--- Most of the backend fixes a ~ b ~ ID.
--- The typechecker produces a ~ (ID, Type' ()), b ~ ID.
-data Expr' a b
-  = EmptyHole a
-  | Ann a (Expr' a b) (Type' b)
-  | Case a (Expr' a b) [CaseBranch] -- See Note [Case]
+data Expr
+  = EmptyHole
+  | Ann Expr Type
+  | Case Expr [CaseBranch]
   deriving stock (Eq, Show, Read, Data, Generic)
 
 -- Note [Holes and bidirectionality]
@@ -160,20 +103,6 @@ data Expr' a b
 -- twofold: having a canonical/normalised AST and making the typechecker a bit
 -- simpler as we don't have to worry about looking up constructors and whether
 -- we have got exactly one branch per constructor.
-
--- | A traversal over the metadata of an expression.
-_exprMeta :: forall a b c. Traversal (Expr' a b) (Expr' c b) a c
-_exprMeta = param @1
-
--- | A lens on to the metadata of an expression.
--- Note that unlike '_exprMeta', this is shallow i.e. it does not recurse in to sub-expressions.
--- And for this reason, it cannot be type-changing.
-_exprMetaLens :: Lens' (Expr' a b) a
-_exprMetaLens = position @1
-
--- | A traversal over the type metadata of an expression
-_exprTypeMeta :: forall a b c. Traversal (Expr' a b) (Expr' a c) b c
-_exprTypeMeta = param @0
 
 data CaseBranch = CaseBranch ValConName
   deriving stock (Eq, Show, Read, Data, Generic)
