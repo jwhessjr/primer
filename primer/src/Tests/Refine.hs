@@ -21,8 +21,7 @@ tasty_refinement_synths = property $ do
 
 genWTType :: Kind -> Gen Type
 genWTType k = do
-  let rec = app : catMaybes [arrow]
-  Gen.recursive Gen.choice [ehole] rec
+  Gen.recursive Gen.choice [ehole] $ app : catMaybes [arrow]
   where
     ehole = pure TEmptyHole
     app = do TApp <$> genWTType (KFun KType k) <*> genWTType KType
