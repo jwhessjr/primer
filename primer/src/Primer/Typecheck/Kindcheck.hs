@@ -14,7 +14,6 @@ module Primer.Typecheck.Kindcheck (
 import Foreword
 
 import Control.Monad.Fresh (MonadFresh)
-import Control.Monad.NestedError (MonadNestedError, throwError')
 import Data.Map qualified as Map
 import Primer.Core.Meta (ID, Meta (Meta), TyVarName, unLocalName)
 import Primer.Core.Type (
@@ -35,13 +34,13 @@ import Primer.Typecheck.KindError (
  )
 
 -- | A shorthand for the constraints needed when kindchecking
-type KindM e m =
+type KindM m =
   ( Monad m
   , MonadReader Cxt m -- has access to a typing context, and SmartHoles option
   , MonadFresh ID m -- can generate fresh IDs
   -- can generate fresh names (needed for "smart holes" and polymorphism)
   , MonadFresh NameCounter m
-  , MonadNestedError KindError e m -- can throw kind errors
+  , MonadError KindError m -- can throw kind errors
   )
 
 type TypeT = Type' (Meta Kind)
@@ -71,7 +70,7 @@ extendLocalCxtTys x cxt = cxt{localCxt = Map.fromList (bimap unLocalName K <$> x
 -- A similar thing would happen with
 --   synthKind $ TApp 0 (TCon 1 List) (THole 2 (TCon 3 List))
 -- because we do not have checkKind KType List
-synthKind :: KindM e m => Type' (Meta a) -> m (Kind, TypeT)
+synthKind :: KindM m => Type' (Meta a) -> m (Kind, TypeT)
 synthKind = \case
   TEmptyHole m -> pure (KHole, TEmptyHole (annotate KHole m))
   TFun m a b -> do
@@ -81,15 +80,15 @@ synthKind = \case
   TApp m s t -> do
     (k, s') <- synthKind s
     case matchArrowKind k of
-      Nothing -> throwError' $ KindDoesNotMatchArrow k
+      Nothing -> throwError $ KindDoesNotMatchArrow k
       Just (k1, k2) -> checkKind k1 t >>= \t' -> pure (k2, TApp (annotate k2 m) s' t')
 
-checkKind :: KindM e m => Kind -> Type' (Meta a) -> m TypeT
+checkKind :: KindM m => Kind -> Type' (Meta a) -> m TypeT
 checkKind k t = do
   (k', t') <- synthKind t
   if consistentKinds k k'
     then pure t'
-    else throwError' $ InconsistentKinds k k'
+    else throwError $ InconsistentKinds k k'
 
 -- | Extend the metadata of an 'Expr' or 'Type'
 -- (usually with a 'TypeCache' or 'Kind')

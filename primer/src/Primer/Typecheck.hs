@@ -29,7 +29,6 @@ module Primer.Typecheck (
 import Foreword
 
 import Control.Monad.Fresh (MonadFresh (..))
-import Control.Monad.NestedError (MonadNestedError (..), modifyError')
 import Data.Map.Strict qualified as Map
 import Optics (
   Lens',
@@ -110,13 +109,13 @@ buildTypingContext tydefs defs =
    in extendTypeDefCxt tydefs $ extendGlobalCxt globals initialCxt
 
 -- | A shorthand for the constraints needed when kindchecking
-type TypeM e m =
+type TypeM m =
   ( Monad m
   , MonadReader Cxt m -- has access to a typing context, and SmartHoles option
   , MonadFresh ID m -- can generate fresh IDs
   -- can generate fresh names (needed for "smart holes" and polymorphism)
   , MonadFresh NameCounter m
-  , MonadNestedError TypeError e m -- can throw type errors
+  , MonadError TypeError m -- can throw type errors
   )
 
 {- HLINT ignore synth "Avoid lambda using `infix`" -}
@@ -142,7 +141,7 @@ type TypeM e m =
 -- the cached type in the output being TCSynthed.
 -- INVARIANT: if @synth e@ gives @(T,e')@, then @e@ and @e'@ agree up to their
 -- cached types, and @TCSynthed T == typeOf e'@
-synth :: TypeM e m => Expr -> m (Type, ExprT)
+synth :: TypeM m => Expr -> m (Type, ExprT)
 synth = \case
   Ann i e t -> do
     -- Check that the type is well-formed by synthesising its kind
@@ -165,7 +164,7 @@ synth = \case
   -- leaving (? : Nat -> Nat) {? True ?}. This causes holes to jump around
   -- which is bad UX.
   -- See https://github.com/hackworthltd/primer/issues/7
-  e -> throwError' $ CannotSynthesiseType e
+  e -> throwError $ CannotSynthesiseType e
   where
     -- We could combine these with some type class shenanigans, but it doesn't
     -- seem worth it. The general scheme is
@@ -175,7 +174,7 @@ synth = \case
     annSynth2 t i c = annSynth1 t i . flip c
 
 -- | Similar to synth, but for checking rather than synthesis.
-check :: TypeM e m => Type -> Expr -> m ExprT
+check :: TypeM m => Type -> Expr -> m ExprT
 check t = \case
   Case i e brs -> do
     (eT, e') <- synth e
@@ -186,13 +185,13 @@ check t = \case
     if isHoleTy
      then if null brs
           then pure $ Case caseMeta e' []
-          else throwError' CaseOfHoleNeedsEmptyBranches
-     else throwError' $ CannotCaseNonADT eT
+          else throwError CaseOfHoleNeedsEmptyBranches
+     else throwError $ CannotCaseNonADT eT
   e -> do
       (t', e') <- synth e
       if consistentTypes t t'
         then pure (set _typecache (TCEmb TCBoth{tcChkedAt = t, tcSynthed = t'}) e')
-        else throwError' (InconsistentTypes t t')
+        else throwError (InconsistentTypes t t')
 
 -- | Two types are consistent if they are equal (up to IDs and alpha) when we
 -- also count holes as being equal to anything.
@@ -218,5 +217,8 @@ consistentTypes x y = uncurry eqType $ holepunch x y
 eqType :: Type' a -> Type' b -> Bool
 eqType t1 t2 = forgetTypeMetadata t1 `alphaEqTy` forgetTypeMetadata t2
 
-checkKind' :: TypeM e m => Kind -> Type' (Meta a) -> m TypeT
-checkKind' k t = modifyError' KindError (checkKind k t)
+checkKind' :: TypeM m => Kind -> Type' (Meta a) -> m TypeT
+checkKind' k t = modifyError KindError (checkKind k t)
+
+modifyError :: MonadError e' m => (e -> e') -> ExceptT e m a -> m a
+modifyError f m = runExceptT m >>= either (throwError . f) pure
