@@ -26,7 +26,7 @@ genWTType k = do
     ehole = pure TBase
     app = do TApp <$> genWTType (KFun KType k) <*> genWTType KType
     arrow =
-      if k == KHole || k == KType
+      if k == KType
         then Just $ TFun <$> genWTType KType <*> genWTType KType
         else Nothing
 
@@ -36,7 +36,7 @@ data Type
   | TApp Type Type
   deriving stock (Eq, Show)
 
-data Kind = KHole | KType | KFun Kind Kind
+data Kind = KType | KFun Kind Kind
   deriving stock (Eq, Show)
 
 consistentTypes :: Type -> Type -> Bool
