@@ -24,7 +24,7 @@ genWTType k = do
   let rec = app : catMaybes [arrow]
   Gen.recursive Gen.choice [ehole] rec
   where
-    ehole = pure $ TEmptyHole
+    ehole = pure TEmptyHole
     app = do TApp <$> genWTType (KFun KType k) <*> genWTType KType
     arrow =
       if k == KHole || k == KType
