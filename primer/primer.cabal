@@ -29,8 +29,6 @@ executable primer-test
     Primer.Core.Type.Utils
     Primer.Typecheck.Cxt
     Primer.Typecheck.Kindcheck
-    Primer.Typecheck.KindError
-    Primer.Typecheck.TypeError
     Tests.Refine
     Primer.Gen.Core.Typed
     Primer.Test.TestM

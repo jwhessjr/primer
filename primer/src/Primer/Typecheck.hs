@@ -47,7 +47,7 @@ import Primer.Core (
   TypeCacheBoth (..),
   _exprMetaLens,
  )
-import Primer.Core.Meta (_type)
+import Primer.Core.Meta (_type, TmVarRef, TyConName, ValConName,)
 import Primer.Core.Utils (
   alphaEqTy,
   forgetTypeMetadata,
@@ -56,7 +56,7 @@ import Primer.Def (
   DefMap,
   defType,
  )
-import Primer.Name (NameCounter)
+import Primer.Name (Name, NameCounter)
 import Primer.Typecheck.Cxt (Cxt (Cxt, globalCxt, localCxt))
 import Primer.Typecheck.Kindcheck (
   KindError (..),
@@ -69,8 +69,28 @@ import Primer.Typecheck.Kindcheck (
   extendLocalCxtTys,
   synthKind,
  )
-import Primer.Typecheck.TypeError (TypeError (..))
 
+
+data TypeError
+  = InternalError Text
+  | UnknownVariable TmVarRef
+  | TmVarWrongSort Name -- type var instead of term var
+  | UnknownConstructor ValConName
+  | -- | Cannot use a PrimCon when either no type of the appropriate name is
+    -- in scope, or it is a user-defined type
+    PrimitiveTypeNotInScope TyConName
+  | CannotSynthesiseType Expr
+  | InconsistentTypes (Type' ()) (Type' ())
+  | TypeDoesNotMatchArrow (Type' ())
+  | TypeDoesNotMatchForall (Type' ())
+  | CaseOfHoleNeedsEmptyBranches
+  | CannotCaseNonADT (Type' ())
+  | CannotCaseNonSaturatedADT (Type' ())
+  | -- | Either wrong number, wrong constructors or wrong order. The fields are @name of the ADT@, @branches given@
+    WrongCaseBranches TyConName [ValConName]
+  | CaseBranchWrongNumberPatterns
+  | KindError KindError
+  deriving stock (Eq, Show, Read)
 
 -- | A lens for the type annotation of an 'Expr' or 'ExprT'
 _typecache :: Lens' (Expr' (Meta a) b) a
