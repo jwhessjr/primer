@@ -21,7 +21,6 @@ import Primer.Gen.Core.Typed (
   synthTest,
  )
 import Primer.Refine (refine)
-import Primer.Subst (substTySimul)
 import Primer.Typecheck (
   consistentTypes,
  )
@@ -38,15 +37,11 @@ tasty_refinement_synths = propertyWT $ do
       --(sb, apps) <- forAllT $ genInstApp is
       --let f x = \case Right tm -> App () x tm; Left ty' -> APP () x ty'
       --    e = foldl' f (Ann () (EmptyHole ()) src) apps
-      let sb = mempty
       let e = Ann () (EmptyHole ()) src
       --annotateShow e
       (ty, e') <- synthTest =<< generateIDs e
       e === forgetMetadata e' -- check no smart holes stuff happened
-      let sb' = mempty
       -- Check some invariants from @genInstApp@
-      sb === sb'
-      instTy' <- substTySimul sb instTy
-      ty === instTy'
+      ty === instTy
       diff ty consistentTypes tgt
     _ -> discard

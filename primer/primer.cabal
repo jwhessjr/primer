@@ -21,7 +21,6 @@ executable primer-test
     Primer.Def
     Primer.Name
     Primer.Refine
-    Primer.Subst
     Primer.Typecheck
     Primer.Core.Meta
     Primer.Core.Type
