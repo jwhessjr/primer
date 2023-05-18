@@ -24,13 +24,8 @@ import Primer.Gen.Core.Typed (
 import Primer.Refine (Inst (InstUnconstrainedAPP), refine)
 import Primer.Subst (substTySimul)
 import Primer.Typecheck (
-  Cxt,
-  Type,
   consistentTypes,
  )
-
-refine' :: Monad m => Cxt -> Type -> Type -> m (Maybe ([Inst], Type))
-refine' cxt s t = refine cxt s t
 
 -- if refine cxt tgt s = Just (is,ty)   =>  (? : s) $ <stuff checking against is>  ∈ ty[instantiation vars substituted appropriately] ~ tgt
 tasty_refinement_synths :: Property
@@ -38,7 +33,7 @@ tasty_refinement_synths = propertyWT $ do
   tgt <- forAllT $ genWTType KType
   src <- forAllT $ genWTType KType
   cxt <- ask
-  r <- refine' cxt tgt src
+  let r = refine cxt tgt src
   annotateShow r
   case r of
     Just (is, instTy) -> do

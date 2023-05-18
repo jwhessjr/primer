@@ -31,20 +31,16 @@ import Primer.Typecheck.Kindcheck (
 --     unification problem with different names may choose the "other" solution.
 --  )
 unify ::
-  (Applicative m) =>
-  -- | We only care about local type vars and typedefs, for kind-checking our unifier
   Cxt ->
-  -- | Which type variables should be considered as unification variables? This should be a subset of the @Cxt@.
-  -- All @Cxt@ vars are considered in scope for a solution of any unification variable.
   S.Set TyVarName ->
   Type ->
   Type ->
-  m (Maybe (M.Map TyVarName Type))
+  Maybe (M.Map TyVarName Type)
 unify _cxt _unificationVars s t = do
   let result = unU $ unify' s t
   case result of
-    Left _err -> pure Nothing
-    Right _ -> pure $ Just mempty
+    Left _err -> Nothing
+    Right _ -> Just mempty
 
 data UnifError
   = NotUnify Type Type

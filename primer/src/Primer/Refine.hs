@@ -26,24 +26,21 @@ data Inst
 -- The names in @InstUnconstrainedAPP@s are all unique, and they scope over all
 -- the @Inst@s to the right, as well as the returned @Type@.
 refine ::
-  forall m.
-  Monad m =>
-  -- | only care about local type vars and typedefs
   Cxt ->
   TC.Type ->
   TC.Type ->
-  m (Maybe ([Inst], TC.Type))
-refine cxt tgtTy srcTy = go [] srcTy
+  Maybe ([Inst], TC.Type)
+refine cxt tgtTy = go []
   where
-    go :: [Either TC.Type (TyVarName, Kind)] -> TC.Type -> m (Maybe ([Inst], TC.Type))
+    go :: [Either TC.Type (TyVarName, Kind)] -> TC.Type -> Maybe ([Inst], TC.Type)
     go instantiation tmTy =
       let cxt' = extendCxtTys (rights instantiation) cxt
           uvs = Set.fromList $ map fst $ rights instantiation
-       in unify cxt' uvs tgtTy tmTy >>= \case
-            Just _sub -> pure $ Just ([], tmTy)
+       in case unify cxt' uvs tgtTy tmTy of
+            Just _sub -> Just ([], tmTy)
             Nothing -> case tmTy of
               TFun _ s t -> go (Left s : instantiation) t
-              _ -> pure Nothing
+              _ -> Nothing
 
 -- NB: this assumes the list is ordered st the /last/ element is most global
 extendCxtTys :: [(TyVarName, Kind)] -> Cxt -> Cxt
