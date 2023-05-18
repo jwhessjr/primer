@@ -1,7 +1,5 @@
 module Foreword (
   module Protolude,
-  module Catch,
-  module Foldable,
 ) where
 
 -- In general, we should defer to "Protolude"'s exports and avoid name
@@ -63,8 +61,3 @@ import Protolude hiding (
   uninterruptibleMask_,
   (%),
  )
-
-import Data.Foldable as Foldable (foldMap')
-
--- We want @exceptions@ rather than @base@'s equivalents.
-import Control.Monad.Catch as Catch
