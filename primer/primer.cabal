@@ -19,7 +19,6 @@ executable primer-test
     Primer.Gen.Core.Typed
     Primer.Refine
     Primer.Typecheck
-    Primer.Typecheck.Kindcheck
     Tests.Refine
 
   default-language:   GHC2021
