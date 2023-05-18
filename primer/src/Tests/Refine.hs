@@ -40,11 +40,7 @@ data Kind = KType | KFun Kind Kind
   deriving stock (Eq, Show)
 
 consistentTypes :: Type -> Type -> Bool
-consistentTypes TBase _ = True
-consistentTypes _ TBase = True
-consistentTypes (TFun s1 t1) (TFun s2 t2) = consistentTypes s1 s2 && consistentTypes t1 t2
-consistentTypes (TApp s1 t1) (TApp s2 t2) = consistentTypes s1 s2 && consistentTypes t1 t2
-consistentTypes _ _ = False
+consistentTypes = (==)
 
 
 refine :: Type -> Type -> Maybe Type
