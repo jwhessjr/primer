@@ -6,8 +6,9 @@
 -- In future we will want to extend it to support more features such as
 -- polymorphism.
 module Primer.Typecheck (
-  Type,
-  Expr,
+  Expr (..),
+  Kind (..),
+  Type (..),
   synth,
   check,
   synthKind,
@@ -16,19 +17,32 @@ module Primer.Typecheck (
   KindError (..),
   consistentKinds,
   consistentTypes,
+  refine,
 ) where
 
 import Prelude
 
-import Primer.Core (
-  Expr (..),
- )
-import Primer.Core.Type (
-  Kind (..),
-  Type (..),
- )
 import Control.Monad.Except (MonadError (throwError))
 import Control.Monad.Trans.Except (ExceptT, runExceptT)
+
+data Type
+  = TEmptyHole
+  | TFun Type Type
+  | TApp Type Type
+  deriving stock (Eq, Show)
+
+-- | Core kinds.
+data Kind = KHole | KType | KFun Kind Kind
+  deriving stock (Eq, Show)
+
+data Expr
+  = EmptyHole
+  | Ann Expr Type
+  | Case Expr [CaseBranch]
+  deriving stock (Eq, Show)
+
+data CaseBranch = CaseBranch
+  deriving stock (Eq, Show)
 
 data KindError
   = InconsistentKinds Kind Kind
@@ -184,3 +198,11 @@ checkKind' k t = modifyError KindError (checkKind k t)
 
 modifyError :: MonadError e' m => (e -> e') -> ExceptT e m a -> m a
 modifyError f m = runExceptT m >>= either (throwError . f) pure
+
+
+refine :: Type -> Type -> Maybe Type
+refine tgtTy tmTy = if consistentTypes tgtTy tmTy
+          then Just tmTy
+          else case tmTy of
+                 TFun _ t -> refine tgtTy t
+                 _ -> Nothing

@@ -14,10 +14,7 @@ executable primer-test
   main-is:            Main.hs
   hs-source-dirs:     src
   other-modules:
-    Primer.Core
-    Primer.Core.Type
     Primer.Gen.Core.Typed
-    Primer.Refine
     Primer.Typecheck
     Tests.Refine
 

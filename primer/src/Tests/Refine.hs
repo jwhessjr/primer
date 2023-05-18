@@ -9,20 +9,15 @@ import Hedgehog (
   discard,
   (===), property, failure,
  )
-import Primer.Core (
-  Expr (Ann, EmptyHole),
- )
-import Primer.Core.Type (
-  Kind (KType),
- )
 import Primer.Gen.Core.Typed (
    forAllT,
   genWTType,
  )
-import Primer.Refine (refine)
 import Primer.Typecheck (
+  Expr (Ann, EmptyHole),
+  Kind (KType),
   consistentTypes, TypeError,
-  synth
+  synth,refine
  )
 import Control.Monad.Trans.Except (runExceptT)
 

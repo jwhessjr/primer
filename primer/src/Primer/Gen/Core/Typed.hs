@@ -13,7 +13,7 @@ import Hedgehog (
  )
 import Hedgehog.Gen qualified as Gen
 import Hedgehog.Internal.Property (forAllT)
-import Primer.Core.Type (
+import Primer.Typecheck (
   Kind (..),
   Type (..)
  )
