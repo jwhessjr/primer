@@ -83,19 +83,19 @@ foldBelow f z = f (target z) <> maybe mempty (go . farthest left) (down z)
 -- Note that we have two specialisations we care about:
 -- bindersBelowTy :: TypeZip -> S.Set Name
 -- bindersBelowTy :: Zipper (Type' One) (Type' One) -> S.Set Name
-bindersBelowTy :: (Data a, Eq a) => Zipper (Type' a) (Type' a) -> S.Set TyVarName
+bindersBelowTy :: Data a => Zipper (Type' a) (Type' a) -> S.Set TyVarName
 bindersBelowTy = foldBelow getBoundHereDnTy
 
 -- Get all names bound by this layer of an type, for any child.
-getBoundHereDnTy :: Eq a => Type' a -> S.Set TyVarName
+getBoundHereDnTy :: Type' a -> S.Set TyVarName
 getBoundHereDnTy e = getBoundHereTy e Nothing
 
-getBoundHereTy :: Eq a => Type' a -> Maybe (Type' a) -> S.Set TyVarName
+getBoundHereTy :: Type' a -> Maybe (Type' a) -> S.Set TyVarName
 getBoundHereTy t prev = S.fromList $ either identity (\(LetTypeBind n _) -> n) <$> getBoundHereTy' t prev
 
 data LetTypeBinding' a = LetTypeBind TyVarName (Type' a)
   deriving stock (Eq, Show)
 
-getBoundHereTy' :: Eq a => Type' a -> Maybe (Type' a) -> [Either TyVarName (LetTypeBinding' a)]
+getBoundHereTy' :: Type' a -> Maybe (Type' a) -> [Either TyVarName (LetTypeBinding' a)]
 getBoundHereTy' t _prev = case t of
   _ -> mempty
