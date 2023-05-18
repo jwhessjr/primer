@@ -9,8 +9,6 @@ module Primer.Typecheck.Kindcheck (
 
 import Foreword
 
-import Control.Monad.Fresh (MonadFresh)
-import Primer.Core.Meta (ID)
 import Primer.Core.Type (
   Kind (KFun, KHole, KType),
   Type (TApp, TEmptyHole, TFun),
@@ -29,8 +27,6 @@ data KindError
 type KindM m =
   ( Monad m
   , MonadReader Cxt m -- has access to a typing context, and SmartHoles option
-  , MonadFresh ID m -- can generate fresh IDs
-  -- can generate fresh names (needed for "smart holes" and polymorphism)
   , MonadError KindError m -- can throw kind errors
   )
 

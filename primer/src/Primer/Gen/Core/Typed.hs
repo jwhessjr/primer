@@ -11,7 +11,6 @@ module Primer.Gen.Core.Typed (
 
 import Foreword hiding (mod)
 
-import Control.Monad.Fresh (MonadFresh)
 import Control.Monad.Morph (hoist)
 import Hedgehog (
   Property, property,
@@ -22,9 +21,6 @@ import Hedgehog.Gen qualified as Gen
 import Hedgehog.Internal.Property (forAllT)
 import Primer.Core (
   Expr,
- )
-import Primer.Core.Meta (
-  ID (),
  )
 import Primer.Core.Type (
   Kind (..),
@@ -59,7 +55,6 @@ newtype WT a = WT {unWT :: ReaderT Cxt TestM a}
     , Applicative
     , Monad
     , MonadReader Cxt
-    , MonadFresh ID
     )
 
 -- | Generates types which infer kinds consistent with the argument
@@ -82,7 +77,7 @@ genWTKind :: Monad m => GenT m Kind
 genWTKind = Gen.recursive Gen.choice [pure KType] [KFun <$> genWTKind <*> genWTKind]
 
 hoist' :: Applicative f => Cxt -> WT a -> f a
-hoist' cxt = pure . evalTestM 0 . flip runReaderT cxt . unWT
+hoist' cxt = pure . evalTestM . flip runReaderT cxt . unWT
 
 -- | Convert a @PropertyT WT ()@ into a @Property@, which Hedgehog can test.
 -- It is recommended to do more than default number of tests when using this module.

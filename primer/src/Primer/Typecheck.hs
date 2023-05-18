@@ -26,14 +26,12 @@ module Primer.Typecheck (
 
 import Foreword
 
-import Control.Monad.Fresh (MonadFresh (..))
 import Data.Map.Strict qualified as Map
 import Primer.Core (
   Expr (..),
  )
 import Primer.Core.Meta (
   GVarName,
-  ID,
  )
 import Primer.Core.Type (
   Kind (..),
@@ -90,8 +88,6 @@ buildTypingContext tydefs defs =
 type TypeM m =
   ( Monad m
   , MonadReader Cxt m -- has access to a typing context, and SmartHoles option
-  , MonadFresh ID m -- can generate fresh IDs
-  -- can generate fresh names (needed for "smart holes" and polymorphism)
   , MonadError TypeError m -- can throw type errors
   )
 
