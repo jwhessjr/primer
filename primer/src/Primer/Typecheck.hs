@@ -41,7 +41,7 @@ data TypeError
   | CaseOfHoleNeedsEmptyBranches
   | CannotCaseNonADT Type
   | KindError KindError
-  deriving stock (Eq, Show, Read)
+  deriving stock (Eq, Show)
 
 -- | A shorthand for the constraints needed when kindchecking
 type TypeM m =

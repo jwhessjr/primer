@@ -5,14 +5,12 @@ module Primer.Core.Type (
 
 import Foreword
 
-import Data.Data (Data)
-
 data Type
   = TEmptyHole
   | TFun Type Type
   | TApp Type Type
-  deriving stock (Eq, Show, Read, Data, Generic)
+  deriving stock (Eq, Show)
 
 -- | Core kinds.
 data Kind = KHole | KType | KFun Kind Kind
-  deriving stock (Eq, Show, Read, Data, Generic)
+  deriving stock (Eq, Show)

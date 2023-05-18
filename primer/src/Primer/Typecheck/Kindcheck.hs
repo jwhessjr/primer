@@ -16,7 +16,7 @@ import Primer.Core.Type (
 data KindError
   = InconsistentKinds Kind Kind
   | KindDoesNotMatchArrow Kind
-  deriving stock (Eq, Show, Read)
+  deriving stock (Eq, Show)
 
 -- | A shorthand for the constraints needed when kindchecking
 type KindM m =
