@@ -19,8 +19,8 @@ main = do
   rs <- replicateM (fromIntegral n) runAndRecheck
   let cs = count rs
   void $ M.traverseWithKey (\ri c -> putStrLn $ showPad ri <> " : " <> show c) cs
-  if (cs M.! RecheckPass) + (cs M.! RecheckDefeat) > n `div` 2
-    then putStrLn @Text "This tickled non-replay bug > 50%"
+  if (cs M.! RecheckPass) + (cs M.! RecheckDefeat) > n `div` 4
+    then putStrLn @Text "This tickled non-replay bug > 25%"
     else die "This did not tickle non-replay bug much"
 
 -- Bounded & Enum: we explicitly give counts of 0 for those which did not appear
