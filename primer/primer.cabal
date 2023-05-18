@@ -22,7 +22,6 @@ executable primer-test
     Primer.Typecheck
     Primer.Core.Meta
     Primer.Core.Type
-    Primer.Core.Type.Utils
     Primer.Typecheck.Cxt
     Primer.Typecheck.Kindcheck
     Tests.Refine

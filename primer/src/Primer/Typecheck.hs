@@ -37,9 +37,6 @@ import Primer.Core.Type (
   Kind (..),
   Type (..),
  )
-import Primer.Core.Type.Utils (
-  alphaEqTy,
- )
 import Primer.Def (
   DefMap,
   defType,
@@ -178,7 +175,7 @@ consistentTypes x y = uncurry eqType $ holepunch x y
 
 -- | Compare two types for alpha equality, ignoring their IDs
 eqType :: Type -> Type -> Bool
-eqType = alphaEqTy
+eqType = (==)
 
 checkKind' :: TypeM m => Kind -> Type -> m Type
 checkKind' k t = modifyError KindError (checkKind k t)
