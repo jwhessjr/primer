@@ -1,17 +1,7 @@
 module Primer.Core.Meta (
   ID (ID),
-  ModuleName (ModuleName, unModuleName),
-  GlobalNameKind (..),
-  GlobalName (GlobalName, qualifiedModule, baseName),
-  TyConName,
   ValConName,
   GVarName,
-  LocalNameKind (..),
-  LocalName (LocalName, unLocalName),
-  TmVarRef (..),
-  LVarName,
-  TyVarName,
-  Value,
   Meta (Meta),
   trivialMeta,
   _type,
@@ -50,44 +40,5 @@ _type = position @2
 trivialMeta :: ID -> Meta (Maybe a)
 trivialMeta id = Meta id Nothing Nothing
 
-newtype ModuleName = ModuleName {unModuleName :: NonEmpty Name}
-  deriving stock (Eq, Ord, Show, Read, Data, Generic)
-
--- | Tags for 'GlobalName'
-data GlobalNameKind
-  = ATyCon
-  | AValCon
-  | ADefName
-
--- | Global names are fully qualified with a module name.
--- They are tagged with what sort of name they are.
-data GlobalName (k :: GlobalNameKind) = GlobalName
-  { qualifiedModule :: ModuleName
-  , baseName :: Name
-  }
-  deriving stock (Eq, Ord, Generic, Data, Show, Read)
-
-type TyConName = GlobalName 'ATyCon
-type ValConName = GlobalName 'AValCon
-type GVarName = GlobalName 'ADefName
-
--- | Tags for 'LocalName'
-data LocalNameKind
-  = ATmVar
-  | ATyVar
-
--- | A newtype wrapper around a 'Name', tracking that the name refers
--- to a local variable. The tag says which sort of variable (term or
--- type) this is.
-newtype LocalName (k :: LocalNameKind) = LocalName {unLocalName :: Name}
-  deriving stock (Eq, Ord, Show, Read, Data, Generic)
-  deriving (IsString) via Name
-
-type LVarName = LocalName 'ATmVar
-type TyVarName = LocalName 'ATyVar
-
--- | A reference to a variable.
-data TmVarRef
-  = GlobalVarRef GVarName
-  | LocalVarRef LVarName
-  deriving stock (Eq, Show, Read, Data, Generic)
+type ValConName = Name
+type GVarName = Name
