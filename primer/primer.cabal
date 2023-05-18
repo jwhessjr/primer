@@ -19,7 +19,6 @@ executable primer-test
     Primer.Core
     Primer.Core.Utils
     Primer.Def
-    Primer.EvalFull
     Primer.Name
     Primer.Refine
     Primer.Subst
@@ -29,16 +28,6 @@ executable primer-test
     Primer.Core.Meta
     Primer.Core.Type
     Primer.Core.Type.Utils
-    Primer.Eval.Ann
-    Primer.Eval.Beta
-    Primer.Eval.Bind
-    Primer.Eval.Case
-    Primer.Eval.Detail
-    Primer.Eval.EvalError
-    Primer.Eval.Inline
-    Primer.Eval.Let
-    Primer.Eval.Prim
-    Primer.Eval.Redex
     Primer.Typecheck.Cxt
     Primer.Typecheck.Kindcheck
     Primer.Typecheck.KindError
