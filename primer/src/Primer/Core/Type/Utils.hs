@@ -8,8 +8,6 @@ module Primer.Core.Type.Utils (
 
 import Foreword
 
-import Data.Map.Strict qualified as M
-import Data.Set qualified as S
 import Data.Set.Optics (setOf)
 import Optics (
   Traversal,

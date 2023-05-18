@@ -97,5 +97,5 @@ data LetTypeBinding' a = LetTypeBind TyVarName (Type' a)
   deriving stock (Eq, Show)
 
 getBoundHereTy' :: Eq a => Type' a -> Maybe (Type' a) -> [Either TyVarName (LetTypeBinding' a)]
-getBoundHereTy' t prev = case t of
+getBoundHereTy' t _prev = case t of
   _ -> mempty

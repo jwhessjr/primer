@@ -7,10 +7,8 @@ import Foreword
 
 import Control.Monad.Fresh (MonadFresh)
 import Data.Map qualified as M
-import Primer.Core.Fresh (freshLocalName)
 import Primer.Core.Meta (TyVarName)
 import Primer.Core.Type (Type' (..))
-import Primer.Core.Type.Utils (freeVarsTy)
 import Primer.Name (NameCounter)
 
 -- | Simple and inefficient capture-avoiding simultaneous substitution.

@@ -20,7 +20,6 @@ import Primer.Core.Utils (forgetMetadata, generateIDs)
 import Primer.Gen.Core.Typed (
   propertyWT,
    forAllT,
-  genInstApp,
   genWTType,
   synthTest,
  )

@@ -15,7 +15,6 @@ import Optics (
  )
 import Primer.Core.Meta (
   Meta,
-  TyVarName,
  )
 
 -- | Core types.

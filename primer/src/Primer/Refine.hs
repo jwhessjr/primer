@@ -3,17 +3,13 @@ module Primer.Refine (refine, Inst (..)) where
 import Foreword
 
 import Control.Monad.Fresh (MonadFresh)
-import Data.Map qualified as Map
 import Data.Set qualified as Set
-import Primer.Core.Fresh (freshLocalName)
 import Primer.Core.Meta (ID, TyVarName)
 import Primer.Core.Type (Kind, Type' (TFun))
 import Primer.Name (NameCounter)
-import Primer.Subst (substTy, substTySimul)
 import Primer.Typecheck.Cxt (Cxt)
 import Primer.Typecheck.Kindcheck qualified as TC
 import Primer.Unification (InternalUnifyError, unify)
-import Primer.Zipper.Type (bindersBelowTy, focus)
 
 data Inst
   = InstApp TC.Type
@@ -46,7 +42,7 @@ refine cxt tgtTy srcTy = go [] srcTy
       let cxt' = extendCxtTys (rights instantiation) cxt
           uvs = Set.fromList $ map fst $ rights instantiation
        in unify cxt' uvs tgtTy tmTy >>= \case
-            Just sub -> pure $ Just ([], tmTy)
+            Just _sub -> pure $ Just ([], tmTy)
             Nothing -> case tmTy of
               TFun _ s t -> go (Left s : instantiation) t
               _ -> pure Nothing

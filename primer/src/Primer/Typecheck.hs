@@ -68,7 +68,6 @@ import Primer.Def (
   defType,
  )
 import Primer.Name (NameCounter)
-import Primer.Subst (substTy)
 import Primer.Typecheck.Cxt (Cxt (Cxt, globalCxt, localCxt))
 import Primer.Typecheck.Kindcheck (
   KindError (..),
@@ -207,8 +206,6 @@ synth = \case
     annSynth0 t i x = (t, x $ annotate (TCSynthed t) i)
     annSynth1 t i c = annSynth0 t i . flip c
     annSynth2 t i c = annSynth1 t i . flip c
-    annSynth3 t i c = annSynth2 t i . flip c
-    annSynth4 t i c = annSynth3 t i . flip c
 
 -- | Similar to synth, but for checking rather than synthesis.
 check :: TypeM e m => Type -> Expr -> m ExprT

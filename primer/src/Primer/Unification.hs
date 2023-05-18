@@ -5,7 +5,7 @@ import Foreword
 import Control.Monad.Fresh (MonadFresh)
 import Data.Map qualified as M
 import Data.Set qualified as S
-import Optics (anyOf, getting, over, set)
+import Optics (set)
 import Primer.Core.Meta (
   ID,
   TyVarName,
@@ -15,15 +15,12 @@ import Primer.Core.Type (
   Type' (TApp, TEmptyHole, TFun),
   _typeMeta,
  )
-import Primer.Core.Type.Utils (_freeVarsTy)
 import Primer.Name (NameCounter)
-import Primer.Subst (substTy)
 import Primer.Typecheck.Cxt (Cxt)
 import Primer.Typecheck.Kindcheck (
   KindError,
   Type,
   checkKind,
-  consistentKinds,
   lookupLocalTy,
  )
 
@@ -88,7 +85,6 @@ type UnifVars = S.Set TyVarName
 
 data UnifError
   = NotUnify Type Type
-  | OccursBoundCheckFail TyVarName Type
 
 -- NB: we need to keep the input types on the same side always, to get boundVars info to line up
 -- or rather, ensure we record the swap if we do a swap
@@ -116,37 +112,6 @@ newtype U m a = U {unU :: ReaderT Env (StateT Subst (ExceptT UnifError m)) a}
     )
 
 deriving newtype instance MonadFresh NameCounter m => MonadFresh NameCounter (U m)
-
--- | @v@ is a unification variable if it both
--- - was declared to be, and
--- - has not been shadowed (by going under a equally-named forall)
-isUnifVarL, isUnifVarR :: MonadFresh NameCounter m => TyVarName -> U m Bool
-isUnifVarL n = asks (\env -> S.member n (unifVars env) && not (M.member n $ boundVarsL env))
-isUnifVarR n = asks (\env -> S.member n (unifVars env) && not (M.member n $ boundVarsR env))
-
-isSameVar :: MonadFresh NameCounter m => TyVarName -> TyVarName -> U m Bool
-isSameVar n m = do
-  nIdx <- asks (M.lookup n . boundVarsL)
-  mIdx <- asks (M.lookup m . boundVarsR)
-  pure $ case (nIdx, mIdx) of
-    (Just i, Just j) -> i == j -- both locally bound (possibly with different names in the left/right type)
-    (Nothing, Nothing) -> n == m -- both from the global context
-    _ -> False -- locally-bound (forall) vars never unify with a variable from the context
-
-swapEnv :: Env -> Env
-swapEnv e = e{boundVarsL = boundVarsR e, boundVarsR = boundVarsL e}
-
--- Note: bound variables shadow unification variables.
--- This is handled in isUnifVarL and isUnifVarR
-bind :: TyVarName -> TyVarName -> Env -> Env
-bind n m e =
-  e
-    { boundVarsL = M.insert n (M.size $ boundVarsL e) $ boundVarsL e
-    , boundVarsR = M.insert m (M.size $ boundVarsR e) $ boundVarsR e
-    }
-
-lookupSubst :: MonadFresh NameCounter m => TyVarName -> U m (Maybe Type)
-lookupSubst = gets . M.lookup
 
 -- We assume (both empty and non-empty) holes can unify with anything!
 unify' :: MonadFresh NameCounter m => Type -> Type -> U m ()
