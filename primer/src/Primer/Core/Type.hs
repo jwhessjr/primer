@@ -3,7 +3,7 @@ module Primer.Core.Type (
   Kind (..),
 ) where
 
-import Foreword
+import Prelude
 
 data Type
   = TEmptyHole

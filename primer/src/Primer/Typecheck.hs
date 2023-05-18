@@ -18,7 +18,7 @@ module Primer.Typecheck (
   consistentTypes,
 ) where
 
-import Foreword
+import Prelude
 
 import Primer.Core (
   Expr (..),
@@ -33,6 +33,8 @@ import Primer.Typecheck.Kindcheck (
   consistentKinds,
   synthKind,
  )
+import Control.Monad.Except (MonadError (throwError))
+import Control.Monad.Trans.Except (ExceptT, runExceptT)
 
 
 data TypeError

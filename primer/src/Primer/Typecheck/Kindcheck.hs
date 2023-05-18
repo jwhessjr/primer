@@ -6,12 +6,13 @@ module Primer.Typecheck.Kindcheck (
   consistentKinds,
 ) where
 
-import Foreword
+import Prelude
 
 import Primer.Core.Type (
   Kind (KFun, KHole, KType),
   Type (TApp, TEmptyHole, TFun),
  )
+import Control.Monad.Except (MonadError (throwError))
 
 data KindError
   = InconsistentKinds Kind Kind

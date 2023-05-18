@@ -9,7 +9,7 @@ module Primer.Gen.Core.Typed (
   synthTest,
 ) where
 
-import Foreword hiding (mod)
+import Prelude
 
 import Control.Monad.Morph (hoist)
 import Hedgehog (
@@ -29,6 +29,10 @@ import Primer.Core.Type (
 import Primer.Typecheck (
   TypeError, synth
  )
+import Data.Functor.Identity (Identity (runIdentity))
+import Data.Maybe (catMaybes)
+import Control.Monad.Trans.Except (runExceptT)
+import Control.Monad.Trans.Class (lift)
 
 {-
 Generate well scoped and typed expressions.
@@ -83,9 +87,9 @@ propertyWT :: PropertyT WT () -> Property
 propertyWT = property . hoist hoist'
 
 -- Lift 'synth' into a property
-synthTest :: HasCallStack => Expr -> PropertyT WT (Type, Expr)
+synthTest :: Expr -> PropertyT WT (Type, Expr)
 synthTest e = do
   x <- lift $ runExceptT @TypeError $ synth e
   case x of
-    Left err -> withFrozenCallStack $ annotateShow err >> failure
+    Left err -> annotateShow err >> failure
     Right y -> pure y

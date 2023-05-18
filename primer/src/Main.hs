@@ -1,8 +1,6 @@
 module Main (main) where
 
-import Foreword
-
-import Data.Text qualified as T
+import Prelude
 import Hedgehog ( Property, withSkip, Seed )
 import Tests.Refine (tasty_refinement_synths)
 import Hedgehog.Internal.Runner (checkReport)
@@ -11,7 +9,13 @@ import qualified Hedgehog.Internal.Seed as Seed
 import Hedgehog.Internal.Report (reportStatus, Report (reportSeed, reportTests), Result (..), FailureReport (failureShrinkPath))
 import Numeric.Natural (Natural)
 import qualified Data.Map.Strict as M
+import Data.Map.Strict (Map)
 import Data.List.Extra (enumerate)
+import Control.Monad.Trans.Except (ExceptT(ExceptT), runExceptT)
+import Data.Void (Void, absurd)
+import Data.Functor (void, (<&>))
+import Control.Monad (replicateM, unless)
+import System.Exit (die)
 
 main :: IO ()
 main = do
@@ -20,7 +24,7 @@ main = do
   let cs = count rs
   void $ M.traverseWithKey (\ri c -> putStrLn $ showPad ri <> " : " <> show c) cs
   if (cs M.! RecheckPass) + (cs M.! RecheckDefeat) > n `div` 4
-    then putStrLn @Text "This tickled non-replay bug > 25%"
+    then putStrLn "This tickled non-replay bug > 25%"
     else die "This did not tickle non-replay bug much"
 
 -- Bounded & Enum: we explicitly give counts of 0 for those which did not appear
@@ -31,7 +35,7 @@ count as = M.unionsWith (+) $ M.fromList [(a,0) | a <- enumerate] : fmap (`M.sin
 -- - if it fails then rechecks it with the reported skip/shrink, reporting whether it finds an error again
 -- - if it passes or gives up, report that
 runAndRecheck :: IO RRInfo
-runAndRecheck = either identity absurd <$> runExceptT go
+runAndRecheck = either id absurd <$> runExceptT go
  where
    go :: ExceptT RRInfo IO Void
    go = do
@@ -54,8 +58,8 @@ data RRInfo
   | RecheckRefind -- rechecking finds /an/ error, not asserted /the same/ error
   deriving stock (Show, Eq, Ord, Enum, Bounded)
 
-showPad :: RRInfo -> Text
-showPad ri = let s = show ri in s <> T.replicate (13 - T.length s) " "
+showPad :: RRInfo -> String
+showPad ri = let s = show ri in s <> replicate (13 - length s) ' '
 
 data RunInfo
   = Passed

@@ -1,6 +1,6 @@
 module Tests.Refine where
 
-import Foreword hiding (diff)
+import Prelude
 
 import Hedgehog (
   Property,

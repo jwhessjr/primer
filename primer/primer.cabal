@@ -14,7 +14,6 @@ executable primer-test
   main-is:            Main.hs
   hs-source-dirs:     src
   other-modules:
-    Foreword
     Primer.Core
     Primer.Core.Type
     Primer.Gen.Core.Typed
@@ -42,8 +41,9 @@ executable primer-test
     , base                         >=4.12     && <4.17.0
     , hedgehog
     , mmorph                       ^>=1.2.0
-    , protolude                    >=0.3.1    && <0.4.0
+    , mtl                          >=2.2.2    && <2.4.0
 -- the rest are only needed for Main
     , containers                   >=0.6.0.1  && <0.7.0
     , extra                        >=1.7.10   && <1.8.0
     , text                         ^>=2.0
+    , transformers                 >=0.5.6.2  && <0.7.0

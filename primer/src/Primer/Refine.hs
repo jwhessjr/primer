@@ -1,6 +1,6 @@
 module Primer.Refine (refine) where
 
-import Foreword
+import Prelude
 
 import Primer.Core.Type (
   Type (TApp, TEmptyHole, TFun),

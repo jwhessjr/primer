@@ -3,7 +3,7 @@ module Primer.Core (
   CaseBranch (..),
 ) where
 
-import Foreword
+import Prelude
 
 import Primer.Core.Type (
   Type (..),

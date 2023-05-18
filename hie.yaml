@@ -3,9 +3,6 @@ cradle:
     - path: "primer/src/Main.hs"
       component: "primer:exe:primer-test"
 
-    - path: "primer/src/Foreword.hs"
-      component: "primer:exe:primer-test"
-
     - path: "primer/src/Primer/Core.hs"
       component: "primer:exe:primer-test"
 
