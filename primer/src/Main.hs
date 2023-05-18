@@ -16,15 +16,18 @@ import Data.Void (Void, absurd)
 import Data.Functor (void, (<&>))
 import Control.Monad (replicateM, unless)
 import System.Exit (die)
+import Numeric (showFFloat)
 
 main :: IO ()
 main = do
-  let n = 100
+  let n = 1000
   rs <- replicateM (fromIntegral n) runAndRecheck
   let cs = count rs
   void $ M.traverseWithKey (\ri c -> putStrLn $ showPad ri <> " : " <> show c) cs
-  if (cs M.! RecheckPass) + (cs M.! RecheckDefeat) > n `div` 4
-    then putStrLn "This tickled non-replay bug > 25%"
+  let t = (cs M.! RecheckPass) + (cs M.! RecheckDefeat)
+  let p :: Double = 100*fromIntegral t / fromIntegral n
+  if t > n `div` 4
+    then putStrLn $ "This tickled non-replay bug " <> showFFloat (Just 2) p "% > 25%"
     else die "This did not tickle non-replay bug much"
 
 -- Bounded & Enum: we explicitly give counts of 0 for those which did not appear
