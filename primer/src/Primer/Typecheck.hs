@@ -15,31 +15,20 @@ module Primer.Typecheck (
   Cxt (..),
   KindOrType (..),
   initialCxt,
-  buildTypingContext,
   TypeError (..),
   KindError (..),
   consistentKinds,
   consistentTypes,
-  extendGlobalCxt,
-  extendTypeDefCxt,
 ) where
 
 import Foreword
 
-import Data.Map.Strict qualified as Map
 import Primer.Core (
   Expr (..),
- )
-import Primer.Core.Meta (
-  GVarName,
  )
 import Primer.Core.Type (
   Kind (..),
   Type (..),
- )
-import Primer.Def (
-  DefMap,
-  defType,
  )
 import Primer.Typecheck.Cxt (Cxt (Cxt, globalCxt, localCxt))
 import Primer.Typecheck.Kindcheck (
@@ -60,12 +49,6 @@ data TypeError
   | KindError KindError
   deriving stock (Eq, Show, Read)
 
-extendGlobalCxt :: [(GVarName, Type)] -> Cxt -> Cxt
-extendGlobalCxt globals cxt = cxt{globalCxt = Map.fromList globals <> globalCxt cxt}
-
-extendTypeDefCxt :: x -> Cxt -> Cxt
-extendTypeDefCxt _ cxt = cxt
-
 -- An empty typing context
 initialCxt :: Cxt
 initialCxt =
@@ -73,12 +56,6 @@ initialCxt =
     { localCxt = mempty
     , globalCxt = mempty
     }
-
--- | Construct an initial typing context, with all given definitions in scope as global variables.
-buildTypingContext :: x -> DefMap -> Cxt
-buildTypingContext tydefs defs =
-  let globals = Map.assocs $ fmap defType defs
-   in extendTypeDefCxt tydefs $ extendGlobalCxt globals initialCxt
 
 -- | A shorthand for the constraints needed when kindchecking
 type TypeM m =

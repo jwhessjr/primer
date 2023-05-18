@@ -18,7 +18,6 @@ executable primer-test
     Primer.Core
     Primer.Core.Meta
     Primer.Core.Type
-    Primer.Def
     Primer.Gen.Core.Typed
     Primer.Name
     Primer.Refine
