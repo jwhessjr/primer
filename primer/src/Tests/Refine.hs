@@ -32,8 +32,7 @@ tasty_refinement_synths :: Property
 tasty_refinement_synths = propertyWT $ do
   tgt <- forAllT $ genWTType KType
   src <- forAllT $ genWTType KType
-  cxt <- ask
-  let r = refine cxt tgt src
+  let r = refine tgt src
   annotateShow r
   case r of
     Just (is, instTy) -> do

@@ -3,14 +3,12 @@ module Primer.Unification (unify) where
 import Foreword
 
 import Data.Map qualified as M
-import Data.Set qualified as S
 import Primer.Core.Meta (
   TyVarName,
  )
 import Primer.Core.Type (
   Type' (TApp, TEmptyHole, TFun),
  )
-import Primer.Typecheck.Cxt (Cxt)
 import Primer.Typecheck.Kindcheck (
   Type,
  )
@@ -31,12 +29,10 @@ import Primer.Typecheck.Kindcheck (
 --     unification problem with different names may choose the "other" solution.
 --  )
 unify ::
-  Cxt ->
-  S.Set TyVarName ->
   Type ->
   Type ->
   Maybe (M.Map TyVarName Type)
-unify _cxt _unificationVars s t = do
+unify s t = do
   let result = unU $ unify' s t
   case result of
     Left _err -> Nothing
