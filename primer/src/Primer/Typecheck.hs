@@ -37,9 +37,8 @@ import Primer.Core.Type (
   Kind (..),
   Type (..),
  )
-import Primer.Core.Utils (
+import Primer.Core.Type.Utils (
   alphaEqTy,
-  forgetTypeMetadata,
  )
 import Primer.Def (
   DefMap,
@@ -119,11 +118,10 @@ synth = \case
   Ann e t -> do
     -- Check that the type is well-formed by synthesising its kind
     t' <- checkKind' KType t
-    let t'' = forgetTypeMetadata t'
     -- Check e against the annotation
-    e' <- check t'' e
+    e' <- check t' e
     -- Annotate the Ann with the same type as e
-    pure (t'', Ann e' t')
+    pure (t', Ann e' t')
   EmptyHole -> pure (TEmptyHole, EmptyHole)
   -- When synthesising a hole, we first check that the expression inside it
   -- synthesises a type successfully (see Note [Holes and bidirectionality]).
@@ -180,7 +178,7 @@ consistentTypes x y = uncurry eqType $ holepunch x y
 
 -- | Compare two types for alpha equality, ignoring their IDs
 eqType :: Type -> Type -> Bool
-eqType t1 t2 = forgetTypeMetadata t1 `alphaEqTy` forgetTypeMetadata t2
+eqType = alphaEqTy
 
 checkKind' :: TypeM m => Kind -> Type -> m Type
 checkKind' k t = modifyError KindError (checkKind k t)

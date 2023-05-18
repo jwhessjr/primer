@@ -16,7 +16,6 @@ executable primer-test
   other-modules:
     Foreword
     Primer.Core
-    Primer.Core.Utils
     Primer.Def
     Primer.Name
     Primer.Refine

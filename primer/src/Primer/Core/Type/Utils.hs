@@ -1,5 +1,4 @@
 module Primer.Core.Type.Utils (
-  forgetTypeMetadata,
   alphaEqTy,
 ) where
 
@@ -8,9 +7,6 @@ import Foreword
 import Primer.Core.Type (
   Type (..),
  )
-
-forgetTypeMetadata :: Type -> Type
-forgetTypeMetadata = identity
 
 -- Check two types for alpha equality
 --

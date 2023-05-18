@@ -17,7 +17,6 @@ import Primer.Core.Meta (
 import Primer.Core.Type (
   Type,
  )
-import Primer.Core.Utils (forgetTypeMetadata)
 
 data Def
   = DefAST ASTDef
@@ -26,7 +25,7 @@ data Def
 
 defType :: Def -> Type
 defType = \case
-  DefAST d -> forgetTypeMetadata $ astDefType d
+  DefAST d -> astDefType d
 
 -- | A mapping of global names to 'Def's.
 type DefMap = Map GVarName Def

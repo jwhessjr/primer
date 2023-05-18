@@ -15,7 +15,6 @@ import Primer.Core (
 import Primer.Core.Type (
   Kind (KType),
  )
-import Primer.Core.Utils (forgetMetadata, generateIDs)
 import Primer.Gen.Core.Typed (
   propertyWT,
    forAllT,
@@ -41,8 +40,8 @@ tasty_refinement_synths = propertyWT $ do
       --    e = foldl' f (Ann () (EmptyHole ()) src) apps
       let e = Ann EmptyHole src
       --annotateShow e
-      (ty, e') <- synthTest =<< generateIDs e
-      e === forgetMetadata e' -- check no smart holes stuff happened
+      (ty, e') <- synthTest e
+      e === e' -- check no smart holes stuff happened
       -- Check some invariants from @genInstApp@
       ty === instTy
       diff ty consistentTypes tgt
