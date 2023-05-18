@@ -33,10 +33,7 @@ import Primer.Typecheck (
  )
 
 refine' :: (MonadFresh NameCounter m, MonadFresh ID m) => Cxt -> Type -> Type -> m (Maybe ([Inst], Type))
-refine' cxt s t = fmap (either crash identity) $ runExceptT $ refine cxt s t
-  where
-    -- If we run across a bug whilst testing, crash loudly
-    crash = panic . ("InternalUnifyError: " <>) . show
+refine' cxt s t = refine cxt s t
 
 -- if refine cxt tgt s = Just (is,ty)   =>  (? : s) $ <stuff checking against is>  ∈ ty[instantiation vars substituted appropriately] ~ tgt
 tasty_refinement_synths :: Property

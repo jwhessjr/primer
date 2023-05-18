@@ -9,7 +9,7 @@ import Primer.Core.Type (Kind, Type' (TFun))
 import Primer.Name (NameCounter)
 import Primer.Typecheck.Cxt (Cxt)
 import Primer.Typecheck.Kindcheck qualified as TC
-import Primer.Unification (InternalUnifyError, unify)
+import Primer.Unification (unify)
 
 data Inst
   = InstApp TC.Type
@@ -29,7 +29,7 @@ data Inst
 -- the @Inst@s to the right, as well as the returned @Type@.
 refine ::
   forall m.
-  (MonadFresh ID m, MonadFresh NameCounter m, MonadError InternalUnifyError m) =>
+  (MonadFresh ID m, MonadFresh NameCounter m) =>
   -- | only care about local type vars and typedefs
   Cxt ->
   TC.Type ->
